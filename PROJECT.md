@@ -21,7 +21,7 @@ Principles
 ## Phase plan
 | Phase | Scope | Status |
 |-------|-------|--------|
-| 1 | Auth + onboarding + Mifflin-St Jeor targets; barcode scanner with explainable 0–100 score and alternatives; food diary + daily dashboard; grocery list | **Built** (needs on-device testing with real Supabase/USDA keys) |
+| 1 | Auth + onboarding + Mifflin-St Jeor targets; barcode scanner with explainable 0–100 score and alternatives; food diary + daily dashboard; grocery list | **Done**: tested end-to-end on a real phone with Expo Go (2026-10-19) |
 | 2 | Meal planning; grocery list generation from plans; recipes/cooking | Not started |
 | 3 | Workout tracking; calorie burn feeds into the diary | Not started |
 | 4 | Adaptive goals: adjust targets from weight trend, intake, and activity | Not started |
@@ -53,3 +53,4 @@ Log every architectural decision here (newest last).
 | 13 | 2026-10-19 | Alternatives come from the two most specific Open Food Facts categories, scored by our own module, and must beat the scanned product by ≥10 points | Broader categories drift off-topic |
 | 14 | 2026-10-19 | Diet preferences only flag conflicts on scanned products (from OFF ingredient analysis/allergen tags); they don't change targets | Approved by founders. Missing data is never treated as "safe" |
 | 15 | 2026-10-19 | Packaged-food search uses Open Food Facts text search on submit only (no search-as-you-type) | OFF rate-limits search (~10 req/min) |
+| 16 | 2026-10-19 | Stay on the Expo SDK supported by the App Store version of Expo Go (currently SDK 57), not the newest SDK | SDK 58 made Expo Go show "app needs updating". Check `https://api.expo.dev/v2/versions/latest` (`expoGoSdkVersion`) before upgrading |

@@ -45,7 +45,8 @@ npx expo start -c
 1. Make sure your phone and computer are on the **same Wi-Fi**.
 2. **iPhone:** open the Camera app and scan the QR code in the terminal, then tap the Expo Go banner. **Android:** open Expo Go and tap "Scan QR code".
 3. Allow camera access when asked (needed for barcode scanning).
-4. If the QR code won't connect (guest Wi-Fi, VPN, firewall), run `npx expo start --tunnel` instead.
+4. If Expo Go says you must sign in to Expo CLI, run `npx expo login --sso` (use "Continue with GitHub"); a GitHub password does not work in the terminal.
+5. If the QR code won't connect (guest Wi-Fi, VPN, firewall), run `npx expo start --tunnel` instead.
 
 ## Scripts
 - `npm run typecheck` – TypeScript check
