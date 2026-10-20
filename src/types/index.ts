@@ -95,9 +95,8 @@ export interface FoodLogEntry {
   carbs_g: number;
   fat_g: number;
   created_at: string;
-}
-
-export interface GroceryItem {
+  health_external_id?: string | null;
+}export interface GroceryItem {
   id: string;
   user_id: string;
   name: string;

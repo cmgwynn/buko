@@ -7,6 +7,7 @@ import { Body, Card, Heading, Loading, Screen } from '../src/components/ui';
 import { isSupabaseConfigured } from '../src/lib/config';
 import { AuthProvider, useAuth } from '../src/providers/AuthProvider';
 import { ProfileProvider, useProfile } from '../src/providers/ProfileProvider';
+import { SettingsProvider } from '../src/providers/SettingsProvider';
 import { colors, spacing } from '../src/theme';
 
 const headerOptions = {
@@ -51,6 +52,13 @@ function Gate() {
         <Stack.Screen name="cook/finish" options={{ ...headerOptions, title: 'Log meal', headerBackVisible: false, gestureEnabled: false }} />
         <Stack.Screen name="grocery/generate" options={{ ...headerOptions, title: 'Grocery list from plan' }} />
         <Stack.Screen name="pantry" options={{ ...headerOptions, title: 'Pantry' }} />
+        <Stack.Screen name="workout/active" options={{ ...headerOptions, title: 'Workout', headerBackVisible: true }} />
+        <Stack.Screen name="workout/exercises" options={{ ...headerOptions, title: 'Exercises' }} />
+        <Stack.Screen name="workout/[id]" options={{ ...headerOptions, title: 'Workout' }} />
+        <Stack.Screen name="exercise/[id]" options={{ ...headerOptions, title: 'Exercise' }} />
+        <Stack.Screen name="progress" options={{ ...headerOptions, title: 'Progress' }} />
+        <Stack.Screen name="body" options={{ ...headerOptions, title: 'Log body stats' }} />
+        <Stack.Screen name="health" options={{ ...headerOptions, title: 'Health & activity' }} />
       </Stack.Protected>
     </Stack>
   );
@@ -82,7 +90,9 @@ export default function RootLayout() {
       {isSupabaseConfigured ? (
         <AuthProvider>
           <ProfileProvider>
-            <Gate />
+            <SettingsProvider>
+              <Gate />
+            </SettingsProvider>
           </ProfileProvider>
         </AuthProvider>
       ) : (

@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, Heading, Label, Notice, Screen, TextField } from '../../src/components/ui';
 import { defaultGrams, defaultMeal, MEALS, macrosForGrams, round1, toDateString } from '../../src/lib/diary';
+import { maybeWriteNutrition } from '../../src/lib/health';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, spacing, typography } from '../../src/theme';
@@ -33,17 +34,18 @@ export default function AddEntry() {
     if (!macros || !session) return;
     setBusy(true);
     setError(null);
-    const { error: e } = await supabase.from('food_log_entries').insert({
+    const { data: inserted, error: e } = await supabase.from('food_log_entries').insert({
       user_id: session.user.id,
       logged_on: params.date ?? toDateString(new Date()),
       meal, source: food.source, source_id: food.sourceId, name: food.name, brand: food.brand,
       quantity: qty, unit: unit === 'serving' ? 'serving' : 'g', grams: round1(grams),
       calories: round1(macros.calories), protein_g: round1(macros.protein_g), carbs_g: round1(macros.carbs_g), fat_g: round1(macros.fat_g),
-    });
+    }).select('id').single();
     if (e) {
       setError(e.message);
       setBusy(false);
     } else {
+      maybeWriteNutrition((inserted as { id: string }).id);
       router.navigate('/(tabs)');
     }
   }

@@ -44,8 +44,14 @@ export default function Profile() {
       ) : null}
 
       <Card>
+        <Text style={typography.label}>Health & activity</Text>
+        <Body muted>Adjust your calorie target for activity, and connect Apple Health or Health Connect. Each connection is optional and off until you turn it on.</Body>
+        <Button title="Health & activity settings" variant="secondary" onPress={() => router.push('/health')} />
+      </Card>
+
+      <Card>
         <Text style={typography.label}>Privacy</Text>
-        <Body muted>Buko has no ads, analytics or trackers. Your data is stored in your private account; the only things sent elsewhere are anonymous food lookups.</Body>
+        <Body muted>Buko has no ads, analytics or trackers. Your data is stored in your private account; the only things sent elsewhere are anonymous food lookups. Health data from Apple Health or Health Connect is never used for advertising and never shared with third parties.</Body>
       </Card>
 
       <Button title="Sign out" variant="ghost" onPress={() => supabase.auth.signOut()} />

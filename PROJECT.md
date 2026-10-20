@@ -23,16 +23,19 @@ Principles
 |-------|-------|--------|
 | 1 | Auth + onboarding + Mifflin-St Jeor targets; barcode scanner with explainable 0–100 score and alternatives; food diary + daily dashboard; grocery list | **Done**: tested end-to-end on a real phone with Expo Go (2026-10-19) |
 | 2 | Recipes (own + URL import), weekly meal planner, grocery generation, pantry, cooking mode, scaling | **Built**; migration `0002` must be run; drag, notifications, photos and live URL import not yet tested on a device |
-| 3 | Workout tracking; calorie burn feeds into the diary | Not started |
+| 3 | Fitness: workouts, exercise library, routines, progress charts, HealthKit / Health Connect, activity-adjusted calorie target | **Built**; migration `0003` must be run; health integrations need a development build and are untested on a device |
 | 4 | Adaptive goals: adjust targets from weight trend, intake, and activity | Not started |
 
 ## Layout
-- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, recipes, grocery), `profile` (header button), `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
+- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
 - `src/lib/scoring/` – isolated health-score module (`config.ts` = all weights/thresholds/sources, `factors.ts`, `index.ts`)
 - `src/lib/nutrition/targets.ts` – Mifflin-St Jeor, calorie floors, macro split
 - `src/lib/api/` – Open Food Facts, USDA, alternatives
 - `src/lib/recipes/` – ingredient parser, units, schema.org import, recipe nutrition/score, grocery builder, week helpers
-- `supabase/migrations/0001_init.sql`, `0002_recipes_planning.sql` – schema + RLS
+- `src/lib/fitness/` – workout maths (e1RM, volume, PRs, moving average, MET estimates, activity-adjusted targets), data access, active-workout session store
+- `src/lib/health/` – HealthKit (`ios.ts`) and Health Connect (`android.ts`) adapters behind one interface, sync and write-back (`index.ts`)
+- `src/providers/SettingsProvider.tsx` – per-user settings (activity adjust, health toggles)
+- `supabase/migrations/0001_init.sql`, `0002_recipes_planning.sql`, `0003_fitness.sql` – schema + RLS
 
 ## Decisions
 Log every architectural decision here (newest last).

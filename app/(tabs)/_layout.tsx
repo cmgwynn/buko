@@ -21,8 +21,10 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: 'Diary', tabBarIcon: icon('book-outline') }} />
       <Tabs.Screen name="scan" options={{ title: 'Scan', tabBarIcon: icon('barcode-outline') }} />
       <Tabs.Screen name="plan" options={{ title: 'Plan', tabBarIcon: icon('calendar-outline') }} />
+      <Tabs.Screen name="train" options={{ title: 'Train', tabBarIcon: icon('barbell-outline') }} />
       <Tabs.Screen name="recipes" options={{ title: 'Recipes', tabBarIcon: icon('restaurant-outline') }} />
-      <Tabs.Screen name="grocery" options={{ title: 'Grocery', tabBarIcon: icon('cart-outline') }} />
+      {/* Grocery moved to a button on the Plan tab; the route stays so the screen and deep links keep working. */}
+      <Tabs.Screen name="grocery" options={{ href: null }} />
     </Tabs>
   );
 }

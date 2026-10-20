@@ -16,10 +16,30 @@
         }
       ],
       "expo-status-bar",
-      "expo-font"
+      "expo-font",
+      "expo-dev-client",
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "Buko reads your steps, active calories and workouts from Apple Health, only if you turn that on, to adjust your daily calorie target and show your activity. This data is never used for advertising or shared with anyone else.",
+          "NSHealthUpdateUsageDescription": "Buko saves the workouts and nutrition you log to Apple Health, only if you turn that on, so your health records stay complete. This data is never used for advertising or shared with anyone else."
+        }
+      ],
+      "react-native-health-connect",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "minSdkVersion": 26
+          }
+        }
+      ]
     ],
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.cmgwynn.buko"
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +48,15 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.cmgwynn.buko",
+      "permissions": [
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+        "android.permission.health.READ_EXERCISE",
+        "android.permission.health.WRITE_EXERCISE",
+        "android.permission.health.WRITE_NUTRITION"
+      ]
     }
   }
 }

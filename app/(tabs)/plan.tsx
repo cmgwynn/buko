@@ -163,9 +163,14 @@ export default function Plan() {
           <TabHeader
             title="Plan"
             right={
-              <Pressable onPress={() => router.push({ pathname: '/grocery/generate', params: { week: start } })} hitSlop={10} accessibilityLabel="Make grocery list from this week">
-                <Ionicons name="cart-outline" size={26} color={colors.primary} />
-              </Pressable>
+              <>
+                <Pressable onPress={() => router.push('/(tabs)/grocery')} hitSlop={10} accessibilityLabel="Open grocery list">
+                  <Ionicons name="list-outline" size={26} color={colors.primary} />
+                </Pressable>
+                <Pressable onPress={() => router.push({ pathname: '/grocery/generate', params: { week: start } })} hitSlop={10} accessibilityLabel="Make grocery list from this week">
+                  <Ionicons name="cart-outline" size={26} color={colors.primary} />
+                </Pressable>
+              </>
             }
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>

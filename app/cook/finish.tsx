@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, Heading, Label, Loading, Notice, Screen } from '../../src/components/ui';
 import { defaultMeal, MEALS, round1, toDateString } from '../../src/lib/diary';
+import { maybeWriteNutrition } from '../../src/lib/health';
 import { loadRecipe, type RecipeFull } from '../../src/lib/recipes/db';
 import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import { supabase } from '../../src/lib/supabase';
@@ -49,7 +50,7 @@ export default function FinishCooking() {
     setBusy(true);
     setError(null);
     const ps = nutrition.perServing;
-    const { error: e } = await supabase.from('food_log_entries').insert({
+    const { data: inserted, error: e } = await supabase.from('food_log_entries').insert({
       user_id: session.user.id,
       logged_on: date,
       meal,
@@ -64,12 +65,13 @@ export default function FinishCooking() {
       protein_g: round1(ps.protein_g * eaten),
       carbs_g: round1(ps.carbs_g * eaten),
       fat_g: round1(ps.fat_g * eaten),
-    });
+    }).select('id').single();
     if (e) {
       setError(e.message);
       setBusy(false);
       return;
     }
+    maybeWriteNutrition((inserted as { id: string }).id);
     if (entry) await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', entry);
     router.dismissAll();
     router.navigate('/(tabs)');

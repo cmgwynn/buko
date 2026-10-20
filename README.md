@@ -17,7 +17,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage). This creates the tables and turns on row-level security so each user can only read and write their own rows.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage) and [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql) (Phase 3: workouts, exercises, body stats, health data, settings). This creates the tables and turns on row-level security so each user can only read and write their own rows.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -48,6 +48,25 @@ npx expo start -c
 4. If Expo Go says you must sign in to Expo CLI, run `npx expo login --sso` (use "Continue with GitHub"); a GitHub password does not work in the terminal.
 5. If the QR code won't connect (guest Wi-Fi, VPN, firewall), run `npx expo start --tunnel` instead.
 
+## Phase 3: fitness and health data
+Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
+
+### Switching from Expo Go to a development build (EAS cloud build)
+You don't have Xcode, so we build in Expo's cloud.
+1. **Expo account:** create one at expo.dev, then run `npx expo login --sso` (Continue with GitHub).
+2. **Link the project:** `npx eas-cli init` (accept creating the project).
+3. **iPhone:**
+   - HealthKit needs an **Apple Developer Program** membership (US$99/year). Free Apple IDs can't use the HealthKit capability or EAS device builds. Enrol at developer.apple.com/programs.
+   - Register your phone: `npx eas-cli device:create`, then open the link on your iPhone and install the profile.
+   - On the iPhone, turn on **Settings › Privacy & Security › Developer Mode** and restart.
+   - Build: `npx eas-cli build --profile development --platform ios` (sign in with your Apple ID when asked; it takes ~15 minutes). Open the build link or QR code on the phone to install.
+4. **Android:** `npx eas-cli build --profile development --platform android`, then open the link on the phone and install the APK. Health Connect is built into Android 14+; on older versions install it from the Play Store.
+5. **Run:** `npx expo start --dev-client` and open the Buko app you installed (not Expo Go).
+6. Rebuild whenever native dependencies or `app.json` plugins change; normal code changes reload without rebuilding.
+7. Your `.env` keys are read by Metro on your computer, so they work in the dev build without uploading them to EAS.
+
+Before public release, Apple and Google each require a published privacy policy, and Google Play needs a Health Connect permissions declaration.
+
 ## Scripts
 - `npm run typecheck` – TypeScript check
 - `npm test` – unit tests for the scoring module and calorie targets
@@ -59,7 +78,7 @@ All weights, thresholds, flagged additives and source citations live in [`src/li
 Paste a recipe link and Buko fetches the page from your phone and reads only its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is always saved and shown. Sites without that data can't be imported; add the recipe by hand instead.
 
 ## Privacy
-No analytics, advertising or tracking SDKs. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import.
+No analytics, advertising or tracking SDKs. Health data from Apple Health or Health Connect is only used when you turn a feature on, is never used for advertising and is never shared with third parties. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import.
 
 ## Data attribution
 Product data is from [Open Food Facts](https://world.openfoodfacts.org) (Open Database License) and is credited in the app. Whole-food data is from [USDA FoodData Central](https://fdc.nal.usda.gov).

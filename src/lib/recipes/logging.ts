@@ -1,4 +1,5 @@
 import { round1 } from '../diary';
+import { maybeWriteNutrition } from '../health';
 import { supabase } from '../supabase';
 import type { Meal } from '../../types';
 import { computeRecipeNutrition } from './nutrition';
@@ -15,7 +16,7 @@ export async function logRecipeServings(
   const n = computeRecipeNutrition(recipe.recipe_ingredients, recipe.servings);
   if (n.counted === 0) return 'This recipe has no nutrition data yet. Edit it and match its ingredients first.';
   const ps = n.perServing;
-  const { error } = await supabase.from('food_log_entries').insert({
+  const { data: inserted, error } = await supabase.from('food_log_entries').insert({
     user_id: userId,
     logged_on: opts.date,
     meal: opts.meal,
@@ -30,8 +31,9 @@ export async function logRecipeServings(
     protein_g: round1(ps.protein_g * opts.servings),
     carbs_g: round1(ps.carbs_g * opts.servings),
     fat_g: round1(ps.fat_g * opts.servings),
-  });
+  }).select('id').single();
   if (error) return error.message;
+  maybeWriteNutrition((inserted as { id: string }).id);
   if (opts.planEntryId) {
     await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', opts.planEntryId);
   }
