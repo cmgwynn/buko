@@ -228,7 +228,7 @@ export default function Plan() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Pressable style={{ flex: 1 }} onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}>
                             <Text style={typography.body} numberOfLines={1}>{e.logged_at ? '✓ ' : ''}{r.title}</Text>
-                            <Text style={typography.small}>{n && n.counted > 0 ? `${Math.round(n.perServing.calories * e.servings)} kcal` : 'No nutrition yet'}</Text>
+                            <Text style={typography.small}>{n && n.counted > 0 ? `${e.servings} serving${e.servings === 1 ? '' : 's'} · ${Math.round(n.perServing.calories * e.servings)} kcal` : 'No nutrition yet'}</Text>
                           </Pressable>
                           <Pressable onPress={() => setServings(e, e.servings - 0.5)} hitSlop={8} accessibilityLabel="Fewer servings"><Ionicons name="remove-circle-outline" size={24} color={colors.primary} /></Pressable>
                           <Text style={[typography.body, { marginHorizontal: 6, minWidth: 28, textAlign: 'center' }]}>{e.servings}</Text>

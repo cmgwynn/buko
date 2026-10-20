@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, Vibration, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, Vibration, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Body, Button, Card, Loading, Notice } from '../../src/components/ui';
 import { cancelNotification, configureNotifications, scheduleTimerNotification } from '../../src/lib/notifications';
@@ -28,6 +28,9 @@ export default function Cook() {
   const [step, setStep] = useState(0);
   const [showIngredients, setShowIngredients] = useState(false);
   const [timers, setTimers] = useState<CookTimer[]>([]);
+  // Per-step timer lengths the user has adjusted; otherwise the length detected from the step text.
+  const [stepSeconds, setStepSeconds] = useState<Record<number, number>>({});
+  const [customMin, setCustomMin] = useState('');
   const [now, setNow] = useState(Date.now());
   const [noNotify, setNoNotify] = useState(false);
   const nextId = useRef(1);
@@ -107,11 +110,20 @@ export default function Cook() {
 
         <Text style={{ fontSize: 30, lineHeight: 42, fontWeight: '600', color: colors.text, marginTop: spacing.lg }}>{current?.text}</Text>
 
-        {current?.timer_seconds ? (
-          <View style={{ marginTop: spacing.xl }}>
-            <Button title={`Start ${formatClock(current.timer_seconds)} timer`} icon="timer-outline" onPress={() => startTimer(`Step ${step + 1}`, current.timer_seconds!)} />
-          </View>
-        ) : null}
+        {current?.timer_seconds ? (() => {
+          const secs = stepSeconds[step] ?? current.timer_seconds!;
+          const adjust = (delta: number) => setStepSeconds((c) => ({ ...c, [step]: Math.max(60, Math.min(24 * 3600, secs + delta)) }));
+          return (
+            <View style={{ marginTop: spacing.xl }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.lg, marginBottom: spacing.sm }}>
+                <Pressable onPress={() => adjust(-60)} hitSlop={10} accessibilityLabel="One minute less"><Ionicons name="remove-circle-outline" size={32} color={colors.primary} /></Pressable>
+                <Text style={typography.subheading}>{formatClock(secs)}</Text>
+                <Pressable onPress={() => adjust(60)} hitSlop={10} accessibilityLabel="One minute more"><Ionicons name="add-circle-outline" size={32} color={colors.primary} /></Pressable>
+              </View>
+              <Button title={`Start ${formatClock(secs)} timer`} icon="timer-outline" onPress={() => startTimer(`Step ${step + 1}`, secs)} />
+            </View>
+          );
+        })() : null}
       </ScrollView>
 
       {noNotify ? <View style={{ paddingHorizontal: spacing.lg }}><Notice>Notifications are off, so timers only alert you while Buko is open. You can allow them in Settings.</Notice></View> : null}
@@ -130,6 +142,24 @@ export default function Cook() {
             </View>
           );
         })}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+          <Text style={typography.small}>Custom:</Text>
+          <TextInput
+            value={customMin}
+            onChangeText={(t) => setCustomMin(t.replace(/[^0-9]/g, '').slice(0, 3))}
+            keyboardType="number-pad"
+            placeholder="min"
+            placeholderTextColor={colors.textMuted}
+            style={[typography.body, { width: 64, textAlign: 'center', paddingVertical: 6, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }]}
+          />
+          <Pressable
+            disabled={!Number(customMin)}
+            onPress={() => { startTimer(`${Number(customMin)} min timer`, Number(customMin) * 60); setCustomMin(''); }}
+            style={{ paddingHorizontal: spacing.md, paddingVertical: 8, borderRadius: radius.pill, backgroundColor: Number(customMin) ? colors.primary : colors.border }}
+          >
+            <Text style={[typography.body, { color: colors.surface, fontWeight: '600' }]}>Start</Text>
+          </Pressable>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
           <Text style={typography.small}>Quick timer:</Text>
           {[1, 5, 10, 15].map((m) => (

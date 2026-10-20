@@ -16,6 +16,10 @@ export interface RecipeDraft {
   photoUri: string | null;
   ingredients: IngredientDraft[];
   steps: StepDraft[];
+  /** Calories per serving the source site states, for comparison only. Not saved. */
+  siteCalories?: number | null;
+  /** True when the page gave no serving count and we assumed one. Not saved. */
+  servingsGuessed?: boolean;
 }
 
 export const emptyDraft = (): RecipeDraft => ({

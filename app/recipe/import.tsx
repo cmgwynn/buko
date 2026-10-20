@@ -21,6 +21,8 @@ export default function ImportRecipe() {
       setDraft({
         title: r.title,
         servings: r.servings ?? 4,
+        servingsGuessed: r.servings === null,
+        siteCalories: r.siteCalories,
         prepMinutes: r.prepMinutes,
         cookMinutes: r.cookMinutes,
         sourceUrl: r.sourceUrl,

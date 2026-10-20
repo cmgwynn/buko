@@ -9,6 +9,8 @@ export interface ParsedRecipe {
   ingredients: string[];
   steps: string[];
   servings: number | null;
+  /** Per-serving calories the page publishes in its structured nutrition data, if any. */
+  siteCalories: number | null;
   prepMinutes: number | null;
   cookMinutes: number | null;
   sourceUrl: string;
@@ -41,6 +43,13 @@ function parseYield(v: unknown): number | null {
   const m = /\d+/.exec(String(first ?? ''));
   const n = m ? Number(m[0]) : NaN;
   return n >= 1 && n <= 100 ? n : null;
+}
+
+function parseSiteCalories(v: unknown): number | null {
+  if (!v || typeof v !== 'object') return null;
+  const m = /\d+(\.\d+)?/.exec(String((v as Record<string, unknown>).calories ?? ''));
+  const n = m ? Number(m[0]) : NaN;
+  return n > 0 && n < 5000 ? Math.round(n) : null;
 }
 
 function collectSteps(v: unknown, out: string[]) {
@@ -106,6 +115,7 @@ export function extractRecipeFromHtml(html: string, sourceUrl: string): ParsedRe
     ingredients,
     steps,
     servings: parseYield(node.recipeYield),
+    siteCalories: parseSiteCalories(node.nutrition),
     prepMinutes: parseDurationMinutes(node.prepTime),
     cookMinutes: parseDurationMinutes(node.cookTime),
     sourceUrl,

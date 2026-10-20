@@ -131,7 +131,11 @@ export default function EditRecipe() {
               color={ing.match_status === 'unmatched' || !ing.grams ? colors.warning : colors.primary}
             />
             <Text style={[typography.small, { marginLeft: 6 }]}>
-              {ing.match_status === 'unmatched' ? 'No nutrition match yet · tap to choose' : ing.grams ? `${Math.round(ing.grams)} g · tap to review` : 'Needs a weight · tap to set'}
+              {ing.match_status === 'unmatched'
+                ? 'No nutrition match yet · tap to choose'
+                : ing.grams
+                  ? `${Math.round(ing.grams)} g${ing.nutrition ? ` · ${Math.round(((ing.nutrition.per100g.calories ?? 0) * ing.grams) / 100)} kcal` : ''} · tap to review`
+                  : 'Needs a weight · tap to set'}
             </Text>
           </Pressable>
         </Card>
@@ -145,6 +149,12 @@ export default function EditRecipe() {
         </View>
       </View>
 
+      {d.servingsGuessed ? <Notice>This page didn’t say how many servings it makes, so we assumed {d.servings}. Set the real number above; per-serving calories depend on it.</Notice> : null}
+      {d.siteCalories && nutrition.counted > 0 ? (
+        <Notice tone={Math.abs(nutrition.perServing.calories - d.siteCalories) / d.siteCalories > 0.25 ? 'warning' : 'info'}>
+          The source site lists {d.siteCalories} kcal per serving; we calculate {Math.round(nutrition.perServing.calories)}. Sites often estimate differently. If ours looks off, check the servings count and each ingredient’s weight and matched food (each shows its kcal above).
+        </Notice>
+      ) : null}
       {nutrition.counted > 0 ? (
         <Card style={{ marginTop: spacing.md, flexDirection: 'row', alignItems: 'center' }}>
           {score ? <ScoreBadge score={score.score} rating={score.rating} size={56} /> : null}
