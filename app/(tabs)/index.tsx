@@ -6,25 +6,39 @@ import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Card, Empty, Heading, Screen } from '../../src/components/ui';
 import { addDays, formatDay, MEALS, toDateString } from '../../src/lib/diary';
+import { logPlanEntry, type RecipeWithNutrition } from '../../src/lib/recipes/logging';
+import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
+import type { MealPlanEntry } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
+import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
-import { colors, spacing, typography } from '../../src/theme';
+import { colors, radius, spacing, typography } from '../../src/theme';
 import type { FoodLogEntry } from '../../src/types';
 
 export default function Diary() {
   const router = useRouter();
   const { targets } = useProfile();
+  const { session } = useAuth();
+  const [planned, setPlanned] = useState<MealPlanEntry[]>([]);
+  const [recipes, setRecipes] = useState<RecipeWithNutrition[]>([]);
   const [date, setDate] = useState(toDateString(new Date()));
   const [entries, setEntries] = useState<FoodLogEntry[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const { data, error: e } = await supabase
-      .from('food_log_entries').select('*').eq('logged_on', date).order('created_at');
-    if (e) setError(e.message);
+    const [log, plan, rec] = await Promise.all([
+      supabase.from('food_log_entries').select('*').eq('logged_on', date).order('created_at'),
+      supabase.from('meal_plan_entries').select('*').eq('planned_on', date).is('logged_at', null).order('created_at'),
+      supabase.from('recipes').select('*, recipe_ingredients(grams, nutrition)'),
+    ]);
+    if (log.error) setError(log.error.message);
     else {
       setError(null);
-      setEntries(data as FoodLogEntry[]);
+      setEntries(log.data as FoodLogEntry[]);
+    }
+    if (!plan.error && !rec.error) {
+      setPlanned(plan.data as MealPlanEntry[]);
+      setRecipes(rec.data as RecipeWithNutrition[]);
     }
   }, [date]);
 
@@ -47,6 +61,13 @@ export default function Diary() {
         },
       },
     ]);
+  }
+
+  async function logPlanned(entry: MealPlanEntry, recipe: RecipeWithNutrition) {
+    if (!session) return;
+    const err = await logPlanEntry(session.user.id, recipe, entry);
+    if (err) Alert.alert('Could not log', err);
+    load();
   }
 
   const isToday = date === toDateString(new Date());
@@ -104,6 +125,30 @@ export default function Diary() {
                 </Pressable>
               </Pressable>
             ))}
+            {planned.filter((p) => p.meal === key).map((p) => {
+              const r = recipes.find((x) => x.id === p.recipe_id);
+              if (!r) return null;
+              const n = computeRecipeNutrition(r.recipe_ingredients, r.servings);
+              return (
+                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, opacity: 0.9 }}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.textMuted} style={{ marginRight: spacing.sm }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={typography.body} numberOfLines={1}>{r.title}</Text>
+                    <Text style={typography.small}>Planned · {p.servings} serving{p.servings === 1 ? '' : 's'}{n.counted > 0 ? ` · ${Math.round(n.perServing.calories * p.servings)} kcal` : ''}</Text>
+                  </View>
+                  <Pressable onPress={() => logPlanned(p, r)} disabled={n.counted === 0} style={{ paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: n.counted > 0 ? colors.primary : colors.border }}>
+                    <Text style={[typography.small, { color: colors.surface, fontWeight: '700' }]}>Log</Text>
+                  </Pressable>
+                </View>
+              );
+            })}
+            <Pressable
+              onPress={() => router.push({ pathname: '/log/recipes', params: { meal: key, date } })}
+              style={{ flexDirection: 'row', alignItems: 'center', paddingTop: spacing.sm }}
+            >
+              <Ionicons name="book-outline" size={20} color={colors.primary} />
+              <Text style={[typography.body, { color: colors.primary, marginLeft: spacing.sm, fontWeight: '600' }]}>Add recipe</Text>
+            </Pressable>
             <Pressable
               onPress={() => router.push({ pathname: '/log/search', params: { meal: key, date } })}
               style={{ flexDirection: 'row', alignItems: 'center', paddingTop: spacing.sm }}

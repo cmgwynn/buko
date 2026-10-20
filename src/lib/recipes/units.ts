@@ -74,6 +74,12 @@ function singularCountUnit(u: string): string {
 
 /** Approximate grams per millilitre, for converting volume measures of common ingredients to weight. */
 const DENSITY: [RegExp, number][] = [
+  // Light, bulky foods are far lighter than water per cup; treating them as water overstates calories.
+  [/\b(cilantro|coriander|parsley|basil|mint|dill|chives?|thyme|rosemary|sage|oregano|tarragon|herbs?)\b/, 0.1],
+  [/\b(lettuce|spinach|arugula|rocket|kale|greens|salad)\b/, 0.15],
+  [/\b(sprouts)\b/, 0.44],
+  [/\b(peanuts|cashews|pistachios|hazelnuts|pine nuts)\b/, 0.6],
+  [/\b(carrots?|radish|celery|cucumber|onions?|shallots?|zucchini|broccoli|cauliflower|mushrooms?|bell pepper|cabbage|tomatoes)\b/, 0.55],
   [/\b(flour)\b/, 0.53],
   [/\b(powdered sugar|icing sugar|confectioners)\b/, 0.56],
   [/\b(brown sugar)\b/, 0.93],
@@ -101,6 +107,7 @@ export function densityFor(name: string): number {
 /** Typical weight in grams of one whole item, for recipes that list "2 onions" or "3 cloves garlic". */
 const PIECE_G: [RegExp, number][] = [
   [/\begg\b|\beggs\b/, 50],
+  [/\bshrimp|\bprawn/, 12],
   [/\bonion/, 110],
   [/\bshallot/, 30],
   [/\bgarlic\b/, 3], // per clove when a clove unit is used

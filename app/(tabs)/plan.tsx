@@ -13,6 +13,7 @@ import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
 import { dayStatus, weekDays, weekStart } from '../../src/lib/recipes/week';
 import { addDays } from '../../src/lib/diary';
+import { logPlanEntry } from '../../src/lib/recipes/logging';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
@@ -80,6 +81,13 @@ export default function Plan() {
     if (!session) return;
     const { error: e } = await supabase.from('meal_plan_entries').insert({ user_id: session.user.id, planned_on: selected, meal, recipe_id: recipeId, servings: 1 });
     if (e) setError(e.message);
+    load();
+  }
+
+  async function logEntry(entry: EntryRow, recipe: RecipeRow) {
+    if (!session) return;
+    const err = await logPlanEntry(session.user.id, recipe, entry);
+    if (err) setError(err);
     load();
   }
 
@@ -239,6 +247,12 @@ export default function Plan() {
                             <Pressable onPress={() => router.push({ pathname: '/cook/[id]', params: { id: r.id, servings: String(r.servings), entry: e.id } })} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>
                               <Ionicons name="flame-outline" size={16} color={colors.primary} />
                               <Text style={[typography.small, { color: colors.primary, marginLeft: 4 }]}>Cook</Text>
+                            </Pressable>
+                          ) : null}
+                          {!e.logged_at ? (
+                            <Pressable onPress={() => logEntry(e, r)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                              <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+                              <Text style={[typography.small, { color: colors.primary, marginLeft: 4 }]}>Log to diary</Text>
                             </Pressable>
                           ) : null}
                           <Pressable onPress={() => removeEntry(e)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>

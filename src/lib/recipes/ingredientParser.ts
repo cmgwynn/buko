@@ -6,6 +6,8 @@ export interface ParsedIngredient {
   /** Unit word as written (normalised to the canonical unit when it is a known measure). */
   unit: string | null;
   name: string;
+  /** Weight in grams of one package when the line states it, e.g. "(8 ounce) package". */
+  sizeGrams?: number;
 }
 
 const UNICODE_FRACTIONS: Record<string, string> = {
@@ -23,6 +25,11 @@ function normalise(text: string): string {
 
 const NUM = String.raw`\d+(?:\.\d+)?(?:\s+\d+\/\d+|\/\d+)?`;
 const LEADING_QTY = new RegExp(String.raw`^(${NUM}|\d*\.\d+)(?:\s*(?:-|–|—|to)\s*(${NUM}))?`);
+
+const PACKAGE_SIZE = /^\(?(\d+(?:\.\d+)?)[\s-]*(ounces?|oz|pounds?|lbs?|grams?|g|kg)\b\.?\)?\s+(packages?|pkgs?|cans?|bags?|jars?|boxes|box|bottles?|packets?|containers?|tubs?|tubes?)\b\s*/i;
+
+const CONTAINERS = /^(package|pkg|can|bag|jar|box|bottle|packet|container|tub|tube)s?$/i;
+const SIZE_ONLY = /^\((\d+(?:\.\d+)?)\s*(ounces?|oz|pounds?|lbs?|grams?|g|kg)\b/i;
 
 function toNumber(s: string): number {
   const parts = s.trim().split(/\s+/);
@@ -44,6 +51,7 @@ export function parseIngredient(rawInput: string): ParsedIngredient {
   const raw = rawInput.trim();
   let s = normalise(raw);
   let quantity: number | null = null;
+  let unit: string | null = null;
 
   const m = LEADING_QTY.exec(s);
   if (m) {
@@ -52,11 +60,21 @@ export function parseIngredient(rawInput: string): ParsedIngredient {
     s = s.slice(m[0].length).trim();
   }
 
+  // "1 (8 ounce) package noodles" or "1 22-ounce bag fries": the real amount is count x size.
+  let sizeGrams: number | undefined;
+  const sized = PACKAGE_SIZE.exec(s);
+  if (sized && quantity !== null) {
+    sizeGrams = Number(sized[1]) * resolveUnit(sized[2]).factor;
+    unit = resolveUnit(sized[3]).canonical || sized[3];
+    s = s.slice(sized[0].length).trim();
+  }
+
+  const parenSize = SIZE_ONLY.exec(s.replace(/^.*?(?=\()/, ''));
+
   // Parenthetical notes like "(14 oz)" or "(optional)" are not part of the name.
   s = s.replace(/\([^)]*\)/g, ' ').replace(/\s+/g, ' ').trim();
 
-  let unit: string | null = null;
-  if (quantity !== null) {
+  if (quantity !== null && !unit) {
     const two = s.split(' ').slice(0, 2).join(' ').toLowerCase();
     const words = s.split(' ');
     if (two === 'fl oz' || two === 'fluid ounce' || two === 'fluid ounces') {
@@ -68,8 +86,13 @@ export function parseIngredient(rawInput: string): ParsedIngredient {
     }
   }
 
+  // "1 can (14 oz) chickpeas": container first, size in parentheses.
+  if (quantity !== null && sizeGrams === undefined && unit && CONTAINERS.test(unit)) {
+    if (parenSize) sizeGrams = Number(parenSize[1]) * resolveUnit(parenSize[2]).factor;
+  }
+
   s = s.replace(/^of\s+/i, '');
   // Preparation notes after a comma ("chopped", "to taste") are dropped from the name.
   const name = s.split(',')[0].replace(/\s+/g, ' ').trim();
-  return { raw, quantity, unit, name: name || raw };
+  return { raw, quantity, unit, name: name || raw, ...(sizeGrams ? { sizeGrams } : {}) };
 }

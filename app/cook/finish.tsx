@@ -16,11 +16,11 @@ const stepBtn = { width: 44, height: 44, borderRadius: radius.pill, backgroundCo
 export default function FinishCooking() {
   const router = useRouter();
   const { session } = useAuth();
-  const { id, entry } = useLocalSearchParams<{ id: string; servings?: string; entry?: string }>();
+  const { id, entry, direct, meal: mealParam, date: dateParam } = useLocalSearchParams<{ id: string; servings?: string; entry?: string; direct?: string; meal?: string; date?: string }>();
   const [full, setFull] = useState<RecipeFull | null>(null);
   const [eaten, setEaten] = useState(1);
-  const [meal, setMeal] = useState<Meal>(defaultMeal());
-  const [date, setDate] = useState(toDateString(new Date()));
+  const [meal, setMeal] = useState<Meal>((MEALS.find((m) => m.key === mealParam)?.key ?? defaultMeal()) as Meal);
+  const [date, setDate] = useState(dateParam ?? toDateString(new Date()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,9 +78,9 @@ export default function FinishCooking() {
   return (
     <Screen edges={[]}>
       <View style={{ alignItems: 'center', marginVertical: spacing.lg }}>
-        <Ionicons name="checkmark-circle" size={56} color={colors.primary} />
-        <Heading>Nice cooking!</Heading>
-        <Body muted>Log how much you ate of {full.recipe.title}.</Body>
+        <Ionicons name={direct ? 'restaurant' : 'checkmark-circle'} size={56} color={colors.primary} />
+        <Heading>{direct ? 'Log a recipe' : 'Nice cooking!'}</Heading>
+        <Body muted>{direct ? `How much ${full.recipe.title} did you eat?` : `Log how much you ate of ${full.recipe.title}.`}</Body>
       </View>
 
       <Card>
@@ -108,7 +108,7 @@ export default function FinishCooking() {
       {!canLog ? <Notice>This recipe has no nutrition data yet, so it can&apos;t be logged. Edit the recipe and match its ingredients first.</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Button title="Log to diary" onPress={log} loading={busy} disabled={!canLog} />
-      <Button title="Skip logging" variant="ghost" onPress={() => { router.dismissAll(); router.navigate('/(tabs)'); }} />
+      {direct ? null : <Button title="Skip logging" variant="ghost" onPress={() => { router.dismissAll(); router.navigate('/(tabs)'); }} />}
     </Screen>
   );
 }

@@ -39,6 +39,7 @@ function Gate() {
         <Stack.Screen name="product/[barcode]" options={{ ...headerOptions, title: 'Product' }} />
         <Stack.Screen name="log/search" options={{ ...headerOptions, title: 'Add food' }} />
         <Stack.Screen name="log/scan" options={{ ...headerOptions, title: 'Scan to log' }} />
+        <Stack.Screen name="log/recipes" options={{ ...headerOptions, title: 'Log a recipe' }} />
         <Stack.Screen name="log/add" options={{ ...headerOptions, title: 'Log food' }} />
         <Stack.Screen name="edit-profile" options={{ ...headerOptions, title: 'Update details' }} />
         <Stack.Screen name="profile" options={{ ...headerOptions, title: 'Profile' }} />
