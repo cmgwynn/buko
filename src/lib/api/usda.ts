@@ -11,6 +11,7 @@ interface UsdaNutrient {
 interface UsdaFood {
   fdcId: number;
   description: string;
+  foodCategory?: string;
   foodNutrients?: UsdaNutrient[];
 }
 
@@ -36,6 +37,7 @@ function parseFood(f: UsdaFood): Food {
     },
     servingG: null,
     servingLabel: null,
+    category: typeof f.foodCategory === 'string' ? f.foodCategory : null,
   };
 }
 

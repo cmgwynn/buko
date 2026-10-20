@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { Attribution } from '../../src/components/Attribution';
-import { Body, Button, Card, Heading, Notice, Screen } from '../../src/components/ui';
-import { CALORIE_FLOOR } from '../../src/lib/nutrition/targets';
-import { formatHeight, formatWeight } from '../../src/lib/units';
-import { supabase } from '../../src/lib/supabase';
-import { useAuth } from '../../src/providers/AuthProvider';
-import { useProfile } from '../../src/providers/ProfileProvider';
-import { colors, spacing, typography } from '../../src/theme';
+import { Attribution } from '../src/components/Attribution';
+import { Body, Button, Card, Heading, Notice, Screen } from '../src/components/ui';
+import { CALORIE_FLOOR } from '../src/lib/nutrition/targets';
+import { formatHeight, formatWeight } from '../src/lib/units';
+import { supabase } from '../src/lib/supabase';
+import { useAuth } from '../src/providers/AuthProvider';
+import { useProfile } from '../src/providers/ProfileProvider';
+import { colors, spacing, typography } from '../src/theme';
 
 const GOAL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain weight' } as const;
 
@@ -17,9 +17,8 @@ export default function Profile() {
   const { profile, targets } = useProfile();
 
   return (
-    <Screen>
-      <Heading>Profile</Heading>
-      <Body muted>{session?.user.email}</Body>
+    <Screen edges={[]}>
+      <Heading>{session?.user.email}</Heading>
       <View style={{ height: spacing.lg }} />
 
       {targets ? (

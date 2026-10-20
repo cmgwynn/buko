@@ -2,7 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Button, Card, Empty, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { TabHeader } from '../../src/components/TabHeader';
+import { Button, Card, Empty, Notice, Screen, TextField } from '../../src/components/ui';
+import { sectionFor } from '../../src/lib/recipes/sections';
+import { SECTIONS } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, spacing, typography } from '../../src/theme';
@@ -30,7 +33,7 @@ export default function Grocery() {
     const trimmed = name.trim();
     if (!trimmed || !session) return;
     setName('');
-    const { error: e } = await supabase.from('grocery_items').insert({ user_id: session.user.id, name: trimmed, source: 'manual' });
+    const { error: e } = await supabase.from('grocery_items').insert({ user_id: session.user.id, name: trimmed, source: 'manual', section: sectionFor(trimmed) });
     if (e) setError(e.message);
     load();
   }
@@ -64,7 +67,10 @@ export default function Grocery() {
       style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md }}>
       <Ionicons name={item.checked ? 'checkbox' : 'square-outline'} size={26} color={item.checked ? colors.primary : colors.textMuted} />
       <View style={{ flex: 1, marginLeft: spacing.md }}>
-        <Text style={[typography.body, item.checked && { textDecorationLine: 'line-through', color: colors.textMuted }]}>{item.name}</Text>
+        <Text style={[typography.body, item.checked && { textDecorationLine: 'line-through', color: colors.textMuted }]}>
+          {item.name}{item.quantity ? ` · ${item.quantity}` : ''}
+        </Text>
+        {item.from_recipes?.length ? <Text style={typography.small} numberOfLines={1}>For {item.from_recipes.join(', ')}</Text> : null}
       </View>
       {item.barcode ? (
         <Pressable onPress={() => router.push({ pathname: '/product/[barcode]', params: { barcode: item.barcode! } })} hitSlop={10} accessibilityLabel="View product score" style={{ marginRight: spacing.md }}>
@@ -79,8 +85,16 @@ export default function Grocery() {
 
   return (
     <Screen>
-      <Heading>Grocery list</Heading>
-      <View style={{ height: spacing.lg }} />
+      <TabHeader
+        title="Grocery"
+        right={
+          <Pressable onPress={() => router.push('/pantry')} hitSlop={10} accessibilityLabel="Pantry">
+            <Ionicons name="file-tray-full-outline" size={24} color={colors.primary} />
+          </Pressable>
+        }
+      />
+      <Button title="Make list from meal plan" icon="calendar-outline" variant="secondary" onPress={() => router.push('/grocery/generate')} />
+      <View style={{ height: spacing.md }} />
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 1 }}>
           <TextField placeholder="Add an item" value={name} onChangeText={setName} onSubmitEditing={add} returnKeyType="done" />
@@ -90,7 +104,15 @@ export default function Grocery() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       {items.length === 0 ? <Empty icon="cart-outline" text="Your list is empty. Add items here or from a scanned product." /> : null}
-      {todo.length ? <Card>{todo.map(row)}</Card> : null}
+      {SECTIONS.map(({ key, label }) => {
+        const inSection = todo.filter((i) => (i.section ?? 'other') === key);
+        return inSection.length ? (
+          <View key={key}>
+            <Text style={[typography.label, { marginTop: spacing.sm, marginBottom: spacing.xs }]}>{label}</Text>
+            <Card>{inSection.map(row)}</Card>
+          </View>
+        ) : null;
+      })}
       {done.length ? (
         <>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: spacing.md }}>

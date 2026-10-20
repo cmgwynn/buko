@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
+import { TabHeader } from '../../src/components/TabHeader';
 import { Card, Empty, Heading, Screen } from '../../src/components/ui';
 import { addDays, formatDay, MEALS, toDateString } from '../../src/lib/diary';
 import { supabase } from '../../src/lib/supabase';
@@ -52,6 +53,7 @@ export default function Diary() {
 
   return (
     <Screen>
+      <TabHeader title="Diary" />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
         <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={12} accessibilityLabel="Previous day">
           <Ionicons name="chevron-back" size={24} color={colors.primary} />

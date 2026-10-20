@@ -2,39 +2,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
-import { Attribution, SourceLink } from '../../src/components/Attribution';
+import { Attribution } from '../../src/components/Attribution';
+import { FactorCard } from '../../src/components/FactorCard';
 import { ScoreBadge, scoreColor } from '../../src/components/ScoreBadge';
 import { Body, Button, Card, Heading, Loading, Notice, Screen } from '../../src/components/ui';
 import { findAlternatives, type Alternative } from '../../src/lib/api/alternatives';
 import { getProductByBarcode } from '../../src/lib/api/openFoodFacts';
 import { dietConflicts } from '../../src/lib/diet';
-import { scoreProduct, type Factor } from '../../src/lib/scoring';
+import { scoreProduct } from '../../src/lib/scoring';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Product } from '../../src/types';
-
-function FactorCard({ factor, totalWeight }: { factor: Factor; totalWeight: number }) {
-  const known = factor.points !== null;
-  const color = !known ? colors.score.unknown : factor.points! >= 75 ? colors.score.excellent : factor.points! >= 50 ? colors.score.good : factor.points! >= 25 ? colors.score.mediocre : colors.score.poor;
-  return (
-    <Card style={{ opacity: known ? 1 : 0.75 }}>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Text style={typography.subheading}>{factor.label}</Text>
-        <Text style={[typography.subheading, { color }]}>{known ? `${factor.points}/100` : '–'}</Text>
-      </View>
-      <Text style={[typography.small, { marginBottom: spacing.sm }]}>
-        {factor.value} · {Math.round((factor.weight / totalWeight) * 100)}% of the score
-      </Text>
-      <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, overflow: 'hidden', marginBottom: spacing.sm }}>
-        <View style={{ height: 6, width: `${factor.points ?? 0}%`, backgroundColor: color }} />
-      </View>
-      <Body>{factor.explanation}</Body>
-      <View style={{ marginTop: spacing.sm }}><SourceLink name={factor.source.name} url={factor.source.url} /></View>
-    </Card>
-  );
-}
 
 export default function ProductScreen() {
   const { barcode } = useLocalSearchParams<{ barcode: string }>();

@@ -17,7 +17,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. This creates the tables and turns on row-level security so each user can only read and write their own rows.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage). This creates the tables and turns on row-level security so each user can only read and write their own rows.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -44,7 +44,7 @@ npx expo start -c
 
 1. Make sure your phone and computer are on the **same Wi-Fi**.
 2. **iPhone:** open the Camera app and scan the QR code in the terminal, then tap the Expo Go banner. **Android:** open Expo Go and tap "Scan QR code".
-3. Allow camera access when asked (needed for barcode scanning).
+3. Allow camera access when asked (barcode scanning), photo access (recipe photos) and notifications (cooking timers).
 4. If Expo Go says you must sign in to Expo CLI, run `npx expo login --sso` (use "Continue with GitHub"); a GitHub password does not work in the terminal.
 5. If the QR code won't connect (guest Wi-Fi, VPN, firewall), run `npx expo start --tunnel` instead.
 
@@ -55,8 +55,11 @@ npx expo start -c
 ## Tuning the health score
 All weights, thresholds, flagged additives and source citations live in [`src/lib/scoring/config.ts`](./src/lib/scoring/config.ts). Each factor's logic is in `factors.ts`. Change a number, run `npm test`, and the app picks it up. Scores are never stored, so there is nothing to migrate.
 
+## Recipe import
+Paste a recipe link and Buko fetches the page from your phone and reads only its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is always saved and shown. Sites without that data can't be imported; add the recipe by hand instead.
+
 ## Privacy
-No analytics, advertising or tracking SDKs. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central.
+No analytics, advertising or tracking SDKs. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import.
 
 ## Data attribution
 Product data is from [Open Food Facts](https://world.openfoodfacts.org) (Open Database License) and is credited in the app. Whole-food data is from [USDA FoodData Central](https://fdc.nal.usda.gov).

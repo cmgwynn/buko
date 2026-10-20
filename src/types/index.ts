@@ -4,7 +4,8 @@ export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'ver
 export type DietPref = 'vegetarian' | 'vegan' | 'gluten_free' | 'dairy_free' | 'nut_free';
 export type Units = 'metric' | 'imperial';
 export type Meal = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-export type FoodSource = 'off' | 'usda' | 'manual';
+export type FoodSource = 'off' | 'usda' | 'manual' | 'recipe';
+export type GrocerySource = 'off' | 'usda' | 'manual' | 'plan';
 
 export interface Profile {
   user_id: string;
@@ -51,6 +52,8 @@ export interface Food {
   /** Grams in one labelled serving, when the source provides it. */
   servingG: number | null;
   servingLabel: string | null;
+  /** Source food category (USDA foodCategory), used to spot fruit/veg/legume/nut ingredients. */
+  category?: string | null;
 }
 
 export type NutriGrade = 'a' | 'b' | 'c' | 'd' | 'e';
@@ -71,6 +74,8 @@ export interface Product extends Food {
   allergens: string[];
   /** Open Food Facts ingredient analysis tags, e.g. "en:vegan", "en:non-vegetarian". */
   ingredientsAnalysis: string[];
+  /** True for synthetic products (recipes) whose additive content is not known; the factor is then skipped. */
+  additivesUnknown?: boolean;
 }
 
 export interface FoodLogEntry {
@@ -97,9 +102,12 @@ export interface GroceryItem {
   user_id: string;
   name: string;
   barcode: string | null;
-  source: FoodSource;
+  source: GrocerySource;
   source_id: string | null;
   quantity: string | null;
+  section: 'produce' | 'dairy' | 'meat' | 'pantry' | 'frozen' | 'other';
+  generated_week: string | null;
+  from_recipes: string[];
   checked: boolean;
   checked_at: string | null;
   created_at: string;

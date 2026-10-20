@@ -68,6 +68,9 @@ export function novaFactor(p: Product): Factor {
 /** Factor 3: number of additives, with extra penalty for ones flagged by EFSA/EU. */
 export function additivesFactor(p: Product): Factor {
   const base = { id: 'additives', label: 'Additives', weight: WEIGHTS.additives, source: SOURCES.additives } as const;
+  if (p.additivesUnknown) {
+    return { ...base, points: null, value: 'Not available', explanation: 'Additives cannot be determined for a home recipe built from generic ingredients, so this factor is left out of the score.' };
+  }
   const flagged = p.additives.filter((a) => FLAGGED_ADDITIVES[a.code]);
   const penalty = (p.additives.length - flagged.length) * ADDITIVE_PENALTY_EACH + flagged.length * ADDITIVE_PENALTY_FLAGGED;
   const points = clamp(100 - penalty, 0, 100);
