@@ -14,7 +14,9 @@
         {
           "cameraPermission": "Buko uses the camera to scan product barcodes."
         }
-      ]
+      ],
+      "expo-status-bar",
+      "expo-font"
     ],
     "ios": {
       "supportsTablet": false
