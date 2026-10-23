@@ -99,10 +99,31 @@ Before public release, Apple and Google each require a published privacy policy,
 All weights, thresholds, flagged additives and source citations live in [`src/lib/scoring/config.ts`](./src/lib/scoring/config.ts). Each factor's logic is in `factors.ts`. Change a number, run `npm test`, and the app picks it up. Scores are never stored, so there is nothing to migrate.
 
 ## Recipe import
-Paste a recipe link and Buko fetches the page from your phone and reads only its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is always saved and shown. Sites without that data can't be imported; add the recipe by hand instead.
+Paste a recipe link and Buko reads only its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is always saved and shown. Sites without that data can't be imported; add the recipe by hand instead.
+
+- **Native app:** fetches directly from the phone.
+- **Web URL import:** uses the authenticated Supabase Edge Function below because recipe sites generally block cross-origin browser fetches (CORS). The initial server allowlist supports `simplyrecipes.com` and `www.simplyrecipes.com` over HTTPS only; every redirect is checked against that list. New sites must be explicitly reviewed and added in `supabase/functions/import-recipe/handler.ts`.
+- **Saved HTML fallback (web):** open the recipe in your browser, use **Save Page As** to save the full page as HTML, enter its original URL in Buko, and choose the `.html` file. Files are parsed locally, never executed or uploaded, with a 3 MB limit. PDFs, screenshots and Reader-mode exports are not supported. This works without deploying a backend.
+
+Some publishers, including Simply Recipes, may block server fetches with HTTP 403 even when their pages open in a browser. The importer reports that block and offers saved HTML; it does not bypass site protections.
+
+### Deploy the web recipe importer
+The web app deployment does **not** deploy Supabase functions. A Supabase project owner must do this once:
+
+1. Install/use the [Supabase CLI](https://supabase.com/docs/guides/cli) and authenticate with `supabase login` on your own computer. Do not put the access token in the app or Git.
+2. Find your project reference in Supabase **Project Settings → General**.
+3. From the repository root, run:
+   ```bash
+   supabase functions deploy import-recipe --project-ref YOUR_PROJECT_REF --no-verify-jwt
+   ```
+   The entry point is `supabase/functions/import-recipe/index.ts`; deploy it together with `handler.ts`. `--no-verify-jwt` disables only the gateway's legacy JWT check: the function itself **requires a valid signed-in user** and verifies the bearer token with Supabase Auth before fetching any page. No service-role key is used.
+4. Supabase supplies `SUPABASE_URL` and `SUPABASE_ANON_KEY` to deployed functions automatically. No additional app secrets or web rebuild are needed.
+5. Test **Recipes → Import link** while signed in. An undeployed function produces a setup message; a publisher block produces a saved-page suggestion.
+
+The function accepts POST requests only, validates destinations and redirects against its fixed allowlist, limits requests to 4 KB and fetched HTML to 3 MB, and times out remote fetches. It forwards no Buko user credentials to recipe publishers. TypeScript checks cover the shared function handler; the Deno-specific entry point can be checked with `deno check supabase/functions/import-recipe/index.ts`.
 
 ## Privacy
-No analytics, advertising or tracking SDKs. Health data from Apple Health or Health Connect is only used when you turn a feature on, is never used for advertising and is never shared with third parties. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import.
+No analytics, advertising or tracking SDKs. Health data from Apple Health or Health Connect is only used when you turn a feature on, is never used for advertising and is never shared with third parties. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import. Web recipe URL requests go through your Supabase function; saved HTML imports stay on your device until you save the parsed recipe to your account.
 
 ## Data attribution
 Product data is from [Open Food Facts](https://world.openfoodfacts.org) (Open Database License) and is credited in the app. Whole-food data is from [USDA FoodData Central](https://fdc.nal.usda.gov).
