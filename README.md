@@ -62,6 +62,8 @@ npm run build:web
 
 The GitHub Pages deployment runs from `main` and publishes the web app at https://cmgwynn.github.io/buko/. Its Actions environment needs the four `EXPO_PUBLIC_*` values from `.env` configured as repository Actions secrets.
 
+Expo embeds these values at build time. Access them directly as `process.env.EXPO_PUBLIC_*` in app code, without aliasing or destructuring `process.env`. Changes to deployment secrets require a new deployment. The workflow rejects missing or invalid Supabase settings before exporting.
+
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
 

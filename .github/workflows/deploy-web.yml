@@ -30,7 +30,18 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Export web app
-        run: npm run build:web
+        run: |
+          node --input-type=module <<'NODE'
+          const url = process.env.EXPO_PUBLIC_SUPABASE_URL;
+          const key = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+          if (!url || !URL.canParse(url) || new URL(url).protocol !== 'https:') {
+            throw new Error('EXPO_PUBLIC_SUPABASE_URL must be a valid HTTPS URL.');
+          }
+          if (!key || key.length < 20 || key === 'your-supabase-anon-key') {
+            throw new Error('EXPO_PUBLIC_SUPABASE_ANON_KEY is missing or invalid.');
+          }
+          NODE
+          npm run build:web
         env:
           EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.EXPO_PUBLIC_SUPABASE_URL }}
           EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
