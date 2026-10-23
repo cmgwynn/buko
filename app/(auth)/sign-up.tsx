@@ -4,6 +4,7 @@ import { View, useWindowDimensions } from 'react-native';
 import { Body, Button, Card, Notice, Screen, TextField, Title } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/theme';
+import { CoconutLogo } from '../../src/components/CoconutLogo';
 
 export default function SignUp() {
   const { height } = useWindowDimensions();
@@ -31,6 +32,7 @@ export default function SignUp() {
     <Screen variant="form" edges={['top', 'bottom']}>
       <View style={{ marginTop: height < 500 ? spacing.sm : spacing.xxl * 2 }} />
       <Card>
+        <CoconutLogo size={44} />
         <Title>Create your account</Title>
         <View style={{ height: spacing.sm }} />
         <Body muted>Your data stays private to you. No ads, no tracking.</Body>

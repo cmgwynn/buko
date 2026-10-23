@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { Button, Card, Notice, Screen, TextField } from '../../src/components/ui';
 import { estimateCalories, estimateStrengthMinutes, newRecordsFor, type DatedSet } from '../../src/lib/fitness/calc';
 import { exerciseHistory, saveRoutine, saveWorkout } from '../../src/lib/fitness/data';
@@ -53,6 +53,7 @@ export default function ActiveWorkout() {
   const [saveAs, setSaveAs] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -136,7 +137,9 @@ export default function ActiveWorkout() {
   }
 
   async function finish() {
-    if (!auth) return;
+    if (busy) return;
+    if (!auth) return setError('Please log in again before saving your workout.');
+    if (saveAs.trim().length > 100) return setError('Use a routine name of 100 characters or fewer.');
     const done = w.items.filter((i) => i.sets.length > 0);
     if (done.length === 0) return setError('Add at least one exercise with a set.');
     setBusy(true);
@@ -144,7 +147,14 @@ export default function ActiveWorkout() {
     try {
       const sum = summary();
       const id = await saveWorkout(auth.user.id, w, { durationMin: sum.duration, calories: sum.calories || null, caloriesEstimated: true });
-      if (saveAs.trim()) await saveRoutine(auth.user.id, saveAs, w).catch(() => {});
+      let routineError: string | undefined;
+      if (saveAs.trim()) {
+        try {
+          await saveRoutine(auth.user.id, saveAs, w);
+        } catch (err) {
+          routineError = err instanceof Error ? err.message : 'Please try creating the routine again.';
+        }
+      }
       const startedAt = new Date(w.startedAt);
       const name = w.name;
       const hint = activityHintFor(w.items.map((i) => ({ name: i.exercise.name, category: i.exercise.category })));
@@ -154,7 +164,7 @@ export default function ActiveWorkout() {
         // Best effort: a failure here never loses the saved workout.
         syncWorkoutToHealth({ id, name, startedAt, durationMin: sum.duration, calories: sum.calories || null, hint, distanceM: distanceM || null }).catch(() => {});
       }
-      router.replace({ pathname: '/workout/[id]', params: { id } });
+      router.replace({ pathname: '/workout/[id]', params: { id, ...(routineError ? { routineError } : {}) } });
     } catch (e) {
       setError((e as Error).message);
       setBusy(false);
@@ -162,10 +172,7 @@ export default function ActiveWorkout() {
   }
 
   function discard() {
-    Alert.alert('Discard workout?', 'Nothing from this workout will be saved.', [
-      { text: 'Keep going', style: 'cancel' },
-      { text: 'Discard', style: 'destructive', onPress: () => { endSession(); router.replace('/(tabs)/train'); } },
-    ]);
+    setConfirmingDiscard(true);
   }
 
   if (finishing) {
@@ -205,6 +212,14 @@ export default function ActiveWorkout() {
           <Ionicons name="trash-outline" size={22} color={colors.danger} />
         </Pressable>
       </View>
+      {confirmingDiscard ? (
+        <Card>
+          <Text style={typography.heading}>Discard workout?</Text>
+          <Text style={typography.body}>Nothing from this workout will be saved. Your saved routine is kept.</Text>
+          <Button title="Confirm discard workout" variant="danger" onPress={() => { endSession(); router.dismissTo('/(tabs)/train'); }} />
+          <Button title="Keep going" variant="secondary" onPress={() => setConfirmingDiscard(false)} />
+        </Card>
+      ) : null}
 
       <View style={{ height: spacing.md }} />
       {w.items.map((item) => {
@@ -258,6 +273,12 @@ export default function ActiveWorkout() {
                       <Ionicons name="remove-circle-outline" size={20} color={colors.textMuted} />
                     </Pressable>
                   </View>
+                  {!cardio ? (
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs, marginLeft: 30 }}>
+                      <Text style={typography.small}>Minutes (optional)</Text>
+                      <NumInput value={set.duration_s == null ? null : set.duration_s / 60} onChange={(n) => patchSet(item.key, idx, { duration_s: n == null ? null : Math.round(n * 60) })} placeholder="min" />
+                    </View>
+                  ) : null}
                   {records.length ? (
                     <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginLeft: 30, marginTop: 2 }}>
                       🏆 New record: {records.map((r) => RECORD_LABEL[r]).join(', ')}

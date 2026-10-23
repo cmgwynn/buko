@@ -1,8 +1,9 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Button, Card, Loading, Notice, Screen } from '../../src/components/ui';
 import { distanceUnit, toDisplayDistance, toDisplayWeight, weightUnit } from '../../src/lib/fitness/format';
+import { deleteWorkout } from '../../src/lib/fitness/data';
 import { startSession, useWorkoutSession } from '../../src/lib/fitness/session';
 import type { Exercise, WorkoutSet } from '../../src/lib/fitness/types';
 import { removeWorkoutFromHealth } from '../../src/lib/health';
@@ -23,13 +24,15 @@ interface Detail {
 }
 
 export default function WorkoutDetail() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, routineError } = useLocalSearchParams<{ id: string; routineError?: string }>();
   const router = useRouter();
   const { profile } = useProfile();
   const units = profile?.units ?? 'metric';
   const active = useWorkoutSession();
   const [w, setW] = useState<Detail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     supabase
@@ -40,13 +43,13 @@ export default function WorkoutDetail() {
       .then(({ data, error: e }) => (e ? setError(e.message) : setW(data as unknown as Detail)));
   }, [id]);
 
-  if (error) return <Screen><Notice tone="danger">{error}</Notice></Screen>;
+  if (error && !w) return <Screen><Notice tone="danger">{error}</Notice><Button title="Back to Train" onPress={() => router.dismissTo('/(tabs)/train')} /></Screen>;
   if (!w) return <Loading />;
 
   const items = [...w.workout_exercises].sort((a, b) => a.position - b.position).map((i) => ({ ...i, workout_sets: [...i.workout_sets].sort((a, b) => a.position - b.position) }));
 
   function repeat() {
-    if (active.active) return Alert.alert('Workout in progress', 'Finish or discard your current workout first.');
+    if (active.active) return setError('Finish or discard your current workout before starting another.');
     startSession(
       w!.name,
       null,
@@ -59,23 +62,25 @@ export default function WorkoutDetail() {
     router.replace('/workout/active');
   }
 
-  function remove() {
-    Alert.alert('Delete workout?', 'This also removes it from your records and progress.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          const { error: e } = await supabase.from('workouts').delete().eq('id', w!.id);
-          if (e) return setError(e.message);
-          removeWorkoutFromHealth(w!.exported_external_id);
-          router.back();
-        },
-      },
-    ]);
+  async function remove() {
+    if (!w || deleting) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteWorkout(w.id);
+      void removeWorkoutFromHealth(w.exported_external_id).catch((err) => console.warn('Could not remove the workout copy from Health:', err));
+      router.dismissTo('/(tabs)/train');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the workout. Try again.');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
     <Screen>
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {routineError ? <Notice tone="danger">Your workout was saved, but its routine could not be saved: {routineError}. Create a routine from Train instead; do not save the workout again.</Notice> : null}
       <Text style={typography.heading}>{w.name}</Text>
       <Text style={typography.small}>
         {new Date(w.started_at).toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
@@ -102,7 +107,16 @@ export default function WorkoutDetail() {
       <View style={{ height: spacing.md }} />
       {items.length ? <Button title="Repeat this workout" icon="repeat" onPress={repeat} /> : null}
       <View style={{ height: spacing.sm }} />
-      <Button title="Delete workout" variant="danger" onPress={remove} />
+      {confirmingDelete ? (
+        <Card>
+          <Text style={typography.heading}>Delete this workout?</Text>
+          <Text style={typography.body}>This permanently removes it from your Buko records and progress. Saved routines are kept.</Text>
+          {w.source !== 'buko' ? <Notice tone="info">This does not delete the original in your health app. If health import stays on, a later sync may import it again.</Notice> : null}
+          <Button title="Confirm delete workout" variant="danger" loading={deleting} onPress={remove} />
+          <Button title="Cancel deletion" variant="secondary" disabled={deleting} onPress={() => setConfirmingDelete(false)} />
+        </Card>
+      ) : <Button title="Delete workout" variant="danger" onPress={() => setConfirmingDelete(true)} />}
+      <Button title="Back to Train" variant="ghost" disabled={deleting} onPress={() => router.dismissTo('/(tabs)/train')} />
     </Screen>
   );
 }

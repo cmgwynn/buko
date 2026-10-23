@@ -72,6 +72,16 @@ Native builds allow portrait and landscape orientations. Existing installed nati
 ### Interaction and visual design
 Buko shares an iOS-inspired visual system across native and web: grouped neutral backgrounds, rounded surfaces, clear focus states, and a highlighted active tab. Buttons, chips, profile actions, and recipe cards use subtle Reanimated spring feedback; macro bars animate changes and tabs fade between screens. Motion respects the device/browser reduced-motion preference. There are no separate web-only Tailwind or Motion dependencies.
 
+### Starter libraries and routines
+- **Recipes → Browse recipe library:** 12 original, simple recipes across breakfast, lunch, dinner and snacks. Preview ingredients/steps, tap **Use**, customize the draft and **Save recipe** to add a private copy. Library originals stay unchanged. Nutrition comes from ingredient matching; it is not pre-certified. Check ingredients for allergies.
+- **Train → Browse workout library:** six starter sessions covering bodyweight, dumbbells, gym and gentle cardio. **Customize** opens the routine editor; **Save routine** adds an independent template without logging a workout.
+- **Train → Create routine**, or **Edit** on a saved routine: rename, add/remove/reorder exercises and change sets, reps, weight, time and cardio distance. Targets use your preferred units and are per set. Changes affect future sessions only, not logged workouts or a session already in progress.
+- **Delete workout** now uses an in-app confirmation on web and native, with Cancel and explicit error feedback. Saved routines are retained. Deleting an imported workout does not delete its original health-app record, which may import again on a later sync.
+
+These features use the existing fitness migration; no new backend deployment is required. Routine edits use several database requests. If an edit fails partway through, the app explicitly requires a reload before retrying; a failed newly created routine is cleaned up where possible.
+
+The temporary coconut mark is original artwork in [`assets/coconut.svg`](./assets/coconut.svg), with a matching native SVG component and generated app/favicon assets. It appears on authentication screens and tab headers. Native app icon changes require rebuilding the app; web branding updates with the next page load.
+
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
 

@@ -29,6 +29,16 @@ const recipeHeaderOptions = {
   ),
 };
 
+const workoutHeaderOptions = {
+  ...headerOptions,
+  headerRight: () => (
+    <Link href="/(tabs)/train" dismissTo accessibilityLabel="Back to Train"
+      style={{ color: colors.primary, fontSize: 15, fontWeight: '600', padding: spacing.sm }}>
+      Train
+    </Link>
+  ),
+};
+
 function Gate() {
   const { session, loading } = useAuth();
   const { profile, loading: profileLoading } = useProfile();
@@ -57,6 +67,7 @@ function Gate() {
         <Stack.Screen name="recipe/[id]" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
         <Stack.Screen name="recipe/edit" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
         <Stack.Screen name="recipe/import" options={{ ...recipeHeaderOptions, title: 'Import recipe' }} />
+        <Stack.Screen name="recipe/library" options={{ ...recipeHeaderOptions, title: 'Recipe library' }} />
         <Stack.Screen name="recipe/match" options={{ ...headerOptions, title: 'Match ingredient' }} />
         <Stack.Screen name="cook/[id]" options={{ ...headerOptions, title: 'Cooking', gestureEnabled: false }} />
         <Stack.Screen name="cook/finish" options={{ ...headerOptions, title: 'Log meal', headerBackVisible: false, gestureEnabled: false }} />
@@ -64,7 +75,9 @@ function Gate() {
         <Stack.Screen name="pantry" options={{ ...headerOptions, title: 'Pantry' }} />
         <Stack.Screen name="workout/active" options={{ ...headerOptions, title: 'Workout', headerBackVisible: true }} />
         <Stack.Screen name="workout/exercises" options={{ ...headerOptions, title: 'Exercises' }} />
-        <Stack.Screen name="workout/[id]" options={{ ...headerOptions, title: 'Workout' }} />
+        <Stack.Screen name="workout/[id]" options={{ ...workoutHeaderOptions, title: 'Workout' }} />
+        <Stack.Screen name="workout/library" options={{ ...workoutHeaderOptions, title: 'Workout library' }} />
+        <Stack.Screen name="routine/edit" options={{ ...workoutHeaderOptions, title: 'Routine' }} />
         <Stack.Screen name="exercise/[id]" options={{ ...headerOptions, title: 'Exercise' }} />
         <Stack.Screen name="progress" options={{ ...headerOptions, title: 'Progress' }} />
         <Stack.Screen name="body" options={{ ...headerOptions, title: 'Log body stats' }} />

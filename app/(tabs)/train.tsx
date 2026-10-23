@@ -95,6 +95,7 @@ export default function Train() {
         <Button title="Start workout" icon="barbell-outline" onPress={() => start()} />
       )}
       <View style={{ height: spacing.sm }} />
+      <Button title="Browse workout library" icon="library-outline" variant="secondary" onPress={() => router.push('/workout/library')} />
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}><Button title="Progress" icon="stats-chart-outline" variant="secondary" onPress={() => router.push('/progress')} /></View>
         <View style={{ flex: 1 }}><Button title="Exercises" icon="search-outline" variant="secondary" onPress={() => router.push('/workout/exercises')} /></View>
@@ -103,19 +104,21 @@ export default function Train() {
       <Button title="Log weight & measurements" icon="body-outline" variant="secondary" onPress={() => router.push('/body')} />
 
       <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>Routines</Text>
+      <Button title="Create routine" icon="add" variant="secondary" onPress={() => router.push('/routine/edit')} />
       {routines.length === 0 ? (
-        <Text style={typography.small}>Finish a workout and choose “Save as a routine” to repeat it later with one tap.</Text>
+        <Text style={typography.small}>Create your own routine, customize an idea from the workout library, or save one when finishing a workout.</Text>
       ) : (
         routines.map((r) => (
-          <Pressable key={r.id} onPress={() => start(r)}>
-            <Card style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}>
-              <View style={{ flex: 1 }}>
+            <Card key={r.id} style={{ padding: spacing.md }}>
+              <View>
                 <Text style={typography.subheading}>{r.name}</Text>
                 <Text style={typography.small} numberOfLines={1}>{r.routine_exercises.map((x) => x.exercises.name).join(' · ')}</Text>
               </View>
-              <Ionicons name="play-circle-outline" size={26} color={colors.primary} />
+              <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+                <View style={{ flex: 1 }}><Button title="Start" icon="play-outline" disabled={active.active} onPress={() => start(r)} /></View>
+                <View style={{ flex: 1 }}><Button title="Edit" icon="create-outline" variant="secondary" onPress={() => router.push({ pathname: '/routine/edit', params: { id: r.id } })} /></View>
+              </View>
             </Card>
-          </Pressable>
         ))
       )}
 

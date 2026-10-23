@@ -3,6 +3,7 @@ import { supabase } from '../supabase';
 import type { DatedSet } from './calc';
 import type { Exercise, MeasurementKind, WorkoutSet } from './types';
 import type { WorkoutSession } from './session';
+import type { RoutineExercise } from './routines';
 
 export const localDate = (iso: string) => toDateString(new Date(iso));
 
@@ -107,38 +108,27 @@ export async function saveWorkout(
 }
 
 export async function saveRoutine(userId: string, name: string, s: WorkoutSession): Promise<void> {
-  const { data, error } = await supabase.from('routines').insert({ user_id: userId, name: name.trim() || 'Routine' }).select('id').single();
-  if (error) throw new Error(error.message);
-  const routineId = (data as { id: string }).id;
-  const rows = s.items.map((i, idx) => {
+  const items: RoutineExercise[] = s.items.map((i) => {
     const working = i.sets.filter((x) => !x.is_warmup);
     const top = working[0] ?? i.sets[0];
     const cardio = i.exercise.category === 'cardio';
     return {
-      routine_id: routineId,
-      user_id: userId,
-      exercise_id: i.exercise.id,
-      position: idx,
-      target_sets: cardio ? 1 : Math.max(1, working.length),
-      target_reps: cardio ? null : top?.reps || null,
-      target_weight_kg: cardio ? null : top?.weight_kg ?? null,
-      target_duration_s: cardio ? top?.duration_s || null : null,
-      target_distance_m: cardio ? top?.distance_m || null : null,
+      exercise: i.exercise,
+      sets: cardio ? 1 : Math.max(1, working.length),
+      reps: cardio ? null : top?.reps || null,
+      weightKg: cardio ? null : top?.weight_kg ?? null,
+      durationS: top?.duration_s || null,
+      distanceM: cardio ? top?.distance_m || null : null,
     };
   });
-  if (rows.length) {
-    const { error: e2 } = await supabase.from('routine_exercises').insert(rows);
-    if (e2) {
-      await supabase.from('routines').delete().eq('id', routineId);
-      throw new Error(e2.message);
-    }
-  }
+  await saveRoutineTemplate(userId, name.trim() || 'Routine', items);
 }
 
 export interface RoutineRow {
   id: string;
   name: string;
   routine_exercises: {
+    id?: string;
     position: number;
     exercise_id: string;
     target_sets: number | null;
@@ -153,10 +143,62 @@ export interface RoutineRow {
 export async function loadRoutines(): Promise<RoutineRow[]> {
   const { data, error } = await supabase
     .from('routines')
-    .select('id, name, routine_exercises(position, exercise_id, target_sets, target_reps, target_weight_kg, target_duration_s, target_distance_m, exercises(*))')
+    .select('id, name, routine_exercises(id, position, exercise_id, target_sets, target_reps, target_weight_kg, target_duration_s, target_distance_m, exercises(*))')
     .order('updated_at', { ascending: false });
   if (error) throw new Error(error.message);
   return (data as unknown as RoutineRow[]).map((r) => ({ ...r, routine_exercises: [...r.routine_exercises].sort((a, b) => a.position - b.position) }));
+}
+
+export function editableRoutineItems(routine: RoutineRow): RoutineExercise[] {
+  return routine.routine_exercises.map((item) => ({
+    id: item.id, exercise: item.exercises, sets: item.target_sets ?? 1, reps: item.target_reps,
+    weightKg: item.target_weight_kg, durationS: item.target_duration_s, distanceM: item.target_distance_m,
+  }));
+}
+
+/** Updates only the routine template, never workout history. Keep existing child ids when editing. */
+export async function saveRoutineTemplate(userId: string, name: string, items: RoutineExercise[], original?: RoutineRow): Promise<string> {
+  if (!name.trim() || name.trim().length > 100 || !items.length) throw new Error('Enter a name and at least one exercise.');
+  let id = original?.id;
+  if (!id) {
+    const { data, error } = await supabase.from('routines').insert({ user_id: userId, name: name.trim() }).select('id').single();
+    if (error) throw new Error(error.message);
+    id = (data as { id: string }).id;
+  }
+  try {
+    const { data: saved, error } = await supabase.from('routine_exercises').upsert(items.map((item, position) => ({
+      ...(item.id ? { id: item.id } : {}),
+      routine_id: id, user_id: userId, exercise_id: item.exercise.id, position,
+      target_sets: item.sets, target_reps: item.reps, target_weight_kg: item.weightKg,
+      target_duration_s: item.durationS, target_distance_m: item.distanceM,
+    })), { onConflict: 'id', defaultToNull: false }).select('id');
+    if (error) throw new Error(error.message);
+    if (!saved || saved.length !== items.length) throw new Error('Not all routine exercises were saved. Please reload.');
+    const savedIds = new Set(saved.map((row: { id: string }) => row.id));
+    const removedIds = original?.routine_exercises.flatMap((item) => item.id && !savedIds.has(item.id) ? [item.id] : []) ?? [];
+    if (removedIds.length) {
+      const { error: removeError } = await supabase.from('routine_exercises').delete().eq('routine_id', id).in('id', removedIds);
+      if (removeError) throw new Error(removeError.message);
+    }
+    const { data: updated, error: updateError } = await supabase.from('routines')
+      .update({ name: name.trim(), updated_at: new Date().toISOString() }).eq('id', id).eq('user_id', userId).select('id').single();
+    if (updateError) throw new Error(updateError.message);
+    if (!updated) throw new Error('The routine could not be updated.');
+    return id;
+  } catch (error) {
+    if (!original) {
+      const { error: cleanupError } = await supabase.from('routines').delete().eq('id', id);
+      if (cleanupError) throw new Error('The routine was only partly saved and cleanup failed. Reload Train and review it before trying again.');
+    }
+    const message = error instanceof Error ? error.message : 'Could not save routine.';
+    throw new Error(original ? `${message} Some changes may have been saved. Reload the routine before trying again.` : message);
+  }
+}
+
+export async function deleteWorkout(id: string): Promise<void> {
+  const { data, error } = await supabase.from('workouts').delete().eq('id', id).select('id');
+  if (error) throw new Error(error.message);
+  if (!data?.length) throw new Error('The workout was not deleted. It may already be gone, or your session may have expired. Reload Train and try again.');
 }
 
 /** Turn a routine into starting items for a new workout. */

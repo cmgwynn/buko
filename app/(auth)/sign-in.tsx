@@ -4,6 +4,7 @@ import { Text, View, useWindowDimensions } from 'react-native';
 import { Body, Button, Card, Notice, Screen, TextField, Title } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/theme';
+import { CoconutLogo } from '../../src/components/CoconutLogo';
 
 export default function SignIn() {
   const { height } = useWindowDimensions();
@@ -23,7 +24,10 @@ export default function SignIn() {
   return (
     <Screen variant="form" edges={['top', 'bottom']}>
       <View style={{ marginTop: height < 500 ? spacing.sm : spacing.xxl * 2, marginBottom: spacing.xl, paddingHorizontal: spacing.sm }}>
-        <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.5, color: colors.primary }}>Buko</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+          <CoconutLogo size={52} />
+          <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.5, color: colors.primary }}>Buko</Text>
+        </View>
         <Body muted>Scan it. Plan it. Cook it. Log it.</Body>
       </View>
       <Card>
