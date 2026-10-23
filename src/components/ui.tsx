@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Children, type ComponentProps, type ReactNode } from 'react';
+import { Children, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
   type StyleProp, type TextInputProps, type ViewStyle,
@@ -38,10 +38,12 @@ export function Screen({
 }
 
 export function CardGrid({ children }: { children: ReactNode }) {
+  const [width, setWidth] = useState(0);
+  const columnWidth = width >= 320 * 2 + spacing.lg ? (width - spacing.lg) / 2 : '100%';
   return (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg }}>
+    <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg }}>
       {Children.map(children, (child) => child == null ? null : (
-        <View style={{ flexBasis: 320, flexGrow: 1, minWidth: 0, maxWidth: '100%' }}>{child}</View>
+        <View style={{ width: columnWidth, minWidth: 0 }}>{child}</View>
       ))}
     </View>
   );

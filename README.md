@@ -65,7 +65,7 @@ The GitHub Pages deployment runs from `main` and publishes the web app at https:
 Expo embeds these values at build time. Access them directly as `process.env.EXPO_PUBLIC_*` in app code, without aliasing or destructuring `process.env`. Changes to deployment secrets require a new deployment. The workflow rejects missing or invalid Supabase settings before exporting.
 
 ### Responsive layout
-The app uses the full width on phones and a centered frame (up to 1040 px) on desktop. Content is capped at 880 px and forms at 520 px. Diary meals and recipe lists switch from one to two columns when space permits. Rotating a phone reflows the layout without losing the current screen; short landscape windows use less top spacing and scrollable scanner/cooking controls.
+The app uses the full width on phones and a centered frame (up to 1040 px) on desktop. Content is capped at 880 px and forms at 520 px. Diary meals and recipe lists switch from one to two columns when space permits; a lone card keeps its column width instead of stretching across the row. Rotating a phone reflows the layout without losing the current screen; short landscape windows use less top spacing and scrollable scanner/cooking controls.
 
 Native builds allow portrait and landscape orientations. Existing installed native builds need rebuilding to pick up the orientation setting; the browser version adapts immediately.
 
