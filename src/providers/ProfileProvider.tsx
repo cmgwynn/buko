@@ -1,11 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import { birthdayTargets, profileAge } from '../lib/nutrition/birthday';
+import { useLocalDay } from '../lib/useLocalDay';
 import type { NutritionTargets, Profile } from '../types';
 import { useAuth } from './AuthProvider';
 
 interface ProfileContextValue {
   profile: Profile | null;
   targets: NutritionTargets | null;
+  age: number | null;
+  today: string;
+  birthdayError: string | null;
   /** True until the first profile fetch for the current user completes. */
   loading: boolean;
   refresh: () => Promise<void>;
@@ -14,6 +19,9 @@ interface ProfileContextValue {
 const ProfileContext = createContext<ProfileContextValue>({
   profile: null,
   targets: null,
+  age: null,
+  today: '',
+  birthdayError: null,
   loading: true,
   refresh: async () => {},
 });
@@ -24,6 +32,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
   const [loadedFor, setLoadedFor] = useState<string | null>(null);
+  const today = useLocalDay();
 
   const refresh = useCallback(async () => {
     if (!userId) {
@@ -48,7 +57,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   // Loading until the profile for the *current* user has been fetched (avoids flashing onboarding on sign-in).
   const loading = userId !== null && loadedFor !== userId;
 
-  const value = useMemo(() => ({ profile, targets, loading, refresh }), [profile, targets, loading, refresh]);
+  const value = useMemo(() => {
+    const date = new Date(`${today}T12:00:00`);
+    const age = profile ? profileAge(profile, date) : null;
+    let currentTargets = targets;
+    let birthdayError: string | null = null;
+    if (profile?.birth_date) {
+      try {
+        currentTargets = birthdayTargets(profile, date);
+      } catch (err) {
+        currentTargets = null;
+        birthdayError = err instanceof Error ? err.message : 'Could not calculate targets from your birthday. Please update your details.';
+      }
+    }
+    return { profile, targets: currentTargets, age, today, birthdayError, loading, refresh };
+  }, [profile, targets, today, loading, refresh]);
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
 

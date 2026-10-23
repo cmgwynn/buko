@@ -17,7 +17,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage) and [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql) (Phase 3: workouts, exercises, body stats, health data, settings). This creates the tables and turns on row-level security so each user can only read and write their own rows.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql) (Phase 3: fitness and health), and [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql) (birthday-based age). This creates the tables and turns on row-level security so each user can only read and write their own rows. For an existing database, run only migrations that have not already been applied.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -81,6 +81,15 @@ Buko shares an iOS-inspired visual system across native and web: rounded surface
 These features use the existing fitness migration; no new backend deployment is required. Routine edits use several database requests. If an edit fails partway through, the app explicitly requires a reload before retrying; a failed newly created routine is cleaned up where possible.
 
 The temporary coconut mark is original artwork in [`assets/coconut.svg`](./assets/coconut.svg), with a matching native SVG component and generated app/favicon assets. It appears on authentication screens and tab headers. Native app icon changes require rebuilding the app; web branding updates with the next page load.
+
+### Birthday-based age and automation
+Before deploying the birthday UI to an existing installation, run [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql) in **Supabase → SQL Editor → New query**. It adds a private, nullable `profiles.birth_date`, keeps existing data and owner-only RLS, and refreshes the API schema. The birthday migration is safe to rerun: it keeps an existing birthday column and named validation constraint instead of recreating them. If an older copy reports `constraint "profiles_birth_date_valid" already exists`, rerun the complete updated file in a new query. No birthday is inferred for existing users. The old app continues working after the migration.
+
+Onboarding and **Profile → Update details & recalculate** ask for month, day and year instead of age. The app requires a valid birthday for ages 18–100 when saving the form. Existing users retain their stored targets and approximate age until they choose to enter their actual birthday.
+
+For profiles with a birthday, completed age and formula-based calorie/macro targets update on the device at local midnight and when the app resumes. A Feb 29 birthday advances March 1 in non-leap years. Profile and activity-adjusted diary targets share the same age calculation. Birthday target changes are derived on-device, not background database jobs: they do not rewrite food logs, saved targets, goals or preferences. If migration `0004` has not been applied, birthday saves show a setup error instead of silently dropping the date.
+
+Phase 4 remains planned, not implemented: customization will guide automation through user goals, preferences and constraints, with explanations, safety limits, pause and override controls. See [PROJECT.md](./PROJECT.md#phase-4-design-direction).
 
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.

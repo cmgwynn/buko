@@ -9,6 +9,7 @@ Principles
 - Every health score is explainable and tied to a named source.
 - Privacy first: no analytics, ads, or tracking SDKs. User data goes nowhere except our Supabase project; the only third-party calls are food lookups (Open Food Facts, USDA).
 - Calm, minimal, modern design driven by a single theme file (`src/theme/index.ts`).
+- Preference-driven automation: users choose goals, preferences and constraints; Buko uses those choices to reduce daily work. Customization should guide automation, not create more manual chores. Keep suggestions explainable, adjustable and easy to override.
 
 ## Tech stack
 - Expo (React Native) + TypeScript
@@ -24,7 +25,14 @@ Principles
 | 1 | Auth + onboarding + Mifflin-St Jeor targets; barcode scanner with explainable 0–100 score and alternatives; food diary + daily dashboard; grocery list | **Done**: tested end-to-end on a real phone with Expo Go (2026-10-19) |
 | 2 | Recipes (own + URL import), weekly meal planner, grocery generation, pantry, cooking mode, scaling | **Built**; migration `0002` must be run; drag, notifications, photos and live URL import not yet tested on a device |
 | 3 | Fitness: workouts, exercise library, routines, progress charts, HealthKit / Health Connect, activity-adjusted calorie target | **Built**; migration `0003` must be run; health integrations need a development build and are untested on a device |
-| 4 | Adaptive goals: adjust targets from weight trend, intake, and activity | Not started |
+| 4 | Preference-driven adaptive goals: use weight trend, intake and activity within user-selected goals, constraints and automation controls | Not started; design direction below |
+
+### Phase 4 design direction
+- Ask users what outcomes, dietary preferences, schedules and practical constraints matter to them; use these as inputs to automation rather than requiring daily configuration. Specific settings and scope still need design and approval.
+- Explain what changed and why, distinguish estimates from measurements, and let users preview/approve recommendations, pause adaptation or override a suggestion.
+- Preserve explicit user choices. Before adding editable nutrition targets, model automatic recommendations separately from manual overrides so a birthday, sync or trend update cannot silently overwrite a user's settings.
+- Maintain existing calorie floors and surface warnings; missing or uncertain data must not become confident recommendations. Do not infer allergies or medical suitability.
+- Minimize personal data and offer clear controls. Birthday-based age is a small foundation for this direction, not implementation of Phase 4 trend adaptation.
 
 ## Layout
 - `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
@@ -50,7 +58,7 @@ Log every architectural decision here (newest last).
 | 6 | 2026-10-19 | Calorie floor is enforced by clamping (1,200 women / 1,500 men) and a visible warning, stored as `nutrition_targets.floor_applied` | Never silently set an unsafe target; replaces the earlier `below_floor_acknowledged` idea |
 | 7 | 2026-10-19 | "Prefer not to say" sex uses the Mifflin-St Jeor midpoint offset (−78) and the higher 1,500 kcal floor | Conservative default |
 | 8 | 2026-10-19 | Macros: protein 1.8/1.6/2.0 g/kg (lose/maintain/gain), fat 25% of kcal, carbs the remainder. Goal adjustment −500/0/+300 kcal | Approved by founders |
-| 9 | 2026-10-19 | Store `birth_year` (derived from entered age) instead of `birth_date`; app is 18+ only | Onboarding asks for age, not date of birth; the calculation isn't validated for minors |
+| 9 | 2026-10-19 | Store `birth_year` (derived from entered age) instead of `birth_date`; app is 18+ only. Superseded by decision 27. | Original onboarding asked for age, not date of birth; the calculation isn't validated for minors |
 | 10 | 2026-10-19 | Height/weight stored metric; `units` preference stored for display | Calculation in one unit system, friendly input |
 | 11 | 2026-10-19 | Session persisted in AsyncStorage; `EXPO_PUBLIC_*` env vars for Supabase URL/anon key and USDA key | Simple under Expo Go; anon key is public by design, protected by RLS; USDA key is free/low-risk (approved) |
 | 12 | 2026-10-19 | Email confirmation: app handles both modes; README recommends turning it off in Supabase while developing | Least friction on phones with Expo Go |
@@ -68,6 +76,8 @@ Log every architectural decision here (newest last).
 | 24 | 2026-10-19 | Drag-and-drop in the planner (long-press) with tap-to-pick fallback | Approved; drag is the riskiest feature on-device |
 | 25 | 2026-10-19 | Recipe accuracy pass after device testing: package sizes ("(8 ounce) package") set the real weight; herbs, greens, sprouts, nuts and chopped veg get realistic densities; USDA matching rewrites awkward names, penalises candy/restaurant/"light" results and returns no match instead of a wrong one (seasoning mixes are left for the user); edit screen shows per-ingredient kcal, the site's own calories for comparison, and a warning when servings were assumed | Imported recipes were off by hundreds of kcal (candy mint, water-density herbs, a missing bag of fries). Traced against two real recipes: 908 → 687 kcal vs the site's 659 |
 | 26 | 2026-10-19 | Planned meals reach the diary: one-tap Log on each planned entry in the Diary and Plan tabs, plus an "Add recipe" option per meal in the Diary; all use one shared `logRecipeServings` | Planning shouldn't mean re-entering meals |
+| 27 | 2026-10-23 | Store private `birth_date` through additive migration `0004`; preserve nullable legacy birthdays and retain `birth_year` for compatibility. Use completed local-calendar age, with Feb 29 advancing March 1 in non-leap years. Derive formula-based targets on-device at local midnight/resume without writing over stored targets or food history. | Age should update on the actual birthday. Never fabricate birthdays from approximate birth years. New/updated profiles still require ages 18–100. |
+| 28 | 2026-10-23 | Phase 4 customization should steer explainable automation through users' goals, preferences and constraints, with pause/override controls and safety limits. | Reduce the effort of maintaining a healthy lifestyle while keeping users in control; detailed Phase 4 implementation remains out of scope. |
 
 ### Phase 2 schema (`0002_recipes_planning.sql`, all RLS, owner-only)
 - `recipes`, `recipe_ingredients`, `recipe_steps` (child tables also require the parent recipe to be owned by the caller)

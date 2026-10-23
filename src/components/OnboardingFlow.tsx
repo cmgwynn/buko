@@ -2,6 +2,7 @@ import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { floorWarning, calculateTargets, MIN_AGE } from '../lib/nutrition/targets';
+import { ageOnDate, birthDateFromParts } from '../lib/nutrition/birthday';
 import { cmToFtIn, ftInToCm, kgToLb, lbToKg } from '../lib/units';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
@@ -52,14 +53,16 @@ function Option({ title, desc, selected, onPress }: { title: string; desc: strin
 export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
   const router = useRouter();
   const { session } = useAuth();
-  const { profile, refresh } = useProfile();
+  const { profile, refresh, today } = useProfile();
 
   const initialUnits: Units = profile?.units ?? 'imperial';
   const initialFt = profile ? cmToFtIn(profile.height_cm) : null;
   const [step, setStep] = useState(0);
   const [goal, setGoal] = useState<Goal | null>(profile?.goal ?? null);
   const [sex, setSex] = useState<Sex | null>(profile?.sex ?? null);
-  const [age, setAge] = useState(profile ? String(new Date().getFullYear() - profile.birth_year) : '');
+  const [birthYear, setBirthYear] = useState(profile?.birth_date?.slice(0, 4) ?? '');
+  const [birthMonth, setBirthMonth] = useState(profile?.birth_date?.slice(5, 7) ?? '');
+  const [birthDay, setBirthDay] = useState(profile?.birth_date?.slice(8, 10) ?? '');
   const [units, setUnits] = useState<Units>(initialUnits);
   const [cm, setCm] = useState(profile && initialUnits === 'metric' ? String(Math.round(profile.height_cm)) : '');
   const [ft, setFt] = useState(profile && initialFt ? String(initialFt.ft) : '');
@@ -72,16 +75,17 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const ageNum = parseInt(age, 10);
+  const birthDate = birthDateFromParts(birthYear, birthMonth, birthDay);
+  const ageNum = ageOnDate(birthDate, new Date(`${today}T12:00:00`));
   const heightCm = units === 'metric' ? parseFloat(cm) : ftInToCm(parseInt(ft || '0', 10), parseFloat(inches || '0'));
   const weightKg = units === 'metric' ? parseFloat(weight) : lbToKg(parseFloat(weight));
 
-  const ageOk = Number.isInteger(ageNum) && ageNum >= MIN_AGE && ageNum <= 100;
+  const ageOk = ageNum !== null && ageNum >= MIN_AGE && ageNum <= 100;
   const heightOk = heightCm >= 120 && heightCm <= 250;
   const weightOk = weightKg >= 30 && weightKg <= 300;
 
   const result = useMemo(() => {
-    if (!goal || !sex || !activity || !ageOk || !heightOk || !weightOk) return null;
+    if (!goal || !sex || !activity || !ageOk || ageNum === null || !heightOk || !weightOk) return null;
     return calculateTargets({ goal, sex, age: ageNum, heightCm, weightKg, activityLevel: activity });
   }, [goal, sex, activity, ageNum, heightCm, weightKg, ageOk, heightOk, weightOk]);
 
@@ -91,13 +95,13 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
     setDiets((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
 
   async function save() {
-    if (!result || !goal || !sex || !activity || !session) return;
+    if (busy || !result || !birthDate || !goal || !sex || !activity || !session) return;
     setBusy(true);
     setError(null);
     const userId = session.user.id;
     const now = new Date().toISOString();
     const p = await supabase.from('profiles').upsert({
-      user_id: userId, goal, sex, birth_year: new Date().getFullYear() - ageNum,
+      user_id: userId, goal, sex, birth_year: Number(birthYear), birth_date: birthDate,
       height_cm: Math.round(heightCm * 10) / 10, weight_kg: Math.round(weightKg * 10) / 10,
       activity_level: activity, diet_prefs: diets, units, updated_at: now,
     });
@@ -107,7 +111,10 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
     });
     const err = p.error ?? t?.error;
     if (err) {
-      setError(err.message);
+      const missingBirthdayColumn = p.error && (p.error.code === 'PGRST204' || p.error.code === '42703') && p.error.message.includes('birth_date');
+      setError(missingBirthdayColumn
+        ? 'Birthday storage is not enabled yet. The app owner needs to run database migration 0004_profile_birthdays.sql. Your changes were not saved.'
+        : t?.error ? `Your profile was saved, but saving its targets failed: ${err.message}. Please retry Save.` : err.message);
       setBusy(false);
       return;
     }
@@ -149,8 +156,18 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
           </ChipRow>
           <Body muted>The Mifflin-St Jeor equation differs slightly by sex. &quot;Prefer not to say&quot; uses the average of the two.</Body>
           <View style={{ height: spacing.lg }} />
-          <TextField label="Age" value={age} onChangeText={setAge} keyboardType="number-pad" maxLength={3} placeholder="e.g. 30"
-            error={age && !ageOk ? `Buko is for adults (${MIN_AGE}–100).` : null} />
+          <Label>Birthday</Label>
+          <Body muted>Your birthday stays in your private profile. Age and formula-based targets update automatically on your birthday.</Body>
+          {profile && !profile.birth_date ? <Notice tone="info">We previously stored only an approximate birth year. Please enter your actual birthday once; we will not guess it.</Notice> : null}
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <View style={{ flex: 1 }}><TextField label="Month" value={birthMonth} onChangeText={setBirthMonth} keyboardType="number-pad" maxLength={2} placeholder="MM" /></View>
+            <View style={{ flex: 1 }}><TextField label="Day" value={birthDay} onChangeText={setBirthDay} keyboardType="number-pad" maxLength={2} placeholder="DD" /></View>
+            <View style={{ flex: 1.4 }}><TextField label="Year" value={birthYear} onChangeText={setBirthYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" /></View>
+          </View>
+          {birthYear || birthMonth || birthDay ? (
+            ageOk ? <Body muted>Age {ageNum} · updates automatically</Body>
+              : <Notice tone="danger">Enter a valid birthday. Buko is for adults aged {MIN_AGE}–100.</Notice>
+          ) : null}
         </>
       )}
 

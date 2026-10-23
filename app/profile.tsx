@@ -14,12 +14,13 @@ const GOAL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain wei
 export default function Profile() {
   const router = useRouter();
   const { session } = useAuth();
-  const { profile, targets } = useProfile();
+  const { profile, targets, age, birthdayError } = useProfile();
 
   return (
     <Screen edges={[]}>
       <Heading>{session?.user.email}</Heading>
       <View style={{ height: spacing.lg }} />
+      {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
 
       {targets ? (
         <Card>
@@ -38,6 +39,14 @@ export default function Profile() {
         <Card>
           <Text style={typography.label}>Your details</Text>
           <Body>{GOAL[profile.goal]} · {formatHeight(profile.height_cm, profile.units)} · {formatWeight(profile.weight_kg, profile.units)}</Body>
+          {profile.birth_date ? (
+            <>
+              <Body muted>Birthday: {new Date(`${profile.birth_date}T12:00:00`).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })} · Age {age ?? 'unavailable'}</Body>
+              <Body muted>Your age and formula-based targets update automatically on your birthday.</Body>
+            </>
+          ) : (
+            <Body muted>Age: approximately {age}. Add your birthday in Update details to keep your age and formula-based targets accurate automatically.</Body>
+          )}
           {profile.diet_prefs.length ? <Body muted>Diet: {profile.diet_prefs.map((d) => d.replace('_', '-')).join(', ')}</Body> : null}
           <Button title="Update details & recalculate" variant="secondary" onPress={() => router.push('/edit-profile')} />
         </Card>

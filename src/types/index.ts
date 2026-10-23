@@ -12,6 +12,8 @@ export interface Profile {
   goal: Goal;
   sex: Sex;
   birth_year: number;
+  /** Calendar date (YYYY-MM-DD); absent/null until legacy users supply their birthday. */
+  birth_date?: string | null;
   height_cm: number;
   weight_kg: number;
   activity_level: ActivityLevel;

@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Card, CardGrid, Empty, Heading, Screen } from '../../src/components/ui';
+import { Card, CardGrid, Empty, Heading, Notice, Screen } from '../../src/components/ui';
 import { addDays, formatDay, MEALS, toDateString } from '../../src/lib/diary';
 import { activityAdjustedTargets } from '../../src/lib/fitness/calc';
 import { loadBurnedForDay } from '../../src/lib/fitness/data';
@@ -21,7 +21,7 @@ import type { FoodLogEntry } from '../../src/types';
 
 export default function Diary() {
   const router = useRouter();
-  const { targets: baseTargets, profile } = useProfile();
+  const { targets: baseTargets, profile, age, birthdayError } = useProfile();
   const { settings } = useSettings();
   const [burned, setBurned] = useState(0);
   const { session } = useAuth();
@@ -71,9 +71,9 @@ export default function Diary() {
     { calories: 0, protein: 0, carbs: 0, fat: 0 },
   );
   const adjusted =
-    settings?.activity_adjust && profile && baseTargets
+    settings?.activity_adjust && profile && baseTargets && age !== null
       ? activityAdjustedTargets(
-          { goal: profile.goal, sex: profile.sex, age: new Date().getFullYear() - profile.birth_year, heightCm: profile.height_cm, weightKg: profile.weight_kg, activityLevel: profile.activity_level },
+          { goal: profile.goal, sex: profile.sex, age, heightCm: profile.height_cm, weightKg: profile.weight_kg, activityLevel: profile.activity_level },
           burned,
           settings.activity_share,
         )
@@ -107,6 +107,7 @@ export default function Diary() {
   return (
     <Screen>
       <TabHeader title="Diary" />
+      {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
         <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={12} accessibilityLabel="Previous day">
           <Ionicons name="chevron-back" size={24} color={colors.primary} />
