@@ -109,9 +109,11 @@ export default function HealthSettings() {
       <Text style={[typography.small, { marginTop: spacing.sm }]}>
         Turning a switch off stops Buko using that data. To fully revoke access, open {Platform.OS === 'ios' ? 'Settings › Health › Data Access & Devices › Buko' : 'Health Connect › App permissions › Buko'}.
       </Text>
-      <Text style={[typography.small, { color: colors.primary, marginTop: spacing.md }]} onPress={() => Linking.openSettings()}>
-        Open phone settings
-      </Text>
+      {Platform.OS !== 'web' ? (
+        <Text style={[typography.small, { color: colors.primary, marginTop: spacing.md }]} onPress={() => Linking.openSettings()}>
+          Open phone settings
+        </Text>
+      ) : null}
       {Platform.OS === 'ios' ? (
         <Text style={[typography.small, { marginTop: spacing.md }]}>
           Note: iOS never tells apps whether read access was granted. If steps or calories show nothing, check Settings › Health › Data Access & Devices › Buko.

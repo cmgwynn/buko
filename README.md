@@ -48,6 +48,20 @@ npx expo start -c
 4. If Expo Go says you must sign in to Expo CLI, run `npx expo login --sso` (use "Continue with GitHub"); a GitHub password does not work in the terminal.
 5. If the QR code won't connect (guest Wi-Fi, VPN, firewall), run `npx expo start --tunnel` instead.
 
+## Run in a web browser
+```bash
+npm run web
+```
+
+Open the URL shown by Expo. The same Supabase and USDA environment variables are used on web; add them to `.env` before starting. Barcode lookup is available by entering a barcode manually. Camera scanning and Apple Health / Health Connect require the mobile app.
+
+To create a static web export for hosting:
+```bash
+npm run build:web
+```
+
+The GitHub Pages deployment runs from `main` and publishes the web app at https://cmgwynn.github.io/buko/. Its Actions environment needs the four `EXPO_PUBLIC_*` values from `.env` configured as repository Actions secrets.
+
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
 

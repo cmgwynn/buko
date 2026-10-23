@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
 import { colors, radius, spacing, typography } from '../theme';
 import { Button, TextField } from './ui';
 
@@ -20,6 +20,17 @@ export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) 
     // Allow scanning again shortly after, e.g. when the user comes back to this screen.
     setTimeout(() => { lock.current = false; }, 2500);
   };
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={[styles.fill, { padding: spacing.lg }]}>
+        <Text style={[typography.small, { textAlign: 'center' }]}>
+          Camera scanning is available in the mobile app. Enter a barcode below to look up a product.
+        </Text>
+        <ManualEntry value={manual} onChange={setManual} onSubmit={fire} />
+      </View>
+    );
+  }
 
   if (!permission) return <View style={styles.fill} />;
 
