@@ -1,10 +1,10 @@
-import type { Product } from '../../types';
-import { ALTERNATIVE_MIN_IMPROVEMENT, MIN_KNOWN_WEIGHT, RATING_BANDS, type RatingKey } from './config';
-import { allFactors, type Factor } from './factors';
+import type { Product } from '../../types/index.ts';
+import { ALTERNATIVE_MIN_IMPROVEMENT, MIN_KNOWN_WEIGHT, RATING_BANDS, type RatingKey } from './config.ts';
+import { allFactors, type Factor } from './factors.ts';
 
-export { ALTERNATIVES_BELOW } from './config';
-export type { Factor } from './factors';
-export type { RatingKey } from './config';
+export { ALTERNATIVES_BELOW } from './config.ts';
+export type { Factor } from './factors.ts';
+export type { RatingKey } from './config.ts';
 
 export interface ScoreResult {
   /** 0–100, or null when there is not enough data to score honestly. */

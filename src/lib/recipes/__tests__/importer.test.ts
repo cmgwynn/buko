@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { createImportHandler } from '../../../../supabase/functions/import-recipe/handler';
-import { importRecipeFromHtml, importRecipeFromUrl, importRecipeViaBackend, MAX_RECIPE_BYTES } from '../importer';
+import { importRecipeFromHtml, importRecipeFromUrl, importRecipeViaBackend, MAX_RECIPE_BYTES, normaliseUrl, supportedRecipeUrl, SUPPORTED_RECIPE_HOSTS } from '../importer';
 
 const url = 'https://www.simplyrecipes.com/recipes/fish_tacos/';
 const html = `<script type="application/ld+json">${JSON.stringify({
@@ -25,10 +25,14 @@ describe('saved recipe import', () => {
 });
 
 describe('recipe URL import', () => {
-  it('preserves native direct import', async () => {
-    const fetchMock = mock.method(globalThis, 'fetch', async () => new Response(html));
+  it('uses the same authenticated backend for native import', async () => {
+    assert.equal(importRecipeFromUrl, importRecipeViaBackend);
+    const fetchMock = mock.method(globalThis, 'fetch', async (input: string | URL | Request) => {
+      assert.equal(input, 'https://project.supabase.co/functions/v1/import-recipe');
+      return Response.json({ html, sourceUrl: url });
+    });
     try {
-      assert.equal((await importRecipeFromUrl(url)).sourceUrl, url);
+      assert.equal((await importRecipeFromUrl(url, { supabaseUrl: 'https://project.supabase.co', anonKey: 'key', accessToken: 'token' })).sourceUrl, url);
     } finally { fetchMock.mock.restore(); }
   });
   it('calls the authenticated backend and parses its result', async () => {
@@ -55,6 +59,27 @@ describe('recipe URL import', () => {
       } finally { fetchMock.mock.restore(); }
     });
   }
+  it('normalises supported addresses and rejects unsafe or unsupported inputs before fetch', async () => {
+    assert.equal(supportedRecipeUrl('  WWW.ALLRECIPES.COM/recipe/1  '), 'https://www.allrecipes.com/recipe/1');
+    assert.throws(() => normaliseUrl('   '), /Enter a recipe/);
+    const fetchMock = mock.method(globalThis, 'fetch', async () => { throw new Error('must not fetch'); });
+    try {
+      for (const target of [
+        'https://example.com/recipe', 'http://allrecipes.com/recipe', 'https://allrecipes.com.evil.test/',
+        'https://recipes.allrecipes.com/', 'https://user:pass@allrecipes.com/', 'https://allrecipes.com:8443/',
+        'file:///recipe', 'https://127.0.0.1/',
+      ]) {
+        await assert.rejects(importRecipeViaBackend(target, { supabaseUrl: 'https://project.supabase.co', anonKey: 'key', accessToken: 'token' }));
+      }
+      assert.equal(fetchMock.mock.callCount(), 0);
+    } finally { fetchMock.mock.restore(); }
+  });
+  it('reports network errors with the text fallback', async () => {
+    const fetchMock = mock.method(globalThis, 'fetch', async () => { throw new TypeError('network'); });
+    try {
+      await assert.rejects(importRecipeViaBackend(url, { supabaseUrl: 'https://project.supabase.co', anonKey: 'key', accessToken: 'token' }), /paste the ingredients and steps/);
+    } finally { fetchMock.mock.restore(); }
+  });
 });
 
 describe('authenticated recipe fetch function', () => {
@@ -97,11 +122,11 @@ describe('authenticated recipe fetch function', () => {
     assert.equal((await handler(request())).status, 400);
     assert.equal(calls, 1);
   });
-  it('reports site blocks with a saved-page fallback', async () => {
+  it('reports site blocks with a paste fallback without bypassing restrictions', async () => {
     const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => new Response('Blocked', { status: 403 }) });
     const response = await handler(request());
     assert.equal(response.status, 422);
-    assert.match((await response.json()).error, /403.*saved HTML/);
+    assert.match((await response.json()).error, /403.*paste its ingredients and steps/);
   });
   it('bounds streamed responses even without content-length', async () => {
     const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => new Response('x'.repeat(MAX_RECIPE_BYTES + 1), { headers: { 'Content-Type': 'text/html' } }) });
@@ -111,5 +136,67 @@ describe('authenticated recipe fetch function', () => {
     const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => Response.json({}) });
     assert.equal((await handler(request())).status, 422);
     assert.equal((await handler(new Request('https://example.com', { method: 'POST', headers: { Authorization: 'Bearer test' }, body: '{' }))).status, 400);
+  });
+  it('accepts only explicit supported hosts and www variants', async () => {
+    for (const host of SUPPORTED_RECIPE_HOSTS) {
+      for (const target of [`https://${host}/recipe`, `https://www.${host}/recipe`]) {
+        assert.equal(supportedRecipeUrl(target), target);
+        const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () =>
+          new Response(html, { headers: { 'Content-Type': 'text/html' } }),
+        });
+        assert.equal((await handler(request(target))).status, 200);
+      }
+    }
+  });
+  it('allows safe relative and supported-host redirects and retains final attribution', async () => {
+    const targets: string[] = [];
+    const handler = createImportHandler({ authenticate: async () => true, fetchPage: async (target) => {
+      targets.push(String(target));
+      if (targets.length < 3) return new Response(null, { status: 302, headers: {
+        Location: targets.length === 1 ? '/final' : 'https://www.budgetbytes.com/recipe/',
+      } });
+      return new Response(html, { headers: { 'Content-Type': 'text/html' } });
+    } });
+    const response = await handler(request());
+    assert.equal(response.status, 200);
+    assert.deepEqual(targets, [url, 'https://www.simplyrecipes.com/final', 'https://www.budgetbytes.com/recipe/']);
+    assert.equal((await response.json()).sourceUrl, targets[2]);
+  });
+  it('revalidates every redirect, including after an allowed redirect', async () => {
+    for (const location of [
+      'http://allrecipes.com/', 'https://allrecipes.com.evil.test/', 'https://evil.test/',
+      'https://user:password@allrecipes.com/', 'https://allrecipes.com:8443/', 'https://[::1]/',
+    ]) {
+      let calls = 0;
+      const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => {
+        calls++;
+        return new Response(null, { status: 307, headers: { Location: calls === 1 ? 'https://allrecipes.com/recipe/' : location } });
+      } });
+      assert.equal((await handler(request())).status, 400);
+      assert.equal(calls, 2);
+    }
+  });
+  it('limits redirect loops and rejects missing or malformed redirect locations', async () => {
+    let calls = 0;
+    const loop = createImportHandler({ authenticate: async () => true, fetchPage: async () => {
+      calls++;
+      return new Response(null, { status: 302, headers: { Location: '/loop' } });
+    } });
+    assert.equal((await loop(request())).status, 422);
+    assert.equal(calls, 6);
+    const redirectHeaders: HeadersInit[] = [{}, { Location: 'https://[' }];
+    for (const headers of redirectHeaders) {
+      const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => new Response(null, { status: 302, headers }) });
+      assert.equal((await handler(request())).status, 422);
+    }
+  });
+  it('rejects oversized URL request bodies before contacting a site', async () => {
+    let calls = 0;
+    const handler = createImportHandler({ authenticate: async () => true, fetchPage: async () => {
+      calls++;
+      return new Response(html);
+    } });
+    assert.equal((await handler(request(`${url}${'x'.repeat(4096)}`))).status, 413);
+    assert.equal(calls, 0);
   });
 });

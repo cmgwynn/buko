@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
+import { CoachDiaryPanel } from '../../src/components/CoachDiaryPanel';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Card, CardGrid, Empty, Heading, Notice, Screen } from '../../src/components/ui';
 import { addDays, formatDay, MEALS, toDateString } from '../../src/lib/diary';
@@ -21,7 +22,7 @@ import type { FoodLogEntry } from '../../src/types';
 
 export default function Diary() {
   const router = useRouter();
-  const { targets: baseTargets, profile, age, birthdayError } = useProfile();
+  const { targets: baseTargets, profile, age, today, birthdayError } = useProfile();
   const { settings } = useSettings();
   const [burned, setBurned] = useState(0);
   const { session } = useAuth();
@@ -142,6 +143,7 @@ export default function Diary() {
         </Card>
       ) : null}
 
+      <CoachDiaryPanel day={date} today={today} targets={targets} />
       <CardGrid>{MEALS.map(({ key, label }) => {
         const items = entries.filter((e) => e.meal === key);
         const kcal = items.reduce((s, e) => s + e.calories, 0);

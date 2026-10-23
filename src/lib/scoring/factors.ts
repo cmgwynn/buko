@@ -1,4 +1,4 @@
-import type { Product } from '../../types';
+import type { Product } from '../../types/index.ts';
 import {
   ADDITIVE_PENALTY_EACH,
   ADDITIVE_PENALTY_FLAGGED,
@@ -10,7 +10,7 @@ import {
   WEIGHTS,
   type FactorId,
   type Source,
-} from './config';
+} from './config.ts';
 
 /** One explainable line of the score breakdown. */
 export interface Factor {

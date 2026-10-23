@@ -1,5 +1,6 @@
 const MAX_PAGE_BYTES = 3_000_000;
-const ALLOWED_HOSTS = new Set(['simplyrecipes.com', 'www.simplyrecipes.com']);
+const RECIPE_HOSTS = ['simplyrecipes.com', 'allrecipes.com', 'bbcgoodfood.com', 'budgetbytes.com', 'spendwithpennies.com'];
+const ALLOWED_HOSTS = new Set(RECIPE_HOSTS.flatMap((host) => [host, `www.${host}`]));
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, apikey, content-type, x-client-info',
@@ -20,7 +21,7 @@ function recipeUrl(input: string): URL {
     throw new RequestError('Enter a valid recipe web address.', 400);
   }
   if (url.protocol !== 'https:' || url.port || url.username || url.password || !ALLOWED_HOSTS.has(url.hostname)) {
-    throw new RequestError('Server import currently supports HTTPS Simply Recipes links only. For other sites, import a saved HTML page.', 400);
+    throw new RequestError(`URL import supports HTTPS links from ${RECIPE_HOSTS.join(', ')} (including www). For other sites, paste the ingredients and steps instead.`, 400);
   }
   return url;
 }
@@ -91,12 +92,17 @@ export function createImportHandler(options: {
           await response.body?.cancel();
           const location = response.headers.get('location');
           if (!location) throw new RequestError('The site returned an invalid redirect.', 422);
-          url = recipeUrl(new URL(location, url).toString());
+          try {
+            url = recipeUrl(new URL(location, url).toString());
+          } catch (error) {
+            if (error instanceof RequestError) throw error;
+            throw new RequestError('The site returned an invalid redirect. Paste the ingredients and steps instead.', 422);
+          }
           continue;
         }
         if (!response.ok) {
           await response.body?.cancel();
-          throw new RequestError(`The recipe site blocked or rejected the request (${response.status}). Open it in your browser and import a saved HTML page instead.`, 422);
+          throw new RequestError(`The recipe site blocked or rejected the request (${response.status}). We cannot bypass publisher restrictions. Open a recipe you can access and paste its ingredients and steps instead.`, 422);
         }
         if (!/^(text\/html|application\/xhtml\+xml)(;|$)/i.test(response.headers.get('content-type') ?? '')) {
           await response.body?.cancel();
@@ -109,7 +115,7 @@ export function createImportHandler(options: {
     } catch (error) {
       if (error instanceof RequestError) return json({ error: error.message }, error.status);
       console.error('Recipe import request failed:', error instanceof Error ? error.name : 'Unknown error');
-      return json({ error: 'Could not fetch the recipe page. Try again, or import a saved HTML page.' }, 502);
+      return json({ error: 'Could not fetch the recipe page. Try again, or paste the ingredients and steps instead.' }, 502);
     } finally {
       clearTimeout(timer);
     }

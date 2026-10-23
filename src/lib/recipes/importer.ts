@@ -1,12 +1,16 @@
-import { USER_AGENT } from '../config';
 import { extractRecipeFromHtml, type ParsedRecipe } from './schemaOrg';
 
 export const MAX_RECIPE_BYTES = 3_000_000;
+export const SUPPORTED_RECIPE_HOSTS = [
+  'simplyrecipes.com', 'allrecipes.com', 'bbcgoodfood.com', 'budgetbytes.com', 'spendwithpennies.com',
+] as const;
+export const SUPPORTED_RECIPE_SITES = SUPPORTED_RECIPE_HOSTS.join(', ');
 
 export class ImportError extends Error {}
 
 export function normaliseUrl(input: string): string {
   const trimmed = input.trim();
+  if (!trimmed) throw new ImportError('Enter a recipe web address.');
   const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
   let url: URL;
   try {
@@ -15,6 +19,16 @@ export function normaliseUrl(input: string): string {
     throw new ImportError('That does not look like a web address.');
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new ImportError('Only http and https links can be imported.');
+  if (url.username || url.password) throw new ImportError('Use a web address without a username or password.');
+  return url.toString();
+}
+
+export function supportedRecipeUrl(input: string): string {
+  const url = new URL(normaliseUrl(input));
+  const host = url.hostname.replace(/^www\./, '');
+  if (url.protocol !== 'https:' || url.port || !SUPPORTED_RECIPE_HOSTS.some((allowed) => host === allowed)) {
+    throw new ImportError(`URL import supports HTTPS links from ${SUPPORTED_RECIPE_SITES} (including www). For other sites, paste the ingredients and steps below.`);
+  }
   return url.toString();
 }
 
@@ -23,7 +37,7 @@ export function importRecipeFromHtml(html: string, input: string): ParsedRecipe 
   if (new TextEncoder().encode(html).byteLength > MAX_RECIPE_BYTES) throw new ImportError('That page is too large to import (maximum 3 MB).');
   const parsed = extractRecipeFromHtml(html, url);
   if (!parsed) {
-    throw new ImportError("This page doesn't include structured recipe data, so it can't be imported. Save the full web page, not Reader view, or add the recipe by hand.");
+    throw new ImportError("This page doesn't include structured recipe data. Paste its ingredients and steps below to create an editable draft.");
   }
   return parsed;
 }
@@ -31,7 +45,7 @@ export function importRecipeFromHtml(html: string, input: string): ParsedRecipe 
 export async function importRecipeViaBackend(input: string, options: {
   supabaseUrl: string; anonKey: string; accessToken: string;
 }): Promise<ParsedRecipe> {
-  const url = normaliseUrl(input);
+  const url = supportedRecipeUrl(input);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
   try {
@@ -41,7 +55,7 @@ export async function importRecipeViaBackend(input: string, options: {
       body: JSON.stringify({ url }),
       signal: controller.signal,
     });
-    if (response.status === 404) throw new ImportError('The recipe import service is not deployed yet. Use a saved HTML page below, or deploy the Supabase function described in the README.');
+    if (response.status === 404) throw new ImportError('The recipe import service (import-recipe) is not deployed or is unavailable. Paste the ingredients and steps below instead; no HTML file is needed.');
     const data: unknown = await response.json();
     if (!data || typeof data !== 'object') throw new ImportError('The recipe import service returned an invalid response.');
     if (!response.ok) {
@@ -51,38 +65,14 @@ export async function importRecipeViaBackend(input: string, options: {
     if (!('html' in data) || typeof data.html !== 'string' || !('sourceUrl' in data) || typeof data.sourceUrl !== 'string') {
       throw new ImportError('The recipe import service returned an invalid response.');
     }
-    return importRecipeFromHtml(data.html, data.sourceUrl);
+    return importRecipeFromHtml(data.html, supportedRecipeUrl(data.sourceUrl));
   } catch (error) {
     if (error instanceof ImportError) throw error;
-    throw new ImportError('Could not reach the recipe import service. Try again, or import a saved HTML page below.');
+    throw new ImportError('Could not reach the recipe import service. Check your connection and try again, or paste the ingredients and steps below.');
   } finally {
     clearTimeout(timer);
   }
 }
 
-/**
- * Fetch a recipe page directly from the phone and parse its schema.org data.
- * Only the page being imported is contacted, and nothing about the user is sent.
- */
-export async function importRecipeFromUrl(input: string): Promise<ParsedRecipe> {
-  const url = normaliseUrl(input);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
-  let html: string;
-  try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new ImportError(`The site returned an error (${res.status}). Try another link or add the recipe by hand.`);
-    const length = Number(res.headers.get('content-length') ?? 0);
-    if (length > MAX_RECIPE_BYTES) throw new ImportError('That page is too large to import.');
-    html = await res.text();
-  } catch (e) {
-    if (e instanceof ImportError) throw e;
-    throw new ImportError('Could not reach that page. Check the link and your connection.');
-  } finally {
-    clearTimeout(timer);
-  }
-  return importRecipeFromHtml(html, url);
-}
+// Native and web use the same authenticated, allowlisted fetch service.
+export const importRecipeFromUrl = importRecipeViaBackend;

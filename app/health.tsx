@@ -81,7 +81,7 @@ export default function HealthSettings() {
 
       <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>{app}</Text>
       <Notice tone="info">
-        Health data stays between you and Buko. It is never used for advertising and never shared with third parties. It’s saved only to your own private account.
+        Health records are saved only to your private account and are never used for advertising. Imported health-app workouts and active energy are excluded from Coach requests. Optional Coach weight-trend sharing is controlled separately in Coach preferences.
       </Notice>
       {available === false ? (
         <Notice tone="warning">

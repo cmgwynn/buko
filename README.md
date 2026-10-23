@@ -17,7 +17,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql) (Phase 2: recipes, meal plan, pantry, photo storage), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql) (Phase 3: fitness and health), and [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql) (birthday-based age). This creates the tables and turns on row-level security so each user can only read and write their own rows. For an existing database, run only migrations that have not already been applied.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), and [`0005_coach.sql`](./supabase/migrations/0005_coach.sql). This creates the tables and turns on owner-only row-level security. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -53,7 +53,7 @@ npx expo start -c
 npm run web
 ```
 
-Open the URL shown by Expo. The same Supabase and USDA environment variables are used on web; add them to `.env` before starting. Barcode lookup is available by entering a barcode manually. Camera scanning and Apple Health / Health Connect require the mobile app.
+Open the URL shown by Expo. The same Supabase and USDA environment variables are used on web; add them to `.env` before starting. **Mobile-web camera scanning now works on HTTPS** (including the published GitHub Pages site): sign in, open **Scan**, start the camera and allow permission. EAN-13, EAN-8, UPC-A and UPC-E decode locally; camera images are not uploaded. Manual barcode entry remains available if permission or camera support is unavailable. An ordinary `http://192.168...` development URL is not a secure camera origin; use the HTTPS site on your phone. Apple Health / Health Connect still require the mobile app.
 
 To create a static web export for hosting:
 ```bash
@@ -89,7 +89,49 @@ Onboarding and **Profile → Update details & recalculate** ask for month, day a
 
 For profiles with a birthday, completed age and formula-based calorie/macro targets update on the device at local midnight and when the app resumes. A Feb 29 birthday advances March 1 in non-leap years. Profile and activity-adjusted diary targets share the same age calculation. Birthday target changes are derived on-device, not background database jobs: they do not rewrite food logs, saved targets, goals or preferences. If migration `0004` has not been applied, birthday saves show a setup error instead of silently dropping the date.
 
-Phase 4 remains planned, not implemented: customization will guide automation through user goals, preferences and constraints, with explanations, safety limits, pause and override controls. See [PROJECT.md](./PROJECT.md#phase-4-design-direction).
+**Profile** now opens a useful overview: targets, personal details, Coach, measurements, progress and activity settings. **Edit goals & personal details** opens a single scrollable form; new-account onboarding remains guided. Privacy/account information is expandable.
+
+## Phase 4: optional wellness coach
+Open **Diary → Coach & weekly review** or **Profile → Coach, weekly review & preferences**.
+
+- **Weekly review:** previous completed Monday-Sunday intake/target coverage, current product-score averages, Buko workouts and optional smoothed weight trend. Factual summaries need no AI API key. Incomplete logs are not treated as zero intake. Mark food logging complete in Diary only when all meals/snacks/drinks are entered; active-target snapshots are collected on consented Diary visits, not reconstructed.
+- **AI chat/check-ins:** when separately activated, Anthropic explains supplied facts and provides three weekly habit suggestions. Code calculates numeric facts; validated model prose cannot prescribe numeric calorie/weight-loss targets. Missing data and uncertain causes stay explicit.
+- **Confirmed actions:** add an eligible saved recipe to a chosen date/meal/serving count or add a better-scoring public product alternative to groceries. Nothing is added without confirmation or logged as eaten. Retrying an action does not duplicate it. Food actions pause for support mode/revoked consent/dietary restrictions and reject changed recipes or suggestions older than 14 days.
+- **Limits:** recipe candidates need complete calorie/protein ingredient matches. High-protein means at least 20 g/serving; an "under 600" candidate must display fewer than 600 kcal. Recipes are not meal-type classified: choose whether each idea suits dinner. No fabricated recipes/nutrition or allergen-safety claims. Restrictive dietary preferences currently withhold automatic food actions.
+- **Privacy/safety:** explicit consent, weight off by default, focus preferences, consent withdrawal and clear-history controls. General wellness information, not medical advice. Medical questions route to professionals; disordered-eating cues pause numeric feedback/actions and share the National Alliance for Eating Disorders helpline. Heuristic detection is not comprehensive and cannot replace professional support.
+- **No autonomous goal changes:** this release never adjusts calorie/macro targets.
+
+### Supabase Free setup - live AI stays off
+Publishing the website does **not** deploy its database migration or Edge Functions. Until these steps are done, Coach displays a setup message; other app features continue to work.
+
+1. Open your existing Supabase project, choose **SQL Editor → New query**, paste the entire [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), then **Run**. Previous migrations must already be applied. This migration preserves existing meals/workouts and is safe to rerun.
+2. On your computer, open this repository in VS Code and choose **Terminal → New Terminal**. Run:
+   ```bash
+   npx supabase login
+   ```
+   Follow the browser login instructions. The CLI is a deployment tool, not a paid subscription. Do not paste login tokens or database passwords into chat.
+3. In Supabase **Project Settings → General**, copy **Project ID / Reference ID**. Replace `YOUR_PROJECT_REF` in each command below with that value (not the project name or full URL):
+   ```bash
+   npx supabase secrets set COACH_AI_ENABLED=false COACH_GLOBAL_DAILY_REQUESTS=100 --project-ref YOUR_PROJECT_REF
+   npx supabase functions deploy coach --project-ref YOUR_PROJECT_REF --no-verify-jwt --use-api
+   npx supabase functions deploy import-recipe --project-ref YOUR_PROJECT_REF --no-verify-jwt --use-api
+   ```
+   `--use-api` bundles remotely without Docker. Both functions validate the user's bearer token with Supabase Auth themselves; `--no-verify-jwt` disables only the legacy gateway check, not that authentication.
+4. Open https://cmgwynn.github.io/buko/ on your phone and refresh. Open Coach, review/accept optional consent, then **Review my logged week (no AI)**. Empty weeks display missing-data limitations, not invented advice. Chat/suggestion buttons intentionally remain unavailable while live AI is off.
+5. Test **Recipes → Import link** with a supported URL, or create a paste-text draft if the publisher blocks fetching.
+
+No Anthropic key is needed for these steps, and they make no paid model calls. Supabase Free has usage/resource limits and may pause inactive projects; staying within its allowance is not unlimited hosting. Do not upgrade or enable paid services just to trial these features.
+
+### Later: explicitly activate Anthropic (optional, metered)
+Only do this after deciding to fund API usage. A free Claude chat account is not free Anthropic API credit.
+
+1. In your Anthropic console, configure available spending/usage limits and choose a supported model ID.
+2. In **Supabase → Edge Functions → Secrets**, add `ANTHROPIC_API_KEY` and `ANTHROPIC_MODEL` using the console values; set `COACH_AI_ENABLED=true`. Never put these or the Supabase service-role key in `.env`, `EXPO_PUBLIC_*`, Git or chat.
+3. Redeploy `coach` with the command above, then verify status while signed in. To stop future model calls, set `COACH_AI_ENABLED=false` and redeploy.
+
+Server limits are **5 requests/minute and 30/UTC day per user**, plus `COACH_GLOBAL_DAILY_REQUESTS` reservations across the project (default 100). Factual summary requests consume reservations too; cached weekly AI replies and safety referrals make no model request. There are no scheduled/background model calls. The global limit is a request count, **not a dollar cap**; provider spending limits are separate. Failed requests can still consume reservations/provider tokens.
+
+Chat sends minimized summaries, goals/preferences, eligible food candidates and up to four recent chat exchanges to Anthropic. Structured context excludes names, email, account IDs and birthdays. Free-text redaction cannot catch every identifier; avoid personal information in messages/recipe titles. Anthropic API retention/processing terms apply. Imported Apple Health/Health Connect workouts and active energy are excluded; weight summaries require separate opt-in. Clearing history deletes Coach replies/action cards, not already-added plan/grocery items or cost-control counters.
 
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
@@ -112,39 +154,39 @@ Before public release, Apple and Google each require a published privacy policy,
 
 ## Scripts
 - `npm run typecheck` – TypeScript check
-- `npm test` – unit tests for the scoring module and calorie targets
+- `npm test` - scoring, targets, recipes, browser barcode decoding, coach facts/safety/handler and PostgreSQL authorization/quota/action tests
 
 ## Tuning the health score
 All weights, thresholds, flagged additives and source citations live in [`src/lib/scoring/config.ts`](./src/lib/scoring/config.ts). Each factor's logic is in `factors.ts`. Change a number, run `npm test`, and the app picks it up. Scores are never stored, so there is nothing to migrate.
 
 ## Recipe import
-Paste a recipe link and Buko reads only its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is always saved and shown. Sites without that data can't be imported; add the recipe by hand instead.
+Paste a recipe link and Buko reads its structured schema.org Recipe data (ingredients, steps, servings, times). The source URL is saved and shown. Always review imports, ingredient matching, nutrition and attribution before saving.
 
-- **Native app:** fetches directly from the phone.
-- **Web URL import:** uses the authenticated Supabase Edge Function below because recipe sites generally block cross-origin browser fetches (CORS). The initial server allowlist supports `simplyrecipes.com` and `www.simplyrecipes.com` over HTTPS only; every redirect is checked against that list. New sites must be explicitly reviewed and added in `supabase/functions/import-recipe/handler.ts`.
-- **Saved HTML fallback (web):** open the recipe in your browser, use **Save Page As** to save the full page as HTML, enter its original URL in Buko, and choose the `.html` file. Files are parsed locally, never executed or uploaded, with a 3 MB limit. PDFs, screenshots and Reader-mode exports are not supported. This works without deploying a backend.
+- **URL import (web and native):** authenticated Supabase Edge Function, HTTPS only. Supported domains: Simply Recipes, Allrecipes, BBC Good Food, Budget Bytes and Spend With Pennies, including each domain's `www` form. Every redirect is checked; credentials and nonstandard ports are rejected. Additional domains need explicit allowlist review.
+- **Phone-friendly fallback:** copy ingredients/instructions from a page you can access, open Buko's import screen, enter a title, paste ingredients (one per line) and instructions (paragraphs separated by blank lines), then tap **Create editable draft**. Optional source URL/attribution are retained. Servings may be 1-100; blank defaults to four and is flagged for review. No HTML download, backend or AI is needed. Fields are limited to 100,000 characters.
+- **Advanced saved HTML (web):** optional **Advanced: import a saved HTML page** retains the local 3 MB `.html` parser. Files are never executed/uploaded; PDFs, screenshots and Reader-mode exports are unsupported. This is not required on iPhone.
 
 After saving, the recipe detail page opens. Use **Recipes** in the top-right header or **Back to recipes** at the bottom to return to the recipe list. The header shortcut also appears during import and editing and works even when there is no back history.
 
-Some publishers, including Simply Recipes, may block server fetches with HTTP 403 even when their pages open in a browser. The importer reports that block and offers saved HTML; it does not bypass site protections.
+Some publishers, including Simply Recipes, may block server fetches with HTTP 403 even when their pages open in a browser. Buko reports the block and recommends pasting recipe text; it does not bypass site protections.
 
-### Deploy the web recipe importer
+### Deploy the recipe importer
 The web app deployment does **not** deploy Supabase functions. A Supabase project owner must do this once:
 
-1. Install/use the [Supabase CLI](https://supabase.com/docs/guides/cli) and authenticate with `supabase login` on your own computer. Do not put the access token in the app or Git.
+1. Use the [Supabase CLI](https://supabase.com/docs/guides/cli) and authenticate with `npx supabase login` on your own computer. Do not put the access token in the app or Git.
 2. Find your project reference in Supabase **Project Settings → General**.
 3. From the repository root, run:
    ```bash
-   supabase functions deploy import-recipe --project-ref YOUR_PROJECT_REF --no-verify-jwt
+   npx supabase functions deploy import-recipe --project-ref YOUR_PROJECT_REF --no-verify-jwt --use-api
    ```
    The entry point is `supabase/functions/import-recipe/index.ts`; deploy it together with `handler.ts`. `--no-verify-jwt` disables only the gateway's legacy JWT check: the function itself **requires a valid signed-in user** and verifies the bearer token with Supabase Auth before fetching any page. No service-role key is used.
 4. Supabase supplies `SUPABASE_URL` and `SUPABASE_ANON_KEY` to deployed functions automatically. No additional app secrets or web rebuild are needed.
-5. Test **Recipes → Import link** while signed in. An undeployed function produces a setup message; a publisher block produces a saved-page suggestion.
+5. Test **Recipes → Import link** while signed in. An undeployed function produces a setup message; a publisher block recommends paste-text drafts.
 
 The function accepts POST requests only, validates destinations and redirects against its fixed allowlist, limits requests to 4 KB and fetched HTML to 3 MB, and times out remote fetches. It forwards no Buko user credentials to recipe publishers. TypeScript checks cover the shared function handler; the Deno-specific entry point can be checked with `deno check supabase/functions/import-recipe/index.ts`.
 
 ## Privacy
-No analytics, advertising or tracking SDKs. Health data from Apple Health or Health Connect is only used when you turn a feature on, is never used for advertising and is never shared with third parties. Your data lives in your Supabase project. The only other network calls are food lookups to Open Food Facts and USDA FoodData Central, and the recipe page you ask to import. Web recipe URL requests go through your Supabase function; saved HTML imports stay on your device until you save the parsed recipe to your account.
+No analytics, advertising or tracking SDKs. Account data lives in your Supabase project. Food lookups use Open Food Facts/USDA; recipe URL requests go through your function to the requested supported publisher without account credentials. Browser camera frames and pasted/saved-page drafts stay on the device until parsed recipe data is saved. Health integration is optional, not used for advertising, and imported workouts/active energy are excluded from Coach. Separately opted-in weight summaries and minimized food/goal/chat context can go to Anthropic only after consent and owner activation; see the Coach section for controls and retention limitations.
 
 ## Data attribution
 Product data is from [Open Food Facts](https://world.openfoodfacts.org) (Open Database License) and is credited in the app. Whole-food data is from [USDA FoodData Central](https://fdc.nal.usda.gov).

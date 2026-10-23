@@ -1,4 +1,4 @@
-import type { NutriGrade } from '../../types';
+import type { NutriGrade } from '../../types/index.ts';
 
 /**
  * ────────────────────────────────────────────────────────────────────────────

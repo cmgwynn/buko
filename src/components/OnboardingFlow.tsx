@@ -49,7 +49,7 @@ function Option({ title, desc, selected, onPress }: { title: string; desc: strin
   );
 }
 
-/** Multi-step profile form. Used for first-time onboarding and for editing details later. */
+/** Guided onboarding; a single-page form when editing an existing profile. */
 export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
   const router = useRouter();
   const { session } = useAuth();
@@ -127,16 +127,16 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
 
   return (
     <Screen variant="form" edges={editing ? [] : ['top', 'bottom']}>
-      <Text style={[typography.label, { marginTop: spacing.md }]}>
+      {!editing ? <><Text style={[typography.label, { marginTop: spacing.md }]}>
         Step {step + 1} of {STEPS.length} · {STEPS[step]}
       </Text>
       <View style={{ flexDirection: 'row', gap: 4, marginVertical: spacing.md }}>
         {STEPS.map((_, i) => (
           <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= step ? colors.primary : colors.border }} />
         ))}
-      </View>
+      </View></> : <Body muted>Update only what has changed. Review your calculated plan below before saving.</Body>}
 
-      {step === 0 && (
+      {(editing || step === 0) && (
         <>
           <Heading>What&apos;s your goal?</Heading>
           <View style={{ height: spacing.md }} />
@@ -144,7 +144,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         </>
       )}
 
-      {step === 1 && (
+      {(editing || step === 1) && (
         <>
           <Heading>About you</Heading>
           <View style={{ height: spacing.md }} />
@@ -171,7 +171,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         </>
       )}
 
-      {step === 2 && (
+      {(editing || step === 2) && (
         <>
           <Heading>Height & weight</Heading>
           <View style={{ height: spacing.md }} />
@@ -194,7 +194,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         </>
       )}
 
-      {step === 3 && (
+      {(editing || step === 3) && (
         <>
           <Heading>How active are you?</Heading>
           <View style={{ height: spacing.md }} />
@@ -202,7 +202,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         </>
       )}
 
-      {step === 4 && (
+      {(editing || step === 4) && (
         <>
           <Heading>Dietary preferences</Heading>
           <View style={{ height: spacing.sm }} />
@@ -214,7 +214,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         </>
       )}
 
-      {step === 5 && result && (
+      {(editing || step === 5) && result && (
         <>
           <Heading>Your daily plan</Heading>
           <View style={{ height: spacing.md }} />
@@ -235,17 +235,19 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
             Calculated with the Mifflin-St Jeor equation: resting burn {result.bmr.toLocaleString()} kcal, about {result.tdee.toLocaleString()} kcal with your activity level.
             These are estimates, not medical advice.
           </Body>
-          {error ? <View style={{ marginTop: spacing.md }}><Notice tone="danger">{error}</Notice></View> : null}
         </>
       )}
 
       <View style={{ marginTop: spacing.xl }}>
-        {step < STEPS.length - 1 ? (
+        {error ? <Notice tone="danger">{error}</Notice> : null}
+        {editing && !result ? <Notice tone="info">Complete a valid birthday, body measurements, goal and activity level to preview and save your updated plan.</Notice> : null}
+        {!editing && step < STEPS.length - 1 ? (
           <Button title="Continue" onPress={() => setStep(step + 1)} disabled={!canNext} />
         ) : (
-          <Button title={editing ? 'Save changes' : 'Start using Buko'} onPress={save} loading={busy} disabled={!canNext} />
+          <Button title={editing ? 'Save changes' : 'Start using Buko'} onPress={save} loading={busy} disabled={!result} />
         )}
-        {step > 0 ? <Button title="Back" variant="ghost" onPress={() => setStep(step - 1)} /> : null}
+        {!editing && step > 0 ? <Button title="Back" variant="ghost" onPress={() => setStep(step - 1)} /> : null}
+        {editing ? <Button title="Cancel changes" variant="ghost" disabled={busy} onPress={() => router.back()} /> : null}
         {!editing && step === 0 ? <Button title="Sign out" variant="ghost" onPress={() => supabase.auth.signOut()} /> : null}
       </View>
     </Screen>
