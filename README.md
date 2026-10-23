@@ -70,7 +70,7 @@ The app uses the full width on phones and a centered frame (up to 1040 px) on de
 Native builds allow portrait and landscape orientations. Existing installed native builds need rebuilding to pick up the orientation setting; the browser version adapts immediately.
 
 ### Interaction and visual design
-Buko shares an iOS-inspired visual system across native and web: grouped neutral backgrounds, rounded surfaces, clear focus states, and a highlighted active tab. Buttons, chips, profile actions, and recipe cards use subtle Reanimated spring feedback; macro bars animate changes and tabs fade between screens. Motion respects the device/browser reduced-motion preference. There are no separate web-only Tailwind or Motion dependencies.
+Buko shares an iOS-inspired visual system across native and web: rounded surfaces, clear focus states, and a highlighted active tab. The palette follows the green coconut logo: forest-green actions, soft cream backgrounds, white cards, and warm shell-brown secondary text and wordmark accents. Health-score and macro colors retain their distinct meanings. Buttons, chips, profile actions, and recipe cards use subtle Reanimated spring feedback; macro bars animate changes and tabs fade between screens. Motion respects the device/browser reduced-motion preference. There are no separate web-only Tailwind or Motion dependencies.
 
 ### Starter libraries and routines
 - **Recipes → Browse recipe library:** 12 original, simple recipes across breakfast, lunch, dinner and snacks. Preview ingredients/steps, tap **Use**, customize the draft and **Save recipe** to add a private copy. Library originals stay unchanged. Nutrition comes from ingredient matching; it is not pre-certified. Check ingredients for allergies.

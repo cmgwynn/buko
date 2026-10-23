@@ -26,7 +26,7 @@ export default function SignIn() {
       <View style={{ marginTop: height < 500 ? spacing.sm : spacing.xxl * 2, marginBottom: spacing.xl, paddingHorizontal: spacing.sm }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
           <CoconutLogo size={52} />
-          <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.5, color: colors.primary }}>Buko</Text>
+          <Text style={{ fontSize: 40, fontWeight: '800', letterSpacing: -1.5, color: colors.brandBrown }}>Buko</Text>
         </View>
         <Body muted>Scan it. Plan it. Cook it. Log it.</Body>
       </View>
