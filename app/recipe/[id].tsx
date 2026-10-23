@@ -70,7 +70,7 @@ export default function RecipeScreen() {
         onPress: async () => {
           try {
             await deleteRecipe(recipe);
-            router.back();
+            router.dismissTo('/(tabs)/recipes');
           } catch (e) {
             setError(e instanceof Error ? e.message : 'Could not delete.');
           }
@@ -193,6 +193,7 @@ export default function RecipeScreen() {
         <Notice>No nutrition yet. Edit the recipe and tap “Match foods” to calculate nutrition and a health score.</Notice>
       )}
 
+      <Button title="Back to recipes" variant="secondary" icon="arrow-back" onPress={() => router.dismissTo('/(tabs)/recipes')} />
       <Button title="Edit recipe" variant="secondary" icon="create-outline" onPress={edit} />
       <Button title="Delete recipe" variant="danger" icon="trash-outline" onPress={confirmDelete} />
       <Attribution usda />

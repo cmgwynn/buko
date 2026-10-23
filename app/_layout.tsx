@@ -1,4 +1,4 @@
-import { Stack } from 'expo-router';
+import { Link, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Linking, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -18,6 +18,16 @@ const headerOptions = {
   headerTitleStyle: { color: colors.text },
   headerBackTitle: 'Back',
 } as const;
+
+const recipeHeaderOptions = {
+  ...headerOptions,
+  headerRight: () => (
+    <Link href="/(tabs)/recipes" dismissTo accessibilityLabel="Back to recipes"
+      style={{ color: colors.primary, fontSize: 15, fontWeight: '600', padding: spacing.sm }}>
+      Recipes
+    </Link>
+  ),
+};
 
 function Gate() {
   const { session, loading } = useAuth();
@@ -44,9 +54,9 @@ function Gate() {
         <Stack.Screen name="log/add" options={{ ...headerOptions, title: 'Log food' }} />
         <Stack.Screen name="edit-profile" options={{ ...headerOptions, title: 'Update details' }} />
         <Stack.Screen name="profile" options={{ ...headerOptions, title: 'Profile' }} />
-        <Stack.Screen name="recipe/[id]" options={{ ...headerOptions, title: 'Recipe' }} />
-        <Stack.Screen name="recipe/edit" options={{ ...headerOptions, title: 'Recipe' }} />
-        <Stack.Screen name="recipe/import" options={{ ...headerOptions, title: 'Import recipe' }} />
+        <Stack.Screen name="recipe/[id]" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
+        <Stack.Screen name="recipe/edit" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
+        <Stack.Screen name="recipe/import" options={{ ...recipeHeaderOptions, title: 'Import recipe' }} />
         <Stack.Screen name="recipe/match" options={{ ...headerOptions, title: 'Match ingredient' }} />
         <Stack.Screen name="cook/[id]" options={{ ...headerOptions, title: 'Cooking', gestureEnabled: false }} />
         <Stack.Screen name="cook/finish" options={{ ...headerOptions, title: 'Log meal', headerBackVisible: false, gestureEnabled: false }} />

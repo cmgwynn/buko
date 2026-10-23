@@ -105,6 +105,8 @@ Paste a recipe link and Buko reads only its structured schema.org Recipe data (i
 - **Web URL import:** uses the authenticated Supabase Edge Function below because recipe sites generally block cross-origin browser fetches (CORS). The initial server allowlist supports `simplyrecipes.com` and `www.simplyrecipes.com` over HTTPS only; every redirect is checked against that list. New sites must be explicitly reviewed and added in `supabase/functions/import-recipe/handler.ts`.
 - **Saved HTML fallback (web):** open the recipe in your browser, use **Save Page As** to save the full page as HTML, enter its original URL in Buko, and choose the `.html` file. Files are parsed locally, never executed or uploaded, with a 3 MB limit. PDFs, screenshots and Reader-mode exports are not supported. This works without deploying a backend.
 
+After saving, the recipe detail page opens. Use **Recipes** in the top-right header or **Back to recipes** at the bottom to return to the recipe list. The header shortcut also appears during import and editing and works even when there is no back history.
+
 Some publishers, including Simply Recipes, may block server fetches with HTTP 403 even when their pages open in a browser. The importer reports that block and offers saved HTML; it does not bypass site protections.
 
 ### Deploy the web recipe importer
