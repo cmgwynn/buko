@@ -1,21 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, View } from 'react-native';
-import { colors, spacing } from '../theme';
-import { Title } from './ui';
+import { View } from 'react-native';
+import { colors, radius, spacing } from '../theme';
+import { MotionPressable, Title } from './ui';
 
 /** Title row for tab screens, with the Profile button at the top right and an optional extra action. */
 export function TabHeader({ title, right }: { title: string; right?: ReactNode }) {
   const router = useRouter();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm, marginBottom: spacing.xl }}>
       <Title>{title}</Title>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
         {right}
-        <Pressable onPress={() => router.push('/profile')} hitSlop={10} accessibilityLabel="Profile">
-          <Ionicons name="person-circle-outline" size={30} color={colors.primary} />
-        </Pressable>
+        <MotionPressable onPress={() => router.push('/profile')} accessibilityRole="button" accessibilityLabel="Profile"
+          style={{ width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="person-outline" size={22} color={colors.primary} />
+        </MotionPressable>
       </View>
     </View>
   );

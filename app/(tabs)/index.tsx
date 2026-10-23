@@ -121,8 +121,9 @@ export default function Diary() {
 
       {targets ? (
         <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: spacing.lg }}>
-            <Text style={{ fontSize: 40, fontWeight: '800', color: remaining < 0 ? colors.danger : colors.primary }}>
+          <Text style={[typography.label, { marginBottom: spacing.sm }]}>Daily overview</Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', marginBottom: spacing.xl }}>
+            <Text style={{ fontSize: 44, fontWeight: '700', letterSpacing: -1.5, fontVariant: ['tabular-nums'], color: remaining < 0 ? colors.danger : colors.primary }}>
               {Math.abs(Math.round(remaining)).toLocaleString()}
             </Text>
             <Text style={[typography.body, { marginLeft: spacing.sm }]}>kcal {remaining < 0 ? 'over' : 'remaining'}</Text>

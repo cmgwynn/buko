@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { RecipeImage } from '../../src/components/RecipeImage';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, CardGrid, Empty, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, CardGrid, Empty, MotionPressable, Notice, Screen } from '../../src/components/ui';
 import { setDraft, emptyDraft } from '../../src/lib/recipes/draft';
 import { computeRecipeNutrition, scoreRecipe } from '../../src/lib/recipes/nutrition';
 import type { Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
@@ -56,7 +56,7 @@ export default function Recipes() {
         const nut = computeRecipeNutrition(r.recipe_ingredients, r.servings);
         const score = nut.counted > 0 ? scoreRecipe(r.title, nut) : null;
         return (
-          <Pressable key={r.id} onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}>
+          <MotionPressable key={r.id} accessibilityRole="button" accessibilityLabel={`Open recipe: ${r.title}`} onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}>
             <Card style={{ flexDirection: 'row', alignItems: 'center', padding: spacing.md }}>
               <RecipeImage path={r.photo_path} style={{ width: 64, height: 64, marginRight: spacing.md }} />
               <View style={{ flex: 1 }}>
@@ -69,7 +69,7 @@ export default function Recipes() {
               </View>
               {score ? <ScoreBadge score={score.score} rating={score.rating} size={46} /> : <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />}
             </Card>
-          </Pressable>
+          </MotionPressable>
         );
       })}</CardGrid>
     </Screen>

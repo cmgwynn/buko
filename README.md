@@ -69,6 +69,9 @@ The app uses the full width on phones and a centered frame (up to 1040 px) on de
 
 Native builds allow portrait and landscape orientations. Existing installed native builds need rebuilding to pick up the orientation setting; the browser version adapts immediately.
 
+### Interaction and visual design
+Buko shares an iOS-inspired visual system across native and web: grouped neutral backgrounds, rounded surfaces, clear focus states, and a highlighted active tab. Buttons, chips, profile actions, and recipe cards use subtle Reanimated spring feedback; macro bars animate changes and tabs fade between screens. Motion respects the device/browser reduced-motion preference. There are no separate web-only Tailwind or Motion dependencies.
+
 ## Phase 3: fitness and health data
 Workouts, the exercise library, routines, progress charts and the activity-adjusted calorie target all work in **Expo Go**. Apple Health and Health Connect need a **development build** (Expo Go can't include them). Until then, the Health settings screen says so.
 

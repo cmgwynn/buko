@@ -1,10 +1,17 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { colors, radius, spacing, typography } from '../theme';
 
 /** Labelled progress bar: `value` of `target`, turning red-ish when well over target. */
 export function MacroBar({ label, value, target, unit = 'g', color }: { label: string; value: number; target: number; unit?: string; color: string }) {
   const pct = target > 0 ? Math.min(value / target, 1) : 0;
   const over = target > 0 && value > target * 1.05;
+  const progress = useSharedValue(pct);
+  useEffect(() => {
+    progress.value = withTiming(pct, { duration: 280, reduceMotion: ReduceMotion.System });
+  }, [pct, progress]);
+  const animatedStyle = useAnimatedStyle(() => ({ width: `${progress.value * 100}%` }));
   return (
     <View style={{ marginBottom: spacing.md }}>
       <View style={styles.head}>
@@ -13,8 +20,9 @@ export function MacroBar({ label, value, target, unit = 'g', color }: { label: s
           {Math.round(value)} / {Math.round(target)} {unit}
         </Text>
       </View>
-      <View style={styles.track}>
-        <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: over ? colors.danger : color }]} />
+      <View style={styles.track} accessibilityRole="progressbar" accessibilityLabel={label}
+        accessibilityValue={{ min: 0, max: 100, now: Math.round(pct * 100), text: `${Math.round(value)} of ${Math.round(target)} ${unit}` }}>
+        <Animated.View style={[styles.fill, animatedStyle, { backgroundColor: over ? colors.danger : color }]} />
       </View>
     </View>
   );

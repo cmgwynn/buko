@@ -2,8 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { Children, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
-  type StyleProp, type TextInputProps, type ViewStyle,
+  type PressableProps, type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
+import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, layout, radius, shadow, spacing, typography } from '../theme';
 
@@ -16,12 +17,13 @@ export function Screen({
   padded?: boolean;
   variant?: 'content' | 'form';
 }) {
-  const { height } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const pad = padded ? styles.screenPad : null;
   const content = [
     styles.screenContent,
     { maxWidth: variant === 'form' ? layout.formMaxWidth : layout.contentMaxWidth },
     pad,
+    padded && width >= 600 && { padding: spacing.xl },
     padded && height < 500 && { paddingVertical: spacing.md },
   ];
   return (
@@ -53,12 +55,36 @@ export function Card({ children, style }: { children: ReactNode; style?: StylePr
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
-export const Title = ({ children }: { children: ReactNode }) => <Text style={typography.title}>{children}</Text>;
-export const Heading = ({ children }: { children: ReactNode }) => <Text style={typography.heading}>{children}</Text>;
+export const Title = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.title}>{children}</Text>;
+export const Heading = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.heading}>{children}</Text>;
 export const Body = ({ children, muted }: { children: ReactNode; muted?: boolean }) => (
   <Text style={muted ? typography.small : typography.body}>{children}</Text>
 );
 export const Label = ({ children }: { children: ReactNode }) => <Text style={[typography.label, { marginBottom: spacing.xs }]}>{children}</Text>;
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+export function MotionPressable({
+  style, disabled, onPressIn, onPressOut, ...props
+}: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle> }) {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: disabled ? 1 : scale.value }],
+  }));
+  const animate = (value: number) => {
+    scale.value = withSpring(value, { damping: 22, stiffness: 320, reduceMotion: ReduceMotion.System });
+  };
+
+  return (
+    <AnimatedPressable
+      {...props}
+      disabled={disabled}
+      style={[style, animatedStyle]}
+      onPressIn={(event) => { if (!disabled) animate(0.98); onPressIn?.(event); }}
+      onPressOut={(event) => { animate(1); onPressOut?.(event); }}
+    />
+  );
+}
 
 export function Button({
   title, onPress, variant = 'primary', loading, disabled, icon,
@@ -73,13 +99,15 @@ export function Button({
   const off = disabled || loading;
   const fg = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.danger : colors.primary;
   return (
-    <Pressable
+    <MotionPressable
       accessibilityRole="button"
+      accessibilityLabel={title}
+      accessibilityState={{ disabled: Boolean(off), busy: Boolean(loading) }}
       onPress={onPress}
       disabled={off}
-      style={({ pressed }) => [
+      style={[
         styles.button,
-        variant === 'primary' && { backgroundColor: pressed ? colors.primaryPressed : colors.primary },
+        variant === 'primary' && { backgroundColor: colors.primary },
         variant === 'secondary' && { backgroundColor: colors.primarySoft },
         variant === 'danger' && { backgroundColor: colors.dangerSoft },
         variant === 'ghost' && { backgroundColor: 'transparent' },
@@ -92,18 +120,23 @@ export function Button({
           <Text style={[styles.buttonText, { color: fg }]}>{title}</Text>
         </View>
       )}
-    </Pressable>
+    </MotionPressable>
   );
 }
 
 export function TextField({ label, error, ...props }: TextInputProps & { label?: string; error?: string | null }) {
+  const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginBottom: spacing.lg }}>
       {label ? <Label>{label}</Label> : null}
       <TextInput
         placeholderTextColor={colors.textMuted}
+        selectionColor={colors.primary}
         {...props}
-        style={[styles.input, error ? { borderColor: colors.danger } : null, props.style]}
+        accessibilityLabel={props.accessibilityLabel ?? label}
+        onFocus={(event) => { setFocused(true); props.onFocus?.(event); }}
+        onBlur={(event) => { setFocused(false); props.onBlur?.(event); }}
+        style={[styles.input, focused && { borderColor: colors.primary, backgroundColor: colors.surface }, error ? { borderColor: colors.danger } : null, props.style]}
       />
       {error ? <Text style={[typography.small, { color: colors.danger, marginTop: spacing.xs }]}>{error}</Text> : null}
     </View>
@@ -112,14 +145,14 @@ export function TextField({ label, error, ...props }: TextInputProps & { label?:
 
 export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
   return (
-    <Pressable
+    <MotionPressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected }}
       style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
     >
       <Text style={[typography.body, selected && { color: colors.onPrimary, fontWeight: '600' }]}>{label}</Text>
-    </Pressable>
+    </MotionPressable>
   );
 }
 
@@ -149,8 +182,10 @@ export function Loading() {
 export function Empty({ icon, text }: { icon: ComponentProps<typeof Ionicons>['name']; text: string }) {
   return (
     <View style={[styles.center, { paddingVertical: spacing.xxl }]}>
-      <Ionicons name={icon} size={36} color={colors.border} />
-      <Text style={[typography.small, { marginTop: spacing.sm, textAlign: 'center' }]}>{text}</Text>
+      <View style={{ width: 64, height: 64, borderRadius: radius.lg, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+        <Ionicons name={icon} size={28} color={colors.primary} />
+      </View>
+      <Text style={[typography.small, { maxWidth: 280, marginTop: spacing.md, textAlign: 'center' }]}>{text}</Text>
     </View>
   );
 }
@@ -163,17 +198,17 @@ export const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     padding: spacing.lg,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.border,
     ...shadow.card,
   },
   row: { flexDirection: 'row', alignItems: 'center' },
-  button: { minHeight: 50, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, marginVertical: spacing.xs },
+  button: { minHeight: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, marginVertical: spacing.xs },
   buttonText: { fontSize: 16, fontWeight: '600' },
   input: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
-    paddingHorizontal: spacing.lg, paddingVertical: 13, fontSize: 16, color: colors.text,
+    minHeight: 52, paddingHorizontal: spacing.lg, paddingVertical: 14, fontSize: 16, color: colors.text,
   },
   chip: {
     paddingHorizontal: spacing.lg, paddingVertical: 10, borderRadius: radius.pill,
