@@ -2,12 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useIsFocused } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Linking, Platform, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, spacing, typography } from '../theme';
+import { Linking, Platform, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { colors, layout, radius, spacing, typography } from '../theme';
 import { Button, TextField } from './ui';
 
 /** Camera barcode scanner with a manual-entry fallback. Calls `onScanned` once per scan. */
 export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) => void; busy?: boolean }) {
+  const { height } = useWindowDimensions();
   const [permission, requestPermission] = useCameraPermissions();
   const focused = useIsFocused();
   const lock = useRef(false);
@@ -23,12 +24,12 @@ export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) 
 
   if (Platform.OS === 'web') {
     return (
-      <View style={[styles.fill, { padding: spacing.lg }]}>
+      <ScrollView contentContainerStyle={styles.manualContent} keyboardShouldPersistTaps="handled">
         <Text style={[typography.small, { textAlign: 'center' }]}>
           Camera scanning is available in the mobile app. Enter a barcode below to look up a product.
         </Text>
         <ManualEntry value={manual} onChange={setManual} onSubmit={fire} />
-      </View>
+      </ScrollView>
     );
   }
 
@@ -36,7 +37,7 @@ export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) 
 
   if (!permission.granted) {
     return (
-      <View style={[styles.fill, { padding: spacing.xl, justifyContent: 'center' }]}>
+      <ScrollView contentContainerStyle={[styles.manualContent, { flexGrow: 1, justifyContent: 'center' }]} keyboardShouldPersistTaps="handled">
         <Ionicons name="camera-outline" size={44} color={colors.primary} style={{ alignSelf: 'center' }} />
         <Text style={[typography.body, { textAlign: 'center', marginVertical: spacing.lg }]}>
           Buko needs the camera to read product barcodes. Images are never saved or uploaded.
@@ -47,13 +48,13 @@ export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) 
           <Button title="Open settings" onPress={() => Linking.openSettings()} />
         )}
         <ManualEntry value={manual} onChange={setManual} onSubmit={fire} />
-      </View>
+      </ScrollView>
     );
   }
 
   return (
-    <View style={styles.fill}>
-      <View style={styles.cameraWrap}>
+    <ScrollView contentContainerStyle={{ width: '100%', maxWidth: layout.formMaxWidth, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+      <View style={[styles.cameraWrap, { height: Math.min(360, height * 0.5) }]}>
         {focused ? (
           <CameraView
             style={StyleSheet.absoluteFill}
@@ -70,7 +71,7 @@ export function BarcodeScanner({ onScanned, busy }: { onScanned: (code: string) 
       <View style={{ padding: spacing.lg }}>
         <ManualEntry value={manual} onChange={setManual} onSubmit={fire} />
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -85,7 +86,8 @@ function ManualEntry({ value, onChange, onSubmit }: { value: string; onChange: (
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  cameraWrap: { height: 360, margin: spacing.lg, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000' },
+  manualContent: { width: '100%', maxWidth: layout.formMaxWidth, alignSelf: 'center', padding: spacing.lg },
+  cameraWrap: { margin: spacing.lg, borderRadius: radius.lg, overflow: 'hidden', backgroundColor: '#000' },
   frame: {
     position: 'absolute', top: '25%', left: '10%', right: '10%', bottom: '25%',
     borderWidth: 3, borderColor: '#FFFFFFCC', borderRadius: radius.md,

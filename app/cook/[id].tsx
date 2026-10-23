@@ -9,7 +9,7 @@ import { cancelNotification, configureNotifications, scheduleTimerNotification }
 import { loadRecipe, type RecipeFull } from '../../src/lib/recipes/db';
 import { formatClock } from '../../src/lib/recipes/timers';
 import { formatQuantity, scaleQuantity } from '../../src/lib/recipes/units';
-import { colors, radius, spacing, typography } from '../../src/theme';
+import { colors, layout, radius, spacing, typography } from '../../src/theme';
 
 interface CookTimer {
   id: number;
@@ -83,7 +83,7 @@ export default function Cook() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom']}>
+    <SafeAreaView style={{ flex: 1, width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center', backgroundColor: colors.background }} edges={['bottom', 'left', 'right']}>
       <Stack.Screen options={{ title: recipe.title }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
         <Text style={typography.label}>Step {step + 1} of {steps.length}</Text>
@@ -126,6 +126,7 @@ export default function Cook() {
         })() : null}
       </ScrollView>
 
+      <ScrollView style={{ flexGrow: 0, maxHeight: '55%' }} keyboardShouldPersistTaps="handled">
       {noNotify ? <View style={{ paddingHorizontal: spacing.lg }}><Notice>Notifications are off, so timers only alert you while Buko is open. You can allow them in Settings.</Notice></View> : null}
 
       <View style={{ paddingHorizontal: spacing.lg }}>
@@ -160,7 +161,7 @@ export default function Cook() {
             <Text style={[typography.body, { color: colors.surface, fontWeight: '600' }]}>Start</Text>
           </Pressable>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm }}>
           <Text style={typography.small}>Quick timer:</Text>
           {[1, 5, 10, 15].map((m) => (
             <Pressable key={m} onPress={() => startTimer(`${m} min timer`, m * 60)} style={{ paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface }}>
@@ -176,6 +177,7 @@ export default function Cook() {
         </View>
         <Body muted>Screen stays awake while you cook.</Body>
       </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

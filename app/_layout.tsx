@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Linking, Text } from 'react-native';
+import { Linking, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Body, Card, Heading, Loading, Screen } from '../src/components/ui';
@@ -8,7 +8,7 @@ import { isSupabaseConfigured } from '../src/lib/config';
 import { AuthProvider, useAuth } from '../src/providers/AuthProvider';
 import { ProfileProvider, useProfile } from '../src/providers/ProfileProvider';
 import { SettingsProvider } from '../src/providers/SettingsProvider';
-import { colors, spacing } from '../src/theme';
+import { colors, layout, spacing } from '../src/theme';
 
 const headerOptions = {
   headerShown: true,
@@ -84,8 +84,9 @@ function SetupNeeded() {
 
 export default function RootLayout() {
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: colors.surfaceMuted }}>
     <SafeAreaProvider>
+      <View style={{ flex: 1, width: '100%', maxWidth: layout.appMaxWidth, alignSelf: 'center', backgroundColor: colors.background }}>
       <StatusBar style="dark" />
       {isSupabaseConfigured ? (
         <AuthProvider>
@@ -98,6 +99,7 @@ export default function RootLayout() {
       ) : (
         <SetupNeeded />
       )}
+      </View>
     </SafeAreaProvider>
     </GestureHandlerRootView>
   );

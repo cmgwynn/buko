@@ -51,7 +51,7 @@ export default function AddEntry() {
   }
 
   return (
-    <Screen edges={[]}>
+    <Screen variant="form" edges={[]}>
       <Heading>{food.name}</Heading>
       {food.brand ? <Body muted>{food.brand}</Body> : null}
       <View style={{ height: spacing.lg }} />

@@ -119,7 +119,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
   const warning = result ? floorWarning(result) : null;
 
   return (
-    <Screen edges={editing ? [] : ['top', 'bottom']}>
+    <Screen variant="form" edges={editing ? [] : ['top', 'bottom']}>
       <Text style={[typography.label, { marginTop: spacing.md }]}>
         Step {step + 1} of {STEPS.length} · {STEPS[step]}
       </Text>

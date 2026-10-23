@@ -53,7 +53,7 @@ export default function Body() {
   }
 
   return (
-    <Screen>
+    <Screen variant="form">
       <ChipRow>
         {MEASUREMENT_KINDS.map((k) => (
           <Chip key={k.key} label={k.label} selected={kind === k.key} onPress={() => setKind(k.key)} />

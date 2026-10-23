@@ -17,7 +17,7 @@ import { logPlanEntry } from '../../src/lib/recipes/logging';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
-import { colors, radius, spacing, typography } from '../../src/theme';
+import { colors, layout, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
 
 type RecipeRow = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'grams' | 'nutrition'>[] };
@@ -158,7 +158,7 @@ export default function Plan() {
 
   return (
     <View ref={rootRef} style={{ flex: 1, backgroundColor: colors.background }} collapsable={false}>
-      <SafeAreaView style={{ flex: 1 }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, width: '100%', maxWidth: layout.contentMaxWidth, alignSelf: 'center' }} edges={['top', 'left', 'right']}>
         <View style={{ paddingHorizontal: spacing.lg }}>
           <TabHeader
             title="Plan"
@@ -193,7 +193,7 @@ export default function Plan() {
               const dt = new Date(d + 'T00:00:00');
               return (
                 <Pressable key={d} onPress={() => setSelected(d)} accessibilityLabel={dt.toDateString()}
-                  style={{ alignItems: 'center', paddingVertical: 8, width: 44, borderRadius: radius.md, backgroundColor: isSel ? colors.primary : 'transparent' }}>
+                  style={{ alignItems: 'center', paddingVertical: 8, flex: 1, maxWidth: 64, borderRadius: radius.md, backgroundColor: isSel ? colors.primary : 'transparent' }}>
                   <Text style={[typography.small, isSel && { color: colors.onPrimary }]}>{dt.toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
                   <Text style={[typography.subheading, isSel && { color: colors.onPrimary }, d === today && !isSel && { color: colors.primary }]}>{dt.getDate()}</Text>
                   <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 3, backgroundColor: isSel ? colors.onPrimary : STATUS_COLOR[st] }} />
@@ -294,7 +294,7 @@ export default function Plan() {
 
       <Modal visible={picker !== null} animationType="slide" transparent onRequestClose={() => setPicker(null)}>
         <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={() => setPicker(null)} />
-        <View style={{ backgroundColor: colors.background, maxHeight: '60%', padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }}>
+        <SafeAreaView edges={['bottom', 'left', 'right']} style={{ width: '100%', maxWidth: layout.formMaxWidth, alignSelf: 'center', backgroundColor: colors.background, maxHeight: '80%', padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }}>
           <Text style={[typography.heading, { marginBottom: spacing.md }]}>Choose a recipe</Text>
           <GHScrollView>
             {recipes.length === 0 ? <Empty icon="restaurant-outline" text="No recipes yet." /> : null}
@@ -308,7 +308,7 @@ export default function Plan() {
             ))}
           </GHScrollView>
           <Button title="Cancel" variant="ghost" onPress={() => setPicker(null)} />
-        </View>
+        </SafeAreaView>
       </Modal>
     </View>
   );

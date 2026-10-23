@@ -5,7 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { RecipeImage } from '../../src/components/RecipeImage';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, Empty, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, CardGrid, Empty, Notice, Screen } from '../../src/components/ui';
 import { setDraft, emptyDraft } from '../../src/lib/recipes/draft';
 import { computeRecipeNutrition, scoreRecipe } from '../../src/lib/recipes/nutrition';
 import type { Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
@@ -52,7 +52,7 @@ export default function Recipes() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {loaded && rows.length === 0 && !error ? <Empty icon="restaurant-outline" text="No recipes yet. Create one or import it from a link." /> : null}
       <View style={{ height: spacing.md }} />
-      {rows.map((r) => {
+      <CardGrid>{rows.map((r) => {
         const nut = computeRecipeNutrition(r.recipe_ingredients, r.servings);
         const score = nut.counted > 0 ? scoreRecipe(r.title, nut) : null;
         return (
@@ -71,7 +71,7 @@ export default function Recipes() {
             </Card>
           </Pressable>
         );
-      })}
+      })}</CardGrid>
     </Screen>
   );
 }

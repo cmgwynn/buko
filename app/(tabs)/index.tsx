@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Card, Empty, Heading, Screen } from '../../src/components/ui';
+import { Card, CardGrid, Empty, Heading, Screen } from '../../src/components/ui';
 import { addDays, formatDay, MEALS, toDateString } from '../../src/lib/diary';
 import { activityAdjustedTargets } from '../../src/lib/fitness/calc';
 import { loadBurnedForDay } from '../../src/lib/fitness/data';
@@ -140,7 +140,7 @@ export default function Diary() {
         </Card>
       ) : null}
 
-      {MEALS.map(({ key, label }) => {
+      <CardGrid>{MEALS.map(({ key, label }) => {
         const items = entries.filter((e) => e.meal === key);
         const kcal = items.reduce((s, e) => s + e.calories, 0);
         return (
@@ -196,7 +196,7 @@ export default function Diary() {
             </Pressable>
           </Card>
         );
-      })}
+      })}</CardGrid>
       {entries.length === 0 ? <Empty icon="restaurant-outline" text="Nothing logged yet. Add a food to a meal above." /> : null}
     </Screen>
   );

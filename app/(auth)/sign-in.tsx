@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Text, View, useWindowDimensions } from 'react-native';
 import { Body, Button, Notice, Screen, TextField, Title } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/theme';
 
 export default function SignIn() {
+  const { height } = useWindowDimensions();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -20,8 +21,8 @@ export default function SignIn() {
   }
 
   return (
-    <Screen edges={['top', 'bottom']}>
-      <View style={{ marginTop: spacing.xxl * 2, marginBottom: spacing.xl }}>
+    <Screen variant="form" edges={['top', 'bottom']}>
+      <View style={{ marginTop: height < 500 ? spacing.sm : spacing.xxl * 2, marginBottom: spacing.xl }}>
         <Text style={{ fontSize: 40, fontWeight: '800', color: colors.primary }}>Buko</Text>
         <Body muted>Scan it. Plan it. Cook it. Log it.</Body>
       </View>

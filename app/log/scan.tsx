@@ -1,6 +1,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarcodeScanner } from '../../src/components/BarcodeScanner';
 import { Notice } from '../../src/components/ui';
 import { getProductByBarcode } from '../../src/lib/api/openFoodFacts';
@@ -27,9 +28,9 @@ export default function LogScan() {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
       {message ? <View style={{ padding: spacing.lg, paddingBottom: 0 }}><Notice tone="danger">{message}</Notice></View> : null}
       <BarcodeScanner onScanned={onScanned} busy={busy} />
-    </View>
+    </SafeAreaView>
   );
 }

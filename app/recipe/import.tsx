@@ -40,7 +40,7 @@ export default function ImportRecipe() {
   }
 
   return (
-    <Screen edges={[]}>
+    <Screen variant="form" edges={[]}>
       <TextField label="Recipe web address" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={run} />
       <Button title="Import recipe" onPress={run} loading={busy} disabled={!url.trim()} />
       {error ? <Notice tone="danger">{error}</Notice> : null}

@@ -1,31 +1,49 @@
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import { Children, type ComponentProps, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
   type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, radius, shadow, spacing, typography } from '../theme';
+import { colors, layout, radius, shadow, spacing, typography } from '../theme';
 
 export function Screen({
-  children, scroll = true, edges = ['top'], padded = true,
+  children, scroll = true, edges = ['top'], padded = true, variant = 'content',
 }: {
   children: ReactNode;
   scroll?: boolean;
   edges?: ('top' | 'bottom' | 'left' | 'right')[];
   padded?: boolean;
+  variant?: 'content' | 'form';
 }) {
+  const { height } = useWindowDimensions();
   const pad = padded ? styles.screenPad : null;
+  const content = [
+    styles.screenContent,
+    { maxWidth: variant === 'form' ? layout.formMaxWidth : layout.contentMaxWidth },
+    pad,
+    padded && height < 500 && { paddingVertical: spacing.md },
+  ];
   return (
-    <SafeAreaView style={styles.screen} edges={edges}>
+    <SafeAreaView style={styles.screen} edges={[...new Set([...edges, 'left', 'right'] as const)]}>
       {scroll ? (
-        <ScrollView contentContainerStyle={[pad, { paddingBottom: spacing.xxl * 2 }]} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[...content, { paddingBottom: spacing.xxl * 2 }]} keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
       ) : (
-        <View style={[{ flex: 1 }, pad]}>{children}</View>
+        <View style={[{ flex: 1 }, ...content]}>{children}</View>
       )}
     </SafeAreaView>
+  );
+}
+
+export function CardGrid({ children }: { children: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.lg }}>
+      {Children.map(children, (child) => child == null ? null : (
+        <View style={{ flexBasis: 320, flexGrow: 1, minWidth: 0, maxWidth: '100%' }}>{child}</View>
+      ))}
+    </View>
   );
 }
 
@@ -137,6 +155,7 @@ export function Empty({ icon, text }: { icon: ComponentProps<typeof Ionicons>['n
 
 export const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
+  screenContent: { width: '100%', alignSelf: 'center' },
   screenPad: { padding: spacing.lg },
   card: {
     backgroundColor: colors.surface,

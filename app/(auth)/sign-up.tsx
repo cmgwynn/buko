@@ -1,11 +1,12 @@
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { View, useWindowDimensions } from 'react-native';
 import { Body, Button, Notice, Screen, TextField, Title } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/theme';
 
 export default function SignUp() {
+  const { height } = useWindowDimensions();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -27,8 +28,8 @@ export default function SignUp() {
   }
 
   return (
-    <Screen edges={['top', 'bottom']}>
-      <View style={{ marginTop: spacing.xxl * 2 }} />
+    <Screen variant="form" edges={['top', 'bottom']}>
+      <View style={{ marginTop: height < 500 ? spacing.sm : spacing.xxl * 2 }} />
       <Title>Create your account</Title>
       <View style={{ height: spacing.sm }} />
       <Body muted>Your data stays private to you. No ads, no tracking.</Body>
