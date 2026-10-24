@@ -4,7 +4,7 @@ Scan products, rate them, track what you eat. See [PROJECT.md](./PROJECT.md) for
 
 Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records app IDs, listing text, account/health declarations and independent device/store acceptance work.
 
-Phases 1-5 are complete and live with subscriptions according to the owner, who also verified account export and deletion. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks. Phase 6 is built and locally verified; the owner confirmed successful application of migration `0012` on 2026-10-24.
+Phases 1-6 are complete and live, including subscriptions and owner-verified account export/deletion. Phase 7 is built and verified; the owner confirmed migration `0013` ran on 2026-10-24 and web publication is proceeding. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks.
 
 Phase 1 includes: email sign-up and onboarding with calorie/macro targets, a barcode scanner with an explainable 0–100 health score and better-product suggestions, a food diary with daily dashboard, and a grocery list.
 
