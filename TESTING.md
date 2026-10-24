@@ -38,3 +38,21 @@ npm run test:components -- --runInBand src/components/workout src/lib/workoutNat
 `npm run build:web` also generates the production static offline shell.
 Native setup and manual acceptance steps are in
 [WORKOUT-NATIVE.md](./docs/WORKOUT-NATIVE.md).
+
+Recipe quality coverage includes deterministic seasoning/portion/time rules,
+bounded chef-review regeneration and compatible fallback, admin authority,
+version immutability, feedback idempotency and owner/provenance checks.
+Cooking feedback and non-admin deep-link gates have component tests. Human
+cooking tests are separate: passing an automated or AI review must never mark
+an existing library recipe physically tested.
+
+```sh
+npx tsx --test "src/lib/recipes/quality/*.test.ts" src/lib/recipes/qualityDatabase.test.ts
+npm run test:components -- --runInBand src/components/RecipeAdmin.jest.test.tsx src/components/RecipeTasteFeedback.jest.test.tsx src/lib/recipes/qualityClient.jest.test.tsx
+npx --yes deno check supabase/functions/recipe-quality/index.ts
+```
+
+The concurrent HTTP fixture holds the first model call while a duplicate request
+arrives. PGlite exercises transaction locks/claim expiry but serializes submitted
+queries, so it does not establish distributed exactly-once behavior. No test
+uses a real paid model.

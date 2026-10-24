@@ -113,6 +113,7 @@ export default function Recipes() {
     <Screen>
       <TabHeader title="Recipes" />
       <RecipeSourceNav active="saved" />
+      <Button title="Find a tested meal" variant="secondary" icon="restaurant-outline" onPress={() => router.push('/recipe/suggest')} />
       <TextField label="Search saved recipes" placeholder="Recipe or ingredient" value={search} onChangeText={setSearch} autoCorrect={false} />
       <ChipRow>
         <Chip label={favoritesOnly ? 'Favorites ✓' : 'Favorites'} selected={favoritesOnly} onPress={() => setFavoritesOnly((value) => !value)} />

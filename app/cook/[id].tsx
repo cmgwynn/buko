@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
+import * as Crypto from 'expo-crypto';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, Vibration, View } from 'react-native';
@@ -35,6 +36,7 @@ export default function Cook() {
   const [noNotify, setNoNotify] = useState(false);
   const nextId = useRef(1);
   const timersRef = useRef<CookTimer[]>([]);
+  const cookingEvent = useRef(Crypto.randomUUID());
   timersRef.current = timers;
 
   useEffect(() => {
@@ -79,7 +81,7 @@ export default function Cook() {
   const last = step === steps.length - 1;
 
   function finish() {
-    router.replace({ pathname: '/cook/finish', params: { id: recipe.id, servings: String(cookServings), ...(entry ? { entry } : {}) } });
+    router.replace({ pathname: '/cook/finish', params: { id: recipe.id, event: cookingEvent.current, servings: String(cookServings), ...(entry ? { entry } : {}) } });
   }
 
   return (

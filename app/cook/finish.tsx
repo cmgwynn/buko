@@ -13,6 +13,7 @@ import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
 import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
+import { RecipeTasteFeedback } from '../../src/components/RecipeTasteFeedback';
 
 const stepBtn = { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' } as const;
 
@@ -20,7 +21,7 @@ export default function FinishCooking() {
   const router = useRouter();
   const { session } = useAuth();
   const { selectedDate, setSelectedDate } = useSelectedDate();
-  const { id, entry, direct, meal: mealParam, date: dateParam } = useLocalSearchParams<{ id: string; servings?: string; entry?: string; direct?: string; meal?: string; date?: string }>();
+  const { id, entry, event, direct, meal: mealParam, date: dateParam } = useLocalSearchParams<{ id: string; servings?: string; entry?: string; event?: string; direct?: string; meal?: string; date?: string }>();
   const [full, setFull] = useState<RecipeFull | null>(null);
   const [eaten, setEaten] = useState(1);
   const [meal, setMeal] = useState<Meal>((MEALS.find((m) => m.key === mealParam)?.key ?? defaultMeal()) as Meal);
@@ -92,6 +93,7 @@ export default function FinishCooking() {
         <Body muted>{direct ? `How much ${full.recipe.title} did you eat?` : `Log how much you ate of ${full.recipe.title}.`}</Body>
       </View>
 
+      {!direct ? <RecipeTasteFeedback key={`${full.recipe.id}:${event ?? ''}`} recipeId={full.recipe.id} cookingEventId={event} /> : null}
       <Card>
         <Label>Servings eaten</Label>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: spacing.sm }}>

@@ -78,6 +78,9 @@ function Gate() {
         <Stack.Screen name="recipe/edit" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
         <Stack.Screen name="recipe/import" options={{ ...recipeHeaderOptions, title: 'Import recipe' }} />
         <Stack.Screen name="recipe/library" options={{ ...recipeHeaderOptions, title: 'Recipe library' }} />
+        <Stack.Screen name="recipe/suggest" options={{ ...recipeHeaderOptions, title: 'Find a tested meal' }} />
+        <Stack.Screen name="recipe/taste" options={{ ...recipeHeaderOptions, title: 'Taste preferences' }} />
+        <Stack.Screen name="recipe/admin" options={{ ...recipeHeaderOptions, title: 'Recipe quality' }} />
         <Stack.Screen name="community/index" options={{ ...recipeHeaderOptions, title: 'Shared recipes' }} />
         <Stack.Screen name="community/[id]" options={{ ...communityHeaderOptions, title: 'Shared recipe' }} />
         <Stack.Screen name="community/publish" options={{ ...communityHeaderOptions, title: 'Share a recipe' }} />

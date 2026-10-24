@@ -5,6 +5,7 @@ import { Linking, Pressable, ScrollView, Text, View } from 'react-native';
 import { Attribution } from '../../src/components/Attribution';
 import { FactorCard } from '../../src/components/FactorCard';
 import { RecipeImage } from '../../src/components/RecipeImage';
+import { RecipeQualityLabel } from '../../src/components/RecipeQualityLabel';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Label, Loading, Notice, Screen } from '../../src/components/ui';
@@ -143,6 +144,7 @@ export default function RecipeScreen() {
       <Stack.Screen options={{ title: 'Recipe' }} />
       <RecipeImage path={recipe.photo_path} style={{ height: 200, marginBottom: spacing.lg }} />
       <Heading>{recipe.title}</Heading>
+      <RecipeQualityLabel key={`${recipe.id}:${recipe.updated_at}`} recipeId={recipe.id} />
       {activityError ? <Notice tone="danger">{activityError}</Notice> : null}
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <Button title={favorite ? 'Favorited' : 'Add to favorites'} variant="secondary" icon={favorite ? 'heart' : 'heart-outline'} disabled={activityBusy || !activityReady} onPress={() => void toggleFavorite()} />

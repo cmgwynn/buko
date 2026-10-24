@@ -140,7 +140,66 @@ The owner has confirmed the current Coach migration and Edge Functions are worki
 
 No Anthropic key is needed for these steps, and they make no paid model calls. Supabase Free has usage/resource limits and may pause inactive projects; staying within its allowance is not unlimited hosting. Do not upgrade or enable paid services just to trial these features.
 
-### Later: explicitly activate Anthropic (optional, metered)
+## Phase 8: recipe quality (release setup)
+
+This release does not automatically certify the existing 210 library recipes.
+The approved collection starts empty until an admin records actual cooking tests.
+Existing private, imported and Shared recipes continue to work normally.
+
+1. After migrations through `0013`, run
+   [`0014_recipe_quality.sql`](./supabase/migrations/0014_recipe_quality.sql)
+   **once** in Supabase SQL Editor. Do not rerun it after success.
+2. Grant your own signed-in account recipe-admin access in SQL Editor, replacing
+   the email with the account you actually use:
+   ```sql
+   insert into public.recipe_admins (user_id)
+   select id from auth.users where lower(email) = lower('YOUR_SIGN_IN_EMAIL')
+   on conflict (user_id) do nothing;
+   ```
+   Confirm exactly the intended account was granted access. App users cannot
+   grant themselves this role; Shared-recipe moderator status is separate.
+3. Deploy the new authenticated function, with paid AI explicitly off:
+   ```sh
+   npx supabase secrets set RECIPE_AI_ENABLED=false --project-ref YOUR_PROJECT_REF
+   npx supabase functions deploy recipe-quality --project-ref YOUR_PROJECT_REF --no-verify-jwt --use-api
+   ```
+   The function verifies bearer tokens itself. Publishing GitHub Pages does
+   not run migrations or deploy Supabase functions.
+4. After the frontend release, open **Profile → Admin: Recipe quality**.
+   Create a normal private recipe with measured/matched ingredients, select
+   it for curation, add cuisine, source/permission notes and permitted swaps,
+   then save a draft. Cook it, record the test/rating and approve the version.
+   Never record a test you have not actually performed.
+5. Open **Recipes → Find a tested meal**. With AI off, a compatible unchanged
+   approved recipe can be saved without a model call. No compatible approved
+   recipe means an explicit unavailable result, never an invented meal.
+6. Finish cooking to leave optional private taste feedback. Explicit preferences
+   and recipe-specific AI consent live at **Profile → Taste preferences**.
+
+AI adaptation is separately opt-in and metered. Do not enable it just to test
+curation. Later, with an owner-funded API budget, set server-only
+`ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` and `RECIPE_AI_ENABLED=true`, then redeploy
+the function and accept the recipe-specific consent in the app. Coach consent
+does not substitute for recipe-sharing consent. Never put private keys into
+`EXPO_PUBLIC_*`, source control or chat.
+
+Adaptations are limited changes to a compatible approved base, with rule checks
+and a separate chef review. There is one regeneration attempt, then an explicit
+unchanged-base fallback. A reviewer is not a physical taste test or an allergy
+certification. Nutrition is recalculated from trusted ingredient data.
+Tested/Adapted labels use server-verified provenance; changing the formulation
+does not retain an unchanged Tested claim. Admins can pause a poorly rated base
+without deleting members' saved copies.
+
+Recipe AI reserves each paid adaptation/review separately: **5 calls/minute and
+20 calls/UTC day per user**, plus `RECIPE_AI_GLOBAL_DAILY_REQUESTS` across the
+project (default 100, range 1–10000). A suggestion can use up to two adaptation
+calls and two reviewer calls; each has a 25-second timeout. These are call
+limits, not dollar caps. Set provider spending limits separately; failed calls
+can consume tokens/reservations. Never promise that an AI-approved meal has been
+physically tasted. No paid calls run automatically after cooking feedback.
+
+## Coach: later activation of Anthropic (optional, metered)
 Only do this after deciding to fund API usage. A free Claude chat account is not free Anthropic API credit.
 
 1. In your Anthropic console, configure available spending/usage limits and choose a supported model ID.

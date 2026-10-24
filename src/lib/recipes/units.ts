@@ -1,4 +1,4 @@
-import type { Units } from '../../types';
+import type { Units } from '../../types/index.ts';
 
 /**
  * Unit handling for recipes and grocery lists.

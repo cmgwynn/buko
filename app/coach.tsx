@@ -119,6 +119,7 @@ export default function Coach() {
   return (
     <Screen>
       <Heading>Your wellness coach</Heading>
+      <Button title="Find a tested meal" variant="secondary" onPress={() => router.push('/recipe/suggest')} />
       <Notice tone="info">{COACH_NOTICE} Suggestions never change your targets or add items without your confirmation.</Notice>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {statusNote ? <Notice tone="info">{statusNote}</Notice> : null}

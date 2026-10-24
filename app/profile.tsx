@@ -10,6 +10,7 @@ import { useAuth } from '../src/providers/AuthProvider';
 import { useProfile } from '../src/providers/ProfileProvider';
 import { useSettings } from '../src/providers/SettingsProvider';
 import { colors, spacing, typography } from '../src/theme';
+import { RecipeAdminLink } from '../src/components/RecipeAdminLink';
 
 const GOAL = { lose: 'Lose weight', maintain: 'Maintain weight', gain: 'Gain weight' } as const;
 
@@ -64,7 +65,9 @@ export default function Profile() {
         <NavigationRow title="Goals & personal details" subtitle="Nutrition goals, units and dietary preferences" icon="person-outline" onPress={() => router.push('/edit-profile')} />
         <NavigationRow title="Health connections" subtitle="Permissions, activity adjustment and sync" icon="heart-outline" onPress={() => router.push('/health')} />
         <NavigationRow title="Coach preferences" subtitle="Weekly review, consent and chat history" icon="chatbubbles-outline" onPress={() => router.push('/coach')} />
+        <NavigationRow title="Taste preferences" subtitle="Cuisines, heat, cooking time and optional AI recipe sharing" icon="restaurant-outline" onPress={() => router.push('/recipe/taste')} />
       </Card>
+      <RecipeAdminLink />
       <Card>
         <Text style={typography.label}>Account & privacy</Text>
         <NavigationRow title="Account & data" subtitle="Export your data or delete your account" icon="shield-checkmark-outline" onPress={() => router.push('/account')} />
