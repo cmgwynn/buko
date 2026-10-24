@@ -3,13 +3,16 @@ import { Stack, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, Text, TextInput, View } from 'react-native';
 import { RecipeImage } from '../../src/components/RecipeImage';
+import { RecoveryNotice } from '../../src/components/RecoveryNotice';
+import { useConfirm } from '../../src/components/ConfirmProvider';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { Body, Button, Card, Label, Notice, Screen, TextField } from '../../src/components/ui';
-import { blankIngredient, updateDraft, useDraft } from '../../src/lib/recipes/draft';
-import { pickPhoto, saveRecipe } from '../../src/lib/recipes/db';
+import { blankIngredient, clearDraft, getDraft, prepareDraftSave, recipeDraftStore, updateDraft, useDraft, useDraftRecovery } from '../../src/lib/recipes/draft';
+import { pickPhoto, RecipePhotoSaveError, saveRecipe } from '../../src/lib/recipes/db';
 import { matchAll, reparse } from '../../src/lib/recipes/matching';
-import { computeRecipeNutrition, scoreRecipe } from '../../src/lib/recipes/nutrition';
+import { computeRecipeNutrition, recipeNutritionMessage, scoreRecipe } from '../../src/lib/recipes/nutrition';
 import { detectTimerSeconds } from '../../src/lib/recipes/timers';
+import { retryRecipeDraftRecovery } from '../../src/lib/recovery';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 
@@ -20,8 +23,10 @@ const intOrNull = (t: string) => {
 
 export default function EditRecipe() {
   const router = useRouter();
+  const confirm = useConfirm();
   const { session } = useAuth();
   const d = useDraft();
+  const recovery = useDraftRecovery();
   const [busy, setBusy] = useState<'match' | 'save' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,14 +34,22 @@ export default function EditRecipe() {
   const score = nutrition.counted > 0 ? scoreRecipe(d.title || 'Recipe', nutrition) : null;
 
   async function match() {
+    if (busy || !recovery.ready) return;
     setBusy('match');
-    const next = await matchAll(d.ingredients);
-    updateDraft({ ingredients: next });
-    setBusy(null);
+    setError(null);
+    try {
+      const next = await matchAll(d.ingredients);
+      if (getDraft() === d) updateDraft({ ingredients: next });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not match ingredients. Please retry.');
+    } finally {
+      setBusy(null);
+    }
   }
 
   async function save() {
-    if (!session) return;
+    if (busy || !recovery.ready) return;
+    if (!session) return setError('Sign in again before saving your recipe.');
     if (!d.title.trim()) return setError('Give the recipe a title.');
     if (!d.ingredients.some((i) => i.raw_text.trim())) return setError('Add at least one ingredient.');
     setBusy('save');
@@ -44,11 +57,20 @@ export default function EditRecipe() {
     try {
       // Anything not matched yet gets one automatic attempt, so nutrition is calculated without extra taps.
       const ingredients = await matchAll(d.ingredients);
+      if (recipeDraftStore.getAccount() !== session.user.id || getDraft() !== d) return;
       updateDraft({ ingredients });
+      await prepareDraftSave();
       const id = await saveRecipe(session.user.id, { ...d, ingredients });
+      if (recipeDraftStore.getAccount() !== session.user.id) return;
+      await clearDraft();
       router.replace({ pathname: '/recipe/[id]', params: { id } });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save the recipe.');
+      if (recipeDraftStore.getAccount() === session.user.id) {
+        if (e instanceof RecipePhotoSaveError) updateDraft({ id: e.recipeId });
+        await recipeDraftStore.retry().catch(() => {});
+      }
+    } finally {
       setBusy(null);
     }
   }
@@ -56,7 +78,7 @@ export default function EditRecipe() {
   async function choosePhoto() {
     try {
       const uri = await pickPhoto();
-      if (uri) updateDraft({ photoUri: uri });
+      if (uri && getDraft() === d) updateDraft({ photoUri: uri });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not open photos.');
     }
@@ -69,9 +91,23 @@ export default function EditRecipe() {
     updateDraft((cur) => ({ steps: cur.steps.map((x, idx) => (idx === i ? { ...x, text, timer_seconds: detectTimerSeconds(text) } : x)) }));
   const removeStep = (i: number) => updateDraft((cur) => ({ steps: cur.steps.filter((_, idx) => idx !== i) }));
 
+  async function discard() {
+    if (!await confirm({ title: 'Discard recipe draft?', message: 'Unsaved changes on this device will be removed. Any previously saved recipe is kept.', confirmLabel: 'Discard draft', destructive: true })) return;
+    try {
+      await clearDraft();
+      router.replace('/(tabs)/recipes');
+    } catch {
+      setError('The draft could not be discarded on this device. Retry before leaving.');
+    }
+  }
+
+  if (!recovery.ready) return <Screen><RecoveryNotice state={recovery} kind="Recipe draft" retry={retryRecipeDraftRecovery} /></Screen>;
+
   return (
     <Screen edges={[]}>
       <Stack.Screen options={{ title: d.id ? 'Edit recipe' : 'New recipe' }} />
+      <RecoveryNotice state={recovery} kind="Recipe draft" retry={retryRecipeDraftRecovery} />
+      <View pointerEvents={busy ? 'none' : 'auto'}>
       <Pressable onPress={choosePhoto} accessibilityLabel="Choose a photo">
         <RecipeImage path={d.photoPath} localUri={d.photoUri} style={{ height: 160, marginBottom: spacing.sm }} />
         <Text style={[typography.small, { textAlign: 'center', marginBottom: spacing.lg }]}>
@@ -167,6 +203,7 @@ export default function EditRecipe() {
           </View>
         </Card>
       ) : null}
+      {recipeNutritionMessage(nutrition) ? <Notice tone="warning">{recipeNutritionMessage(nutrition)}</Notice> : null}
 
       <View style={{ height: spacing.lg }} />
       <Label>Steps</Label>
@@ -194,6 +231,8 @@ export default function EditRecipe() {
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <View style={{ height: spacing.lg }} />
       <Button title={d.id ? 'Save changes' : 'Save recipe'} onPress={save} loading={busy === 'save'} />
+      <Button title="Discard draft" variant="ghost" onPress={discard} disabled={!!busy} />
+      </View>
     </Screen>
   );
 }

@@ -4,12 +4,14 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { Button, Card, Notice, Screen, TextField } from '../../src/components/ui';
+import { RecoveryNotice } from '../../src/components/RecoveryNotice';
+import { useConfirm } from '../../src/components/ConfirmProvider';
 import { estimateCalories, estimateStrengthMinutes, newRecordsFor, type DatedSet } from '../../src/lib/fitness/calc';
 import { exerciseHistory, saveRoutine, saveWorkout } from '../../src/lib/fitness/data';
 import {
   distanceUnit, formatDuration, fromDisplayDistance, fromDisplayWeight, parseNum, toDisplayDistance, toDisplayWeight, weightUnit,
 } from '../../src/lib/fitness/format';
-import { blankSet, endSession, updateSession, useWorkoutSession } from '../../src/lib/fitness/session';
+import { blankSet, endSession, getSession, prepareWorkoutSave, updateSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore } from '../../src/lib/fitness/session';
 import type { WorkoutSet } from '../../src/lib/fitness/types';
 import { activityHintFor, syncWorkoutToHealth } from '../../src/lib/health';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -41,10 +43,12 @@ function NumInput({ value, onChange, placeholder, width = 64 }: { value: number 
 export default function ActiveWorkout() {
   useKeepAwake();
   const router = useRouter();
+  const confirm = useConfirm();
   const { session: auth } = useAuth();
   const { profile } = useProfile();
   const { settings } = useSettings();
   const w = useWorkoutSession();
+  const recovery = useWorkoutRecovery();
   const units = profile?.units ?? 'metric';
   const [now, setNow] = useState(Date.now());
   const [histories, setHistories] = useState<Record<string, { dated: DatedSet[]; last: WorkoutSet[] }>>({});
@@ -53,7 +57,6 @@ export default function ActiveWorkout() {
   const [saveAs, setSaveAs] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [confirmingDiscard, setConfirmingDiscard] = useState(false);
 
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
@@ -72,10 +75,13 @@ export default function ActiveWorkout() {
     }
   }, [w.items, histories]);
 
+  if (!recovery.ready) return <Screen><RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} /></Screen>;
+
   if (!w.active) {
     return (
       <Screen>
         <Text style={typography.body}>No workout in progress.</Text>
+        <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
         <View style={{ height: spacing.md }} />
         <Button title="Back to Train" onPress={() => router.replace('/(tabs)/train')} />
       </Screen>
@@ -146,7 +152,11 @@ export default function ActiveWorkout() {
     setError(null);
     try {
       const sum = summary();
+      await prepareWorkoutSave();
       const id = await saveWorkout(auth.user.id, w, { durationMin: sum.duration, calories: sum.calories || null, caloriesEstimated: true });
+      if (workoutSessionStore.getAccount() !== auth.user.id || getSession() !== w) return;
+      await endSession();
+      const completed = getSession();
       let routineError: string | undefined;
       if (saveAs.trim()) {
         try {
@@ -159,26 +169,35 @@ export default function ActiveWorkout() {
       const name = w.name;
       const hint = activityHintFor(w.items.map((i) => ({ name: i.exercise.name, category: i.exercise.category })));
       const distanceM = w.items.reduce((s, i) => s + (i.exercise.category === 'cardio' ? i.sets.reduce((a, x) => a + (x.distance_m ?? 0), 0) : 0), 0);
-      endSession();
       if (settings?.health_write_workouts) {
         // Best effort: a failure here never loses the saved workout.
         syncWorkoutToHealth({ id, name, startedAt, durationMin: sum.duration, calories: sum.calories || null, hint, distanceM: distanceM || null }).catch(() => {});
       }
+      if (workoutSessionStore.getAccount() !== auth.user.id || getSession() !== completed) return;
       router.replace({ pathname: '/workout/[id]', params: { id, ...(routineError ? { routineError } : {}) } });
     } catch (e) {
       setError((e as Error).message);
+      if (workoutSessionStore.getAccount() === auth.user.id && getSession() === w) await workoutSessionStore.retry().catch(() => {});
+    } finally {
       setBusy(false);
     }
   }
 
-  function discard() {
-    setConfirmingDiscard(true);
+  async function discard() {
+    if (!await confirm({ title: 'Discard workout?', message: 'This removes the unfinished workout from this device. Your saved routine is kept.', confirmLabel: 'Discard workout', destructive: true })) return;
+    try {
+      await endSession();
+      router.dismissTo('/(tabs)/train');
+    } catch {
+      setError('The workout could not be discarded on this device. Retry before leaving.');
+    }
   }
 
   if (finishing) {
     const sum = summary();
     return (
       <Screen>
+        <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
         <Text style={typography.heading}>Nice work</Text>
         <Card style={{ marginTop: spacing.md }}>
           <Text style={typography.body}>Time: {sum.duration} min</Text>
@@ -187,17 +206,18 @@ export default function ActiveWorkout() {
             An estimate from the exercises’ MET values (a standard energy-cost rating), your weight and time. It can be off by a lot, so treat it as a rough guide.
           </Text>
         </Card>
-        <TextField label="Save as a routine (optional)" placeholder="e.g. Push day" value={saveAs} onChangeText={setSaveAs} />
+        <TextField label="Save as a routine (optional)" placeholder="e.g. Push day" value={saveAs} onChangeText={setSaveAs} editable={!busy} />
         {error ? <Notice tone="danger">{error}</Notice> : null}
         <Button title="Save workout" onPress={finish} loading={busy} />
         <View style={{ height: spacing.sm }} />
-        <Button title="Keep training" variant="ghost" onPress={() => setFinishing(false)} />
+        <Button title="Keep training" variant="ghost" onPress={() => setFinishing(false)} disabled={busy} />
       </Screen>
     );
   }
 
   return (
     <Screen>
+      <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <View style={{ flex: 1, marginRight: spacing.md }}>
           <TextInput
@@ -212,14 +232,6 @@ export default function ActiveWorkout() {
           <Ionicons name="trash-outline" size={22} color={colors.danger} />
         </Pressable>
       </View>
-      {confirmingDiscard ? (
-        <Card>
-          <Text style={typography.heading}>Discard workout?</Text>
-          <Text style={typography.body}>Nothing from this workout will be saved. Your saved routine is kept.</Text>
-          <Button title="Confirm discard workout" variant="danger" onPress={() => { endSession(); router.dismissTo('/(tabs)/train'); }} />
-          <Button title="Keep going" variant="secondary" onPress={() => setConfirmingDiscard(false)} />
-        </Card>
-      ) : null}
 
       <View style={{ height: spacing.md }} />
       {w.items.map((item) => {

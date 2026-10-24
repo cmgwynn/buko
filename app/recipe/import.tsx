@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { SavedPageImport } from '../../src/components/SavedPageImport';
 import { PremiumGate } from '../../src/components/PremiumGate';
-import { Body, Button, Card, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Body, Button, Card, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { config } from '../../src/lib/config';
 import { setDraft } from '../../src/lib/recipes/draft';
 import { importRecipeFromHtml, importRecipeViaBackend, SUPPORTED_RECIPE_SITES } from '../../src/lib/recipes/importer';
@@ -26,6 +26,7 @@ function ImportContent() {
   const [steps, setSteps] = useState('');
   const [sourceName, setSourceName] = useState('');
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [mode, setMode] = useState<'url' | 'paste'>('url');
 
   function openDraft(r: ParsedRecipe) {
     setDraft(recipeToDraft(r));
@@ -69,33 +70,36 @@ function ImportContent() {
 
   return (
     <Screen variant="form" edges={[]}>
-      <Heading>Import from a supported site</Heading>
-      <Body muted>Supported hosts: {SUPPORTED_RECIPE_SITES} (with or without www). Use an HTTPS recipe link. Some publishers may block automatic import; paste is always available below.</Body>
-      <TextField label="Recipe web address (optional for paste)" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={run} editable={!busy} />
-      <Button title="Import from URL" onPress={run} loading={busy} disabled={!url.trim()} />
-      {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Card style={{ marginTop: spacing.lg }}>
-        <Heading>Or paste ingredients and steps</Heading>
-        <Body muted>
-          Open a recipe you can access in your browser and copy just its ingredients and instructions here. No AI or HTML file is needed. Keep its link above and optional attribution below. Everything opens in an editable draft for review before saving.
-        </Body>
+      <Heading>Import a recipe</Heading>
+      <ChipRow>
+        <Chip label="Recipe link" selected={mode === 'url'} onPress={() => setMode('url')} />
+        <Chip label="Paste text" selected={mode === 'paste'} onPress={() => setMode('paste')} />
+      </ChipRow>
+      {mode === 'url' ? <>
+        <Body muted>Import structured recipe data from a supported HTTPS link. Some publishers block automatic import.</Body>
+        <TextField label="Recipe web address" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={run} editable={!busy} />
+        <Button title="Import recipe" onPress={run} loading={busy} disabled={!url.trim()} />
+      </> : <>
+        <Body muted>Copy the ingredients and instructions from a recipe you can access. Everything stays in a private editable draft until you save it.</Body>
+        <TextField label="Source link (optional)" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
+        <TextField label="Publisher / attribution (optional)" value={sourceName} onChangeText={setSourceName} placeholder="Publisher, author or family recipe" editable={!busy} />
         <TextField label="Recipe title" value={title} onChangeText={setTitle} placeholder="Weeknight lentil soup" editable={!busy} />
         <TextField label="Servings (optional; starts with 4)" value={servings} onChangeText={setServings} keyboardType="number-pad" placeholder="4" editable={!busy} />
-        <TextField label="Ingredients — one per line" value={ingredients} onChangeText={setIngredients} multiline textAlignVertical="top" style={{ minHeight: 150 }} placeholder={'1 cup lentils\n2 cups water'} editable={!busy} />
-        <TextField label="Instructions — a blank line between steps" value={steps} onChangeText={setSteps} multiline textAlignVertical="top" style={{ minHeight: 180 }} placeholder={'Combine lentils and water.\n\nSimmer for 20 minutes.'} editable={!busy} />
-        <TextField label="Source / attribution (optional)" value={sourceName} onChangeText={setSourceName} placeholder="Publisher, author or family recipe" editable={!busy} />
-        <Button title="Create editable draft" onPress={importPastedText} disabled={busy} />
-      </Card>
-      <Card style={{ marginTop: spacing.lg }}>
+        <TextField label="Ingredients — one per line" value={ingredients} onChangeText={setIngredients} multiline textAlignVertical="top" style={{ minHeight: 140 }} placeholder={'1 cup lentils\n2 cups water'} editable={!busy} />
+        <TextField label="Instructions — separate steps with a blank line" value={steps} onChangeText={setSteps} multiline textAlignVertical="top" style={{ minHeight: 160 }} placeholder={'Combine lentils and water.\n\nSimmer for 20 minutes.'} editable={!busy} />
+        <Button title="Review editable recipe" onPress={importPastedText} disabled={busy} />
+      </>}
+      {error ? <Notice tone="danger">{error}</Notice> : null}
+      {mode === 'url' ? <Card style={{ marginTop: spacing.lg }}>
         <Body muted>
-          URL import on phone and web uses the same authenticated service and supported-site checks. Buko reads published structured recipe data, not stories or photos, and keeps the source link. Recipe sites receive no Buko account credentials. Publisher restrictions are not bypassed. Pasted text is parsed locally into ingredients and timer suggestions; review the draft before saving.
+          Supported sites only: {SUPPORTED_RECIPE_SITES}. Buko reads published structured recipe data, not stories or photos, and keeps the source link. Publisher restrictions are not bypassed. Review imported ingredients and amounts before saving.
         </Body>
         <Button title={showAdvanced ? 'Hide advanced saved HTML import' : 'Advanced: import a saved HTML page'} variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)} />
         {showAdvanced ? <>
           <Body muted>If you already have a full saved .html page, enter its original address above and choose the file. Files are read locally, never executed or uploaded. PDF, screenshots and Reader view are not supported.</Body>
           <SavedPageImport disabled={busy || !url.trim()} onLoad={importSavedPage} onError={setError} />
         </> : null}
-      </Card>
+      </Card> : null}
     </Screen>
   );
 }

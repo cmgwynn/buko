@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Children, useState, type ComponentProps, type ReactNode } from 'react';
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
+  ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
   type PressableProps, type StyleProp, type TextInputProps, type ViewStyle,
 } from 'react-native';
 import Animated, { ReduceMotion, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -65,9 +65,10 @@ export const Label = ({ children }: { children: ReactNode }) => <Text style={[ty
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function MotionPressable({
-  style, disabled, onPressIn, onPressOut, ...props
+  style, disabled, onPressIn, onPressOut, onFocus, onBlur, ...props
 }: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle> }) {
   const scale = useSharedValue(1);
+  const [focused, setFocused] = useState(false);
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: disabled ? 1 : scale.value }],
   }));
@@ -78,8 +79,15 @@ export function MotionPressable({
   return (
     <AnimatedPressable
       {...props}
+      aria-checked={props['aria-checked'] ?? props.accessibilityState?.checked}
+      aria-selected={props['aria-selected'] ?? props.accessibilityState?.selected}
+      aria-expanded={props['aria-expanded'] ?? props.accessibilityState?.expanded}
+      aria-busy={props['aria-busy'] ?? props.accessibilityState?.busy}
+      aria-disabled={props['aria-disabled'] ?? disabled ?? props.accessibilityState?.disabled}
       disabled={disabled}
-      style={[style, animatedStyle]}
+      style={[style, animatedStyle, Platform.OS === 'web' && focused && { outlineColor: colors.primary, outlineWidth: 2, outlineOffset: 2, outlineStyle: 'solid' }]}
+      onFocus={(event) => { setFocused(true); onFocus?.(event); }}
+      onBlur={(event) => { setFocused(false); onBlur?.(event); }}
       onPressIn={(event) => { if (!disabled) animate(0.98); onPressIn?.(event); }}
       onPressOut={(event) => { animate(1); onPressOut?.(event); }}
     />
@@ -133,7 +141,7 @@ export function TextField({ label, error, ...props }: TextInputProps & { label?:
         placeholderTextColor={colors.textMuted}
         selectionColor={colors.primary}
         {...props}
-        accessibilityLabel={props.accessibilityLabel ?? label}
+        accessibilityLabel={props.accessibilityLabel ?? label ?? props.placeholder}
         onFocus={(event) => { setFocused(true); props.onFocus?.(event); }}
         onBlur={(event) => { setFocused(false); props.onBlur?.(event); }}
         style={[styles.input, focused && { borderColor: colors.primary, backgroundColor: colors.surface }, error ? { borderColor: colors.danger } : null, props.style]}
@@ -143,13 +151,14 @@ export function TextField({ label, error, ...props }: TextInputProps & { label?:
   );
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress: () => void }) {
+export function Chip({ label, selected, disabled, onPress }: { label: string; selected?: boolean; disabled?: boolean; onPress: () => void }) {
   return (
     <MotionPressable
       onPress={onPress}
+      disabled={disabled}
       accessibilityRole="button"
-      accessibilityState={{ selected: !!selected }}
-      style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+      accessibilityState={{ selected: !!selected, disabled: !!disabled }}
+      style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }, disabled && { opacity: 0.5 }]}
     >
       <Text style={[typography.body, selected && { color: colors.onPrimary, fontWeight: '600' }]}>{label}</Text>
     </MotionPressable>
@@ -164,7 +173,7 @@ export function Notice({ tone = 'warning', children }: { tone?: 'warning' | 'dan
   const bg = tone === 'danger' ? colors.dangerSoft : tone === 'info' ? colors.primarySoft : colors.warningSoft;
   const fg = tone === 'danger' ? colors.danger : tone === 'info' ? colors.primary : colors.warning;
   return (
-    <View style={[styles.notice, { backgroundColor: bg }]}>
+    <View accessibilityRole={tone === 'danger' ? 'alert' : undefined} accessibilityLiveRegion={tone === 'danger' ? 'assertive' : 'polite'} style={[styles.notice, { backgroundColor: bg }]}>
       <Ionicons name={tone === 'info' ? 'information-circle' : 'warning'} size={20} color={fg} style={{ marginRight: spacing.sm, marginTop: 1 }} />
       <Text style={[typography.body, { flex: 1 }]}>{children}</Text>
     </View>
@@ -173,10 +182,42 @@ export function Notice({ tone = 'warning', children }: { tone?: 'warning' | 'dan
 
 export function Loading() {
   return (
-    <View style={styles.center}>
+    <View accessibilityLabel="Loading" accessibilityState={{ busy: true }} aria-busy accessibilityLiveRegion="polite" style={styles.center}>
       <ActivityIndicator color={colors.primary} size="large" />
+      <Text style={[typography.small, { marginTop: spacing.sm }]}>Loading…</Text>
     </View>
   );
+}
+
+export function NavigationRow({ title, subtitle, icon, onPress }: {
+  title: string; subtitle?: string; icon?: ComponentProps<typeof Ionicons>['name']; onPress(): void;
+}) {
+  return (
+    <MotionPressable accessibilityRole="button" onPress={onPress} style={{
+      minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      paddingVertical: spacing.md, borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+    }}>
+      {icon ? <Ionicons name={icon} size={22} color={colors.primary} /> : null}
+      <View style={{ flex: 1 }}>
+        <Text style={typography.body}>{title}</Text>
+        {subtitle ? <Text style={typography.small}>{subtitle}</Text> : null}
+      </View>
+      <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+    </MotionPressable>
+  );
+}
+
+export function Disclosure({ title, children }: { title: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return <View>
+    <MotionPressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)}
+      style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm }}>
+      <Text style={[typography.subheading, { flex: 1 }]}>{title}</Text>
+      <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={colors.primary} />
+    </MotionPressable>
+    {open ? children : null}
+  </View>;
 }
 
 export function Empty({ icon, text }: { icon: ComponentProps<typeof Ionicons>['name']; text: string }) {

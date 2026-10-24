@@ -111,7 +111,9 @@ describe('recipe nutrition and score', () => {
     assert.equal(Math.round(nut.perServing.calories), 60);
     assert.equal(nut.excluded, 1);
     assert.equal(nut.fvlPercent, 100);
-    const s = scoreRecipe('Veg', nut);
+    assert.equal(nut.complete, false);
+    assert.equal(scoreRecipe('Incomplete veg', nut).score, null);
+    const s = scoreRecipe('Veg', computeRecipeNutrition([{ grams: 400, nutrition: veg }], 2));
     assert.ok(s.score !== null && s.score >= 75);
     assert.equal(s.factors.find((f) => f.id === 'additives')!.points, null);
   });

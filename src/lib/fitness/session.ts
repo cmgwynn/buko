@@ -1,7 +1,10 @@
 import { useSyncExternalStore } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { createRecoveryStore, WORKOUT_SESSION_TTL } from '../localRecovery';
+import { isRecoverableWorkout } from './recovery';
 import type { Exercise, WorkoutSet } from './types';
 
-/** The in-progress workout. Held in memory only; it is saved to Supabase when the user taps Finish. */
+/** The in-progress workout, recovered locally until Finish saves it to Supabase. */
 export interface SessionItem {
   key: string;
   exercise: Exercise;
@@ -17,9 +20,11 @@ export interface WorkoutSession {
 
 const empty = (): WorkoutSession => ({ active: false, name: '', startedAt: 0, routineId: null, items: [] });
 
-let current: WorkoutSession = empty();
-const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+export const workoutSessionStore = createRecoveryStore<WorkoutSession>({
+  kind: 'workout', ttl: WORKOUT_SESSION_TTL, storage: AsyncStorage, empty,
+  isEmpty: (session) => !session.active,
+  validate: isRecoverableWorkout,
+});
 
 let counter = 0;
 const nextKey = () => `i${Date.now()}_${counter++}`;
@@ -29,22 +34,19 @@ export const blankSet = (position: number, from?: Partial<WorkoutSet>): WorkoutS
 });
 
 export function getSession() {
-  return current;
+  return workoutSessionStore.get();
 }
 
 export function startSession(name = 'Workout', routineId: string | null = null, items: { exercise: Exercise; sets: WorkoutSet[] }[] = []) {
-  current = { active: true, name, startedAt: Date.now(), routineId, items: items.map((i) => ({ key: nextKey(), ...i })) };
-  emit();
+  workoutSessionStore.set({ active: true, name, startedAt: Date.now(), routineId, items: items.map((i) => ({ key: nextKey(), ...i })) });
 }
 
 export function endSession() {
-  current = empty();
-  emit();
+  return workoutSessionStore.clear();
 }
 
 export function updateSession(fn: (s: WorkoutSession) => WorkoutSession) {
-  current = fn(current);
-  emit();
+  workoutSessionStore.set(fn(getSession()));
 }
 
 export function addExercise(exercise: Exercise, sets?: WorkoutSet[]) {
@@ -55,11 +57,11 @@ export function addExercise(exercise: Exercise, sets?: WorkoutSet[]) {
 }
 
 export function useWorkoutSession(): WorkoutSession {
-  return useSyncExternalStore(
-    (cb) => {
-      listeners.add(cb);
-      return () => listeners.delete(cb);
-    },
-    () => current,
-  );
+  return useSyncExternalStore(workoutSessionStore.subscribe, workoutSessionStore.get);
 }
+
+export function useWorkoutRecovery() {
+  return useSyncExternalStore(workoutSessionStore.subscribe, workoutSessionStore.getRecovery);
+}
+
+export const prepareWorkoutSave = workoutSessionStore.prepareToComplete;

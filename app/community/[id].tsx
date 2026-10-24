@@ -1,14 +1,18 @@
 import { Link, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Body, Button, Card, Chip, ChipRow, Heading, Loading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Ionicons } from '@expo/vector-icons';
+import { Pressable, Text, View } from 'react-native';
+import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Loading, Notice, Screen, TextField } from '../../src/components/ui';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { FactorCard } from '../../src/components/FactorCard';
-import { communityRpc, memberLabel, type CommunityDetail } from '../../src/lib/recipes/community';
+import { communityRpc, loadContributorAliases, type CommunityDetail } from '../../src/lib/recipes/community';
+import { contributorLabel } from '../../src/lib/recipes/communityProfiles';
 import { communityCopy, dietaryWarnings } from '../../src/lib/recipes/communityPolicy';
 import { setDraft } from '../../src/lib/recipes/draft';
 import { ratingFor } from '../../src/lib/scoring';
 import { computeRecipeNutrition, scoreRecipe } from '../../src/lib/recipes/nutrition';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { colors, spacing, typography } from '../../src/theme';
 
 export default function SharedRecipe() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,11 +28,19 @@ export default function SharedRecipe() {
   const [reason, setReason] = useState('');
   const [withdraw, setWithdraw] = useState(false);
   const [explain, setExplain] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [reviewMenu, setReviewMenu] = useState<string | null>(null);
+  const [aliases, setAliases] = useState<Record<string, string>>({});
+  const [aliasError, setAliasError] = useState<string | null>(null);
   useFocusEffect(useCallback(() => {
     let active = true;
     setDetail(null); setError(null); setMessage(null); setReport(null); setWithdraw(false);
     communityRpc<CommunityDetail>('community_detail', { p_id: id }).then((d) => {
-      if (active) { setDetail(d); setStars(d.myReview?.stars ?? 0); setBody(d.myReview?.body ?? ''); }
+      if (!active) return;
+      setDetail(d); setStars(d.myReview?.stars ?? 0); setBody(d.myReview?.body ?? '');
+      void loadContributorAliases([d.recipe.user_id, ...d.reviews.map((v) => v.user_id)]).then((result) => {
+        if (active) { setAliases(result.aliases); setAliasError(result.error); }
+      });
     }).catch((e) => { if (active) setError(e.message); });
     return () => { active = false; };
   }, [id]));
@@ -48,31 +60,54 @@ export default function SharedRecipe() {
   const scoreDetails = r.nutrition_score === null ? null : scoreRecipe(r.title, computeRecipeNutrition(r.payload.ingredients, r.payload.servings));
   const open = (recipeId: string) => router.push({ pathname: '/community/[id]', params: { id: recipeId } });
   return <Screen edges={[]}>
-    <Heading>{r.title}</Heading><Body muted>{r.meal} · {r.cuisine} · {memberLabel(r.user_id)}</Body>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+      <View style={{ flex: 1 }}><Heading>{r.title}</Heading></View>
+      {!mine ? <Pressable accessibilityRole="button" accessibilityLabel="More recipe actions" accessibilityState={{ expanded: moreOpen }} aria-expanded={moreOpen} hitSlop={10} onPress={() => setMoreOpen((open) => !open)} style={{ padding: spacing.sm }}>
+        <Ionicons name="ellipsis-horizontal" size={24} color={colors.primary} />
+      </Pressable> : null}
+    </View>
+    {moreOpen && !mine ? <Card>
+      <Button title="Report this recipe" disabled={busy} variant="ghost" onPress={() => { setReport({ id, kind: 'recipe' }); setReason(''); setMoreOpen(false); }} />
+      <Button title="Block contributor" disabled={busy} variant="ghost" onPress={() => { setMoreOpen(false); void act(async () => {
+        await communityRpc('community_block', { p_user: r.user_id, p_block: true }); router.replace('/community');
+      }); }} />
+    </Card> : null}
+    <Body muted>{r.meal} · {r.cuisine} · {contributorLabel(r.user_id, aliases)}</Body>
+    {aliasError ? <Notice>{aliasError}</Notice> : null}
     <Body>{r.description}</Body>
+    {r.parent_id ? <Card><Text style={typography.label}>What changed from the original</Text>
+      <Body>{r.change_summary || 'Shared before change notes were available. Compare with the original recipe.'}</Body></Card> : null}
     {r.parent_id ? <Button title="View original shared recipe" variant="ghost" onPress={() => open(r.parent_id!)} /> : null}
     <Card>
-      <ScoreBadge score={r.nutrition_score} rating={r.nutrition_score === null ? 'unknown' : ratingFor(r.nutrition_score).key} />
-      <Body>{r.nutrition_score === null ? 'Nutrition score unavailable: match every ingredient and nutrient to score it.' : `${ratingFor(r.nutrition_score).label} · estimated Buko nutrition score · ${Math.round(r.calories ?? 0)} kcal/serving`}</Body>
-      <Body muted>Buko nutrition scores are out of 100, separate from cooking ratings. Estimates use contributor-supplied ingredient weights and nutrition; not independently verified. Processing/additives and measured cooked yield are not included. A high score is not a guarantee of dietary suitability.</Body>
-      <Body>{detail.reviewCount ? `${detail.averageRating} stars · ${detail.reviewCount} member rating${detail.reviewCount === 1 ? '' : 's'}` : 'Not yet rated by members'}</Body>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <ScoreBadge score={r.nutrition_score} rating={r.nutrition_score === null ? 'unknown' : ratingFor(r.nutrition_score).key} />
+        <View style={{ flex: 1 }}>
+          <Body>{r.nutrition_score === null ? 'Nutrition estimate incomplete' : `${ratingFor(r.nutrition_score).label} · estimated score`}</Body>
+          <Body muted>{r.nutrition_score === null ? 'Match every ingredient and nutrient to score it.' : `${Math.round(r.calories ?? 0)} kcal per serving`}</Body>
+        </View>
+      </View>
+      <Body>{detail.reviewCount ? `★ ${detail.averageRating} · ${detail.reviewCount} cooking rating${detail.reviewCount === 1 ? '' : 's'}` : 'No cooking ratings yet'}</Body>
+      <Body muted>Nutrition score is separate from cooking stars. Estimate uses contributor data, not verified yield.</Body>
       {scoreDetails ? <Button title={explain ? 'Hide nutrition explanation' : 'Explain nutrition score'} variant="ghost" onPress={() => setExplain(!explain)} /> : null}
       {scoreDetails && explain ? <>
         <Body muted>Current scoring model, based on the published ingredient snapshot. Stored publication score: {r.nutrition_score}. Scoring rules may change in future releases.</Body>
         {scoreDetails.factors.map((factor) => <FactorCard key={factor.id} factor={factor} totalWeight={scoreDetails.factors.reduce((sum, f) => sum + f.weight, 0)} />)}
       </> : null}
     </Card>
-    <Body>Author-declared dietary tags: {r.tags.join(', ') || 'None'}</Body>
-    <Body muted>Not certified vegan, gluten-free or allergen-safe. Check brands, preparation and cross-contact. Missing tags do not establish suitability.</Body>
-    {dietaryWarnings(r.tags, r.payload.ingredients).map((warning) => <Notice key={warning}>{warning}</Notice>)}
-    <Button title="Save or modify a private copy" onPress={() => { setDraft(communityCopy(r.payload, r.id)); router.push('/recipe/edit'); }} />
-    <Body muted>Review ingredients, edit and save. Your copy works with the existing planner, grocery list and cooking mode. To share your changes, publish that saved copy as a linked variation; its score is recalculated.</Body>
+    <Body>Author tags: {r.tags.join(' · ') || 'None'}</Body>
+    <Body muted>Tags are not allergy or safety certifications. Check ingredients and cross-contact.</Body>
+    <Disclosure title="Dietary and allergen safety">
+      <Body muted>Tags are contributor-declared, not certified. Check brands and preparation. Missing tags do not establish suitability.</Body>
+      {dietaryWarnings(r.tags, r.payload.ingredients).map((warning) => <Notice key={warning}>{warning}</Notice>)}
+    </Disclosure>
+    <Button title="Save a copy" onPress={() => { setDraft(communityCopy(r.payload, r.id)); router.push('/recipe/edit'); }} />
+    <Body muted>Review and edit your private copy before saving. To share changes, publish it as a linked variation with a description of what changed.</Body>
     <Card><Heading>Ingredients</Heading><Body>{r.payload.servings} serving{r.payload.servings === 1 ? '' : 's'} · {(r.payload.prepMinutes ?? 0) + (r.payload.cookMinutes ?? 0)} min</Body>
-      {r.payload.ingredients.map((i) => <Card key={i.position}>
+      {r.payload.ingredients.map((i) => <View key={i.position} style={{ paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }}>
         <Body>• {i.raw_text}</Body>
         <Body muted>{i.food_source === 'manual' ? 'Contributor-entered nutrition' : i.food_source ? `Contributor-matched ${i.food_source.toUpperCase()} nutrition` : 'No nutrition source'}</Body>
         {i.food_source === 'usda' && /^\d+$/.test(i.food_source_id ?? '') ? <Link href={`https://fdc.nal.usda.gov/food-details/${i.food_source_id}/nutrients`} target="_blank">USDA ingredient reference</Link> : null}
-      </Card>)}
+      </View>)}
     </Card>
     <Card><Heading>Steps</Heading>{r.payload.steps.map((s) => <Body key={s.position}>{s.position + 1}. {s.text}</Body>)}</Card>
     {variations.length ? <Card><Heading>Recipe variations</Heading><Body muted>Latest 20 shared variations; each has independent nutrition and reviews.</Body>
@@ -81,12 +116,18 @@ export default function SharedRecipe() {
     <Heading>Ratings & reviews</Heading>
     <Body muted>Latest 50 reviews. Share what you cooked, ingredient swaps, quantities and results—not medical advice, personal information or abuse. One rating per member; authors cannot rate their own recipes.</Body>
     {reviews.map((v) => <Card key={v.id}>
-      <Body>{v.stars} stars · {memberLabel(v.user_id)}</Body><Body>{v.body || 'Rating only'}</Body>
-      {v.user_id !== session?.user.id ? <>
-        <Button title={`Report review by ${memberLabel(v.user_id)}`} disabled={busy} variant="ghost" onPress={() => { setReport({ id: v.id, kind: 'review' }); setReason(''); }} />
-        <Button title={`Block ${memberLabel(v.user_id)}`} disabled={busy} variant="ghost" onPress={() => void act(async () => {
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Body>★ {v.stars} · {contributorLabel(v.user_id, aliases)}</Body>
+        {v.user_id !== session?.user.id ? <Pressable accessibilityRole="button" accessibilityLabel={`More actions for review by ${contributorLabel(v.user_id, aliases)}`} accessibilityState={{ expanded: reviewMenu === v.id }} aria-expanded={reviewMenu === v.id} onPress={() => setReviewMenu(reviewMenu === v.id ? null : v.id)} hitSlop={10} style={{ padding: spacing.xs }}>
+          <Ionicons name="ellipsis-horizontal" size={20} color={colors.primary} />
+        </Pressable> : null}
+      </View>
+      <Body>{v.body || 'Rating only'}</Body>
+      {reviewMenu === v.id ? <>
+        <Button title="Report review" disabled={busy} variant="ghost" onPress={() => { setReport({ id: v.id, kind: 'review' }); setReason(''); setReviewMenu(null); }} />
+        <Button title="Block member" disabled={busy} variant="ghost" onPress={() => { setReviewMenu(null); void act(async () => {
           await communityRpc('community_block', { p_user: v.user_id, p_block: true }); await refresh(); setMessage('Member blocked. Their content is hidden; unblock from Shared recipes.');
-        })} />
+        }); }} />
       </> : null}
     </Card>)}
     {!mine ? <Card><Heading>{detail.myReview ? 'Edit your review' : 'Rate this recipe'}</Heading>
@@ -99,12 +140,7 @@ export default function SharedRecipe() {
         await communityRpc('community_remove', { p_id: detail.myReview!.id, p_kind: 'review' }); await refresh(); setMessage('Review deleted.');
       })} /> : null}
     </Card> : null}
-    {!mine ? <>
-      <Button title="Report this recipe" disabled={busy} variant="ghost" onPress={() => { setReport({ id, kind: 'recipe' }); setReason(''); }} />
-      <Button title="Block recipe contributor" disabled={busy} variant="ghost" onPress={() => void act(async () => {
-        await communityRpc('community_block', { p_user: r.user_id, p_block: true }); router.replace('/community');
-      })} />
-    </> : <Button title="Withdraw my shared recipe" variant="danger" disabled={busy} onPress={() => setWithdraw(!withdraw)} />}
+    {mine ? <Button title="Withdraw my shared recipe" variant="danger" disabled={busy} onPress={() => setWithdraw(!withdraw)} /> : null}
     {withdraw ? <Card><Body>Stop sharing this recipe? Your private original stays saved. Copies already saved by other members remain private to them. This snapshot cannot be republished.</Body>
       <Button title="Confirm withdrawal" variant="danger" loading={busy} onPress={() => void act(async () => {
         await communityRpc('community_remove', { p_id: id, p_kind: 'recipe' }); router.replace('/community');

@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from '../config';
-import { getSession, endSession } from '../fitness/session';
-import { emptyDraft, getDraft, setDraft } from '../recipes/draft';
+import { getSession } from '../fitness/session';
+import { getDraft } from '../recipes/draft';
+import { purgeAccountWork } from '../recovery';
 import { supabase } from '../supabase';
 import { cleanupDeletedAccount } from './cleanup';
 import { removeAccountExportCache } from './download';
@@ -61,6 +62,9 @@ export async function deleteAccount(confirmation: string): Promise<{ cleanupErro
   if (!session) throw new AccountClientError('Sign in first.', 'UNAUTHORIZED');
   const result = await request('delete', session.user.id, confirmation);
   if (result.deleted !== true) throw new AccountClientError('The server did not confirm deletion. Please retry.');
+  let recoveryError: string | null = null;
+  try { await purgeAccountWork(session.user.id); }
+  catch { recoveryError = 'Your account was deleted, but clearing device recovery failed. Clear this app’s saved data on this device.'; }
   try {
     await cleanupDeletedAccount(session.user.id, {
       currentUserId: async () => (await supabase.auth.getSession()).data.session?.user.id ?? null,
@@ -72,10 +76,10 @@ export async function deleteAccount(confirmation: string): Promise<{ cleanupErro
         const { error } = await supabase.auth.signOut({ scope: 'local' });
         if (error) throw error;
       },
-      resetMemory: () => { setDraft(emptyDraft()); endSession(); },
+      resetMemory: () => {},
       authStorageKey: `sb-${new URL(config.supabaseUrl).hostname.split('.')[0]}-auth-token`,
     });
-    return { cleanupError: null };
+    return { cleanupError: recoveryError };
   } catch (error) {
     return { cleanupError: error instanceof Error ? error.message : 'Account deleted. Clear this app’s saved data on this device.' };
   }

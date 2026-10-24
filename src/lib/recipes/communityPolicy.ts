@@ -32,8 +32,10 @@ export function communityPublishInput(value: unknown) {
     throw new Error('Check recipe, categories and sharing permission.');
   }
   const tags = input.tags;
+  const changes = input.changes === undefined || input.changes === null || (typeof input.changes === 'string' && !input.changes.trim())
+    ? null : text(input.changes, 3, 1000).trim();
   return { recipeId, description: text(input.description, 1, 2000), meal: input.meal, cuisine: input.cuisine,
-    tags: DIET_TAGS.filter((tag) => tags.includes(tag)) };
+    tags: DIET_TAGS.filter((tag) => tags.includes(tag)), changes };
 }
 
 /** Whitelist the shared snapshot: never publish private IDs, photos, source URLs or extra fields. */

@@ -9,7 +9,13 @@ export interface CleanupDependencies {
 /** Never clears global AsyncStorage or another signed-in account's session. */
 export async function cleanupDeletedAccount(userId: string, deps: CleanupDependencies): Promise<void> {
   const failures: string[] = [];
-  try { await deps.removeKeys([`buko:diagnostics:${userId}`]); }
+  try {
+    await deps.removeKeys([
+      `buko:diagnostics:${userId}`, recoveryKey('recipe', userId), recoveryKey('workout', userId),
+      recipeFavoritesKey(userId), recentlyCookedKey(userId),
+      ...accountWorkKeys(userId),
+    ]);
+  }
   catch { failures.push('device preferences'); }
   if (await deps.currentUserId() === userId) {
     deps.resetMemory();
@@ -23,3 +29,6 @@ export async function cleanupDeletedAccount(userId: string, deps: CleanupDepende
   }
   if (failures.length) throw new Error(`Your server account was deleted, but clearing ${failures.join(' and ')} failed. Close the app and clear its saved data on this device. Do not retry server deletion.`);
 }
+import { recoveryKey } from '../localRecovery';
+import { recipeFavoritesKey, recentlyCookedKey } from '../recipes/activity';
+import { accountWorkKeys } from './storageWrites';

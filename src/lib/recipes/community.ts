@@ -12,6 +12,7 @@ export interface CommunityRecipe {
   nutrition_score: number | null;
   calories: number | null;
   parent_id: string | null;
+  change_summary?: string | null;
   created_at: string;
 }
 export interface CommunityRow extends CommunityRecipe {
@@ -42,8 +43,31 @@ export async function communityRpc<T>(name: string, args: Record<string, unknown
 }
 export const memberLabel = (id: string) => `Member ${id.slice(0, 8)}`;
 
+/** Lookup failures are reported to the caller while generic member labels keep browsing usable. */
+export async function loadContributorAliases(userIds: string[]): Promise<{ aliases: Record<string, string>; error: string | null }> {
+  const ids = [...new Set(userIds)].slice(0, 100);
+  if (!ids.length) return { aliases: {}, error: null };
+  const { data, error } = await supabase.rpc('community_aliases', { p_users: ids });
+  if (error) return { aliases: {}, error: error.code === 'PGRST202'
+    ? 'Public names are unavailable until backend setup (migration 0011) is deployed; showing member labels.'
+    : 'Public names could not be loaded; showing member labels.' };
+  return { aliases: (data ?? {}) as Record<string, string>, error: null };
+}
+
+export async function setMyPublicAlias(alias: string | null): Promise<string | null> {
+  const { data, error } = await supabase.rpc('community_set_alias', { p_alias: alias ?? '' });
+  if (error) throw new Error(error.code === 'PGRST202' ? 'Public names need backend setup (migration 0011).' : error.message);
+  return (data as string | null) ?? null;
+}
+
+export async function getMyPublicAlias(): Promise<string | null> {
+  const { data, error } = await supabase.rpc('community_my_alias');
+  if (error) throw new Error(error.code === 'PGRST202' ? 'Public names need backend setup (migration 0011).' : error.message);
+  return (data as string | null) ?? null;
+}
+
 export async function publishCommunity(input: {
-  recipeId: string; description: string; meal: string; cuisine: string; tags: DietTag[]; confirmRights: boolean;
+  recipeId: string; description: string; meal: string; cuisine: string; tags: DietTag[]; confirmRights: boolean; changes?: string;
 }): Promise<string> {
   const { data, error } = await supabase.functions.invoke('community', { body: input });
   if (error) {

@@ -11,6 +11,7 @@ import { SettingsProvider } from '../src/providers/SettingsProvider';
 import { BillingProvider } from '../src/providers/BillingProvider';
 import { DiagnosticBoundary, DiagnosticLifecycle } from '../src/components/DiagnosticBoundary';
 import { BackButton } from '../src/components/BackButton';
+import { ConfirmProvider } from '../src/components/ConfirmProvider';
 import { colors, layout, spacing } from '../src/theme';
 
 const headerOptions = {
@@ -62,6 +63,7 @@ function Gate() {
         <Stack.Screen name="log/scan" options={{ ...headerOptions, title: 'Scan to log' }} />
         <Stack.Screen name="log/recipes" options={{ ...headerOptions, title: 'Log a recipe' }} />
         <Stack.Screen name="log/add" options={{ ...headerOptions, title: 'Log food' }} />
+        <Stack.Screen name="log/manual" options={{ ...headerOptions, title: 'Enter nutrition' }} />
         <Stack.Screen name="edit-profile" options={{ ...headerOptions, title: 'Update details' }} />
         <Stack.Screen name="profile" options={{ ...headerOptions, title: 'Profile' }} />
         <Stack.Screen name="settings" options={{ ...headerOptions, title: 'Settings' }} />
@@ -129,7 +131,9 @@ export default function RootLayout() {
               <BillingProvider>
               <DiagnosticLifecycle />
               <DiagnosticBoundary>
+              <ConfirmProvider>
               <Gate />
+              </ConfirmProvider>
               </DiagnosticBoundary>
               </BillingProvider>
             </SettingsProvider>

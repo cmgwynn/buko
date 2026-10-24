@@ -1,5 +1,6 @@
 import { useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { floorWarning, calculateTargets, MIN_AGE } from '../lib/nutrition/targets';
 import { ageOnDate, birthDateFromParts } from '../lib/nutrition/birthday';
@@ -8,8 +9,11 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../providers/AuthProvider';
 import { useProfile } from '../providers/ProfileProvider';
 import { colors, radius, spacing, typography } from '../theme';
+import { accountStorageWrites } from '../lib/account/storageWrites';
+import { onboardingDraftKey, parseOnboardingDraft } from '../lib/nutrition/onboardingDraft';
+import { signOutSafely } from '../lib/recovery';
 import type { ActivityLevel, DietPref, Goal, Sex, Units } from '../types';
-import { Body, Button, Card, Chip, ChipRow, Heading, Label, Notice, Screen, TextField } from './ui';
+import { Body, Button, Card, Chip, ChipRow, Heading, Label, Loading, Notice, Screen, TextField } from './ui';
 
 const GOALS: { key: Goal; title: string; desc: string }[] = [
   { key: 'lose', title: 'Lose weight', desc: 'A gentle deficit of about 0.5 kg (1 lb) a week.' },
@@ -74,6 +78,37 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
   const [diets, setDiets] = useState<DietPref[]>(profile?.diet_prefs ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ready, setReady] = useState(editing);
+  const [draftMessage, setDraftMessage] = useState<string | null>(null);
+  const finished = useRef(false);
+  const userId = session?.user.id;
+  useEffect(() => {
+    if (editing || !userId) return;
+    let live = true;
+    void AsyncStorage.getItem(onboardingDraftKey(userId)).then(async (raw) => {
+      if (!live || !raw) return;
+      const a = parseOnboardingDraft(raw);
+      if (!a) { await AsyncStorage.removeItem(onboardingDraftKey(userId)); return; }
+      if (!live) return;
+      setStep(a.step); setGoal(a.goal); setSex(a.sex); setBirthYear(a.birthYear);
+      setBirthMonth(a.birthMonth); setBirthDay(a.birthDay); setUnits(a.units);
+      setCm(a.cm); setFt(a.ft); setInches(a.inches); setWeight(a.weight);
+      setActivity(a.activity); setDiets(a.diets);
+      setDraftMessage('Your setup progress was restored on this device.');
+    }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : 'Could not restore setup progress.'); })
+      .finally(() => { if (live) setReady(true); });
+    return () => { live = false; };
+  }, [editing, userId]);
+  useEffect(() => {
+    if (editing || !ready || !userId || finished.current) return;
+    const timer = setTimeout(() => {
+      const value = { savedAt: Date.now(), answers: { step, goal, sex, birthYear, birthMonth, birthDay, units, cm, ft, inches, weight, activity, diets } };
+      void accountStorageWrites.run(userId, async () => { await AsyncStorage.setItem(onboardingDraftKey(userId), JSON.stringify(value)); })
+        .then((written) => { if (!written) throw new Error('Setup progress was not saved because your account changed.'); })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not save setup progress on this device.'));
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [editing, ready, userId, step, goal, sex, birthYear, birthMonth, birthDay, units, cm, ft, inches, weight, activity, diets]);
 
   const birthDate = birthDateFromParts(birthYear, birthMonth, birthDay);
   const ageNum = ageOnDate(birthDate, new Date(`${today}T12:00:00`));
@@ -95,7 +130,7 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
     setDiets((cur) => (cur.includes(d) ? cur.filter((x) => x !== d) : [...cur, d]));
 
   async function save() {
-    if (busy || !result || !birthDate || !goal || !sex || !activity || !session) return;
+    if (busy || !ready || !result || !birthDate || !goal || !sex || !activity || !session) return;
     setBusy(true);
     setError(null);
     const userId = session.user.id;
@@ -118,6 +153,11 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
       setBusy(false);
       return;
     }
+    if (!editing) {
+      finished.current = true;
+      try { await accountStorageWrites.run(userId, async () => { await AsyncStorage.removeItem(onboardingDraftKey(userId)); }); }
+      catch { setError('Profile saved, but clearing setup progress failed. Sign out to clear this device.'); }
+    }
     await refresh();
     setBusy(false);
     if (editing) router.back();
@@ -125,11 +165,16 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
 
   const warning = result ? floorWarning(result) : null;
 
+  if (!ready) return <Screen variant="form"><Loading /></Screen>;
+
   return (
     <Screen variant="form" edges={editing ? [] : ['top', 'bottom']}>
       {!editing ? <><Text style={[typography.label, { marginTop: spacing.md }]}>
         Step {step + 1} of {STEPS.length} · {STEPS[step]}
       </Text>
+      <Body muted>About 2 minutes. These details help estimate personal targets; they are not a medical assessment. Setup progress stays on this device for up to 7 days and is cleared on sign-out.</Body>
+      {draftMessage ? <Notice tone="info">{draftMessage}</Notice> : null}
+      {!ready ? <Notice tone="info">Restoring setup…</Notice> : null}
       <View style={{ flexDirection: 'row', gap: 4, marginVertical: spacing.md }}>
         {STEPS.map((_, i) => (
           <View key={i} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= step ? colors.primary : colors.border }} />
@@ -248,7 +293,9 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
         )}
         {!editing && step > 0 ? <Button title="Back" variant="ghost" onPress={() => setStep(step - 1)} /> : null}
         {editing ? <Button title="Cancel changes" variant="ghost" disabled={busy} onPress={() => router.back()} /> : null}
-        {!editing && step === 0 ? <Button title="Sign out" variant="ghost" onPress={() => supabase.auth.signOut()} /> : null}
+        {!editing && step === 0 ? <Button title="Sign out" variant="ghost" onPress={() => {
+          void signOutSafely().catch((e: unknown) => setError(e instanceof Error ? e.message : 'Could not sign out. Please retry.'));
+        }} /> : null}
       </View>
     </Screen>
   );

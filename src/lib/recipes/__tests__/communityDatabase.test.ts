@@ -23,7 +23,7 @@ async function setup() {
     grant usage on schema public,auth,storage to authenticated,service_role;
     insert into auth.users values('${alice}'),('${bob}'),('${carol}');
   `);
-  for (const file of readdirSync(migrations).filter((name) => /^000[1-9]_.*\.sql$/.test(name)).sort()) {
+  for (const file of readdirSync(migrations).filter((name) => /^00(?:0[1-9]|1[01])_.*\.sql$/.test(name)).sort()) {
     await db.exec(readFileSync(new URL(file, migrations), 'utf8'));
   }
   await db.exec(`insert into recipes(id,user_id,title) values('${privateId}','${alice}','Private beans')`);
@@ -38,9 +38,10 @@ async function asMember<T>(db: PGlite, user: string, name: string, args: unknown
   await db.exec(`set role authenticated;select set_config('request.jwt.claim.sub','${user}',false)`);
   try { return await rpc<T>(db, name, args); } finally { await db.exec('reset role'); }
 }
-async function publish(db: PGlite, recipe = privateId, score: number | null = 90, parent: string | null = null) {
-  return rpc<string>(db, 'community_publish', [alice, recipe, 'Easy original beans', 'Dinner', 'Everyday', ['Vegan'],
-    JSON.stringify({ title: 'Shared beans', search: 'chickpeas', servings: 1, ingredients: [], steps: [] }), score, 400, parent]);
+async function publish(db: PGlite, recipe = privateId, score: number | null = 90, parent: string | null = null,
+  changes: string | null = parent ? 'Used less oil' : null, user = alice) {
+  return rpc<string>(db, 'community_publish', [user, recipe, 'Easy original beans', 'Dinner', 'Everyday', ['Vegan'],
+    JSON.stringify({ title: 'Shared beans', search: 'chickpeas', servings: 1, ingredients: [], steps: [] }), score, 400, parent, changes]);
 }
 describe('community database boundaries and lifecycle', () => {
   it('keeps private data separate, rejects anonymous/forged writes, and browses combined filters', async () => {
@@ -131,7 +132,7 @@ describe('community database boundaries and lifecycle', () => {
       await asMember(db, bob, 'community_review', [id, 4, 'Tasty']);
       await db.query(`insert into recipes(user_id,title,community_parent_id) values($1,'My saved copy',$2)`, [bob, id]);
       const tables = await rpc<string[]>(db, 'account_export_tables');
-      for (const table of ['community_recipes', 'community_reviews', 'community_blocks', 'community_reports']) assert.ok(tables.includes(table));
+      for (const table of ['community_recipes', 'community_reviews', 'community_blocks', 'community_reports', 'community_profiles']) assert.ok(tables.includes(table));
       const exported = await rpc<{ rows: { id: string }[] }>(db, 'account_export_page', [alice, 'community_recipes', 0, 100]);
       assert.equal(exported.rows[0].id, id);
       await db.query('delete from auth.users where id=$1', [alice]);
@@ -164,10 +165,14 @@ describe('community database boundaries and lifecycle', () => {
     try {
       const id = await publish(db);
       const copy = (await db.query<{ id: string }>(`insert into recipes(user_id,title,community_parent_id) values($1,'My variation',$2) returning id`, [alice, id])).rows[0].id;
-      const variation = await publish(db, copy, 60, id);
+      await assert.rejects(publish(db, copy, 60, id, null), /what changed/);
+      await assert.rejects(publish(db, copy, 60, id, '  '), /what changed/);
+      const variation = await publish(db, copy, 60, id, 'Swapped cream for yogurt');
       await db.query(`update recipes set title='Changed in private' where id=$1`, [privateId]);
       const detail = await asMember<{ recipe: { title: string }; variations: { id: string; nutrition_score: number }[] }>(db, bob, 'community_detail', [id]);
       assert.equal(detail.recipe.title, 'Shared beans');
+      const variationDetail = await asMember<{ recipe: { change_summary: string | null } }>(db, bob, 'community_detail', [variation]);
+      assert.equal(variationDetail.recipe.change_summary, 'Swapped cream for yogurt');
       assert.deepEqual(detail.variations.map((v) => [v.id, v.nutrition_score]), [[variation, 60]]);
       await asMember(db, alice, 'community_remove', [variation, 'recipe']);
       assert.equal((await asMember<{ variations: unknown[] }>(db, bob, 'community_detail', [id])).variations.length, 0);
@@ -192,6 +197,46 @@ describe('community database boundaries and lifecycle', () => {
       const pending = await asMember<{ id: string }[]>(db, carol, 'community_reports_queue');
       await asMember(db, carol, 'community_moderate', [pending[0].id, false, 'Tags checked and kept']);
       assert.equal((await asMember<{ total: number }>(db, bob, 'community_browse')).total, 1);
+    } finally { await db.close(); }
+  });
+  it('keeps optional public aliases owner-written, validated and visible only for unblocked contributors', async () => {
+    const db = await setup();
+    try {
+      const id = await publish(db);
+      await db.query(`insert into recipes(id,user_id,title) values('55555555-5555-4555-8555-555555555555',$1,'Original only')`, [alice]);
+      await assert.rejects(publish(db, '55555555-5555-4555-8555-555555555555', 50, null, 'Not a variation'), /Only variations/);
+      await db.exec('set role authenticated');
+      await assert.rejects(db.query('select * from community_profiles'), /permission denied/);
+      await assert.rejects(db.query(`insert into community_profiles values('${bob}','Forged')`), /permission denied/);
+      await db.exec('reset role;set role anon');
+      await assert.rejects(rpc(db, 'community_set_alias', ['Anon']), /permission denied/);
+      await assert.rejects(rpc(db, 'community_aliases', [[alice]]), /permission denied/);
+      await db.exec('reset role');
+      for (const bad of ['ab', 'me@example.com', 'Buko Team', 'official chef', 'two  spaces', '-dash', 'x'.repeat(31)]) {
+        await assert.rejects(asMember(db, alice, 'community_set_alias', [bad]), /3-30 letters/);
+      }
+      assert.equal(await asMember(db, alice, 'community_my_alias'), null);
+      assert.equal(await asMember(db, alice, 'community_set_alias', ['  Lentil Fan ']), 'Lentil Fan');
+      assert.equal(await asMember(db, alice, 'community_my_alias'), 'Lentil Fan');
+      await assert.rejects(asMember(db, bob, 'community_set_alias', ['lentil fan']), /already in use/);
+      assert.equal(await asMember(db, bob, 'community_set_alias', ['Quiet Cook']), 'Quiet Cook');
+      assert.equal(await asMember(db, bob, 'community_my_alias'), 'Quiet Cook');
+      assert.deepEqual(await asMember(db, carol, 'community_aliases', [[alice, bob]]), { [alice]: 'Lentil Fan' });
+      await asMember(db, bob, 'community_review', [id, 4, 'Tasty']);
+      assert.deepEqual(await asMember(db, carol, 'community_aliases', [[alice, bob]]), { [alice]: 'Lentil Fan', [bob]: 'Quiet Cook' });
+      await asMember(db, carol, 'community_block', [alice, true]);
+      assert.deepEqual(await asMember(db, carol, 'community_aliases', [[alice, bob]]), { [bob]: 'Quiet Cook' });
+      assert.deepEqual(await asMember(db, alice, 'community_aliases', [[carol, bob]]), { [bob]: 'Quiet Cook' });
+      await asMember(db, alice, 'community_remove', [id, 'recipe']);
+      assert.deepEqual(await asMember(db, bob, 'community_aliases', [[alice]]), {});
+      await assert.rejects(asMember(db, bob, 'community_aliases', [Array.from({ length: 101 }, () => alice)]), /Invalid alias/);
+      assert.equal(await asMember(db, bob, 'community_set_alias', ['']), null);
+      assert.equal(await asMember(db, bob, 'community_my_alias'), null);
+      await asMember(db, alice, 'community_set_alias', ['Lentil Fan']);
+      const exported = await rpc<{ rows: { alias: string }[] }>(db, 'account_export_page', [alice, 'community_profiles', 0, 10]);
+      assert.equal(exported.rows[0].alias, 'Lentil Fan');
+      await db.query('delete from auth.users where id=$1', [alice]);
+      assert.equal((await db.query('select * from community_profiles')).rows.length, 0);
     } finally { await db.close(); }
   });
 });

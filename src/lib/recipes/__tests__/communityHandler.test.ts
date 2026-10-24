@@ -7,10 +7,10 @@ import { STARTER_RECIPES, starterRecipeDraft } from '../library';
 const user = '11111111-1111-4111-8111-111111111111';
 const recipeId = '22222222-2222-4222-8222-222222222222';
 const body = { recipeId, description: 'My original recipe', meal: 'Dinner', cuisine: 'Everyday', tags: ['Vegetarian'], confirmRights: true };
-function fixture(options: { denied?: boolean; owner?: string; dbFailure?: boolean; missing?: boolean } = {}) {
+function fixture(options: { denied?: boolean; owner?: string; dbFailure?: boolean; missing?: boolean; parent?: string } = {}) {
   const draft = starterRecipeDraft(STARTER_RECIPES[0]);
   const r = { user_id: options.owner ?? user, title: draft.title, servings: draft.servings, prep_minutes: draft.prepMinutes,
-    cook_minutes: draft.cookMinutes, community_parent_id: null, photo_path: 'private/photo.jpg', source_url: 'https://private.test',
+    cook_minutes: draft.cookMinutes, community_parent_id: options.parent ?? null, photo_path: 'private/photo.jpg', source_url: 'https://private.test',
     recipe_ingredients: draft.ingredients, recipe_steps: draft.steps };
   const calls: { url: string; init?: RequestInit }[] = [];
   const fetcher: typeof fetch = async (input, init) => {
@@ -63,6 +63,24 @@ describe('community publishing Edge Function', () => {
     assert.equal(f.calls.length, 1);
     const malformed = new Request('https://community.test', { method: 'POST', headers: { Authorization: 'Bearer token' }, body: '{' });
     assert.equal((await f.handler(malformed)).status, 400);
+  });
+  it('requires explicit change notes for variations and rejects them for originals', async () => {
+    const parent = '33333333-3333-4333-8333-333333333333';
+    const missing = fixture({ parent });
+    assert.equal((await missing.handler(request())).status, 400);
+    assert.equal(missing.calls.length, 2);
+    const variation = fixture({ parent });
+    assert.equal((await variation.handler(request({ ...body, changes: '  Swapped cream for yogurt ' }))).status, 200);
+    const sent = JSON.parse(String(variation.calls[2].init?.body));
+    assert.equal(sent.p_parent, parent);
+    assert.equal(sent.p_changes, 'Swapped cream for yogurt');
+    const original = fixture();
+    assert.equal((await original.handler(request({ ...body, changes: 'Not a variation' }))).status, 400);
+    assert.equal(original.calls.length, 2);
+    const plain = fixture();
+    assert.equal((await plain.handler(request({ ...body, changes: '' }))).status, 200);
+    assert.ok(!('p_changes' in JSON.parse(String(plain.calls[2].init?.body))));
+    assert.equal((await fixture().handler(request({ ...body, changes: 'x'.repeat(1001) }))).status, 400);
   });
   it('surfaces persistence failures instead of claiming a publication succeeded', async () => {
     const f = fixture({ dbFailure: true });

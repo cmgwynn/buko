@@ -1,9 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Body, Button, Card, Empty, Loading, Notice, Screen } from '../../src/components/ui';
-import { addDays, toDateString } from '../../src/lib/diary';
+import { Body, Button, Card, Chip, ChipRow, Disclosure, Empty, Loading, Notice, Screen } from '../../src/components/ui';
+import { addDays, MEALS, toDateString } from '../../src/lib/diary';
 import { buildGroceryList, type GeneratedItem } from '../../src/lib/recipes/grocery';
 import { SECTIONS, type PantryItem, type Recipe, type RecipeIngredient } from '../../src/lib/recipes/types';
 import { weekStart } from '../../src/lib/recipes/week';
@@ -11,6 +11,7 @@ import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
 import { colors, spacing, typography } from '../../src/theme';
+import type { Meal } from '../../src/types';
 
 type RecipeRow = Recipe & { recipe_ingredients: RecipeIngredient[] };
 
@@ -25,13 +26,20 @@ export default function GenerateGrocery() {
   const [pantryCount, setPantryCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [selectedDays, setSelectedDays] = useState([0, 1, 2, 3, 4, 5, 6]);
+  const [selectedMeals, setSelectedMeals] = useState<Meal[]>(MEALS.map((m) => m.key));
+  const request = useRef(0);
 
   const build = useCallback(async () => {
+    const version = ++request.current;
     setItems(null);
+    setError(null);
+    if (!selectedDays.length || !selectedMeals.length) { setItems([]); setMeals(0); return; }
     const [e, p] = await Promise.all([
-      supabase.from('meal_plan_entries').select('recipe_id, servings').gte('planned_on', week).lte('planned_on', addDays(week, 6)).is('logged_at', null),
+      supabase.from('meal_plan_entries').select('recipe_id, servings').in('planned_on', selectedDays.map((i) => addDays(week, i))).in('meal', selectedMeals).is('logged_at', null),
       supabase.from('pantry_items').select('*'),
     ]);
+    if (version !== request.current) return;
     if (e.error || p.error) return setError((e.error ?? p.error)!.message);
     const planned = new Map<string, number>();
     for (const row of e.data as { recipe_id: string; servings: number }[]) {
@@ -42,6 +50,7 @@ export default function GenerateGrocery() {
     let recipes: RecipeRow[] = [];
     if (planned.size) {
       const r = await supabase.from('recipes').select('*, recipe_ingredients(*)').in('id', [...planned.keys()]);
+      if (version !== request.current) return;
       if (r.error) return setError(r.error.message);
       recipes = r.data as RecipeRow[];
     }
@@ -58,7 +67,7 @@ export default function GenerateGrocery() {
         profile?.units ?? 'metric',
       ),
     );
-  }, [week, profile?.units]);
+  }, [week, profile?.units, selectedDays, selectedMeals]);
 
   useEffect(() => { build(); }, [build]);
 
@@ -66,31 +75,23 @@ export default function GenerateGrocery() {
     if (!session || !items) return;
     setBusy(true);
     setError(null);
-    // Regenerating replaces only unchecked generated items for this week; checked items and hand-added items stay.
-    const del = await supabase.from('grocery_items').delete().eq('generated_week', week).eq('checked', false);
-    if (del.error) {
-      setError(del.error.message);
-      return setBusy(false);
-    }
-    if (items.length) {
-      const ins = await supabase.from('grocery_items').insert(
-        items.map((i) => ({
-          user_id: session.user.id,
+    const result = await supabase.rpc('replace_generated_groceries', {
+      p_week: week,
+      p_expected_user_id: session.user.id,
+      p_items: items.map((i) => ({
           name: i.name,
-          source: 'plan',
           quantity: i.display || null,
           quantity_value: i.amount,
           unit: i.baseUnit || null,
           section: i.section,
-          generated_week: week,
           from_recipes: i.fromRecipes,
-        })),
-      );
-      if (ins.error) {
-        setError(ins.error.message);
-        return setBusy(false);
-      }
+      })),
+    });
+    if (result.error) {
+      setError(result.error.code === 'PGRST202' ? 'Grocery generation needs database migration 0010. Your current list is unchanged.' : `Your current list is unchanged: ${result.error.message}`);
+      setBusy(false); return;
     }
+    setBusy(false);
     router.replace('/(tabs)/grocery');
   }
 
@@ -99,11 +100,21 @@ export default function GenerateGrocery() {
   return (
     <Screen edges={[]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.lg }}>
-        <Pressable onPress={() => setWeek(addDays(week, -7))} hitSlop={12}><Ionicons name="chevron-back" size={24} color={colors.primary} /></Pressable>
+        <Pressable accessibilityLabel="Previous week" onPress={() => setWeek(addDays(week, -7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}><Ionicons name="chevron-back" size={24} color={colors.primary} /></Pressable>
         <Text style={typography.heading}>{label}</Text>
-        <Pressable onPress={() => setWeek(addDays(week, 7))} hitSlop={12}><Ionicons name="chevron-forward" size={24} color={colors.primary} /></Pressable>
+        <Pressable accessibilityLabel="Next week" onPress={() => setWeek(addDays(week, 7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}><Ionicons name="chevron-forward" size={24} color={colors.primary} /></Pressable>
       </View>
+      <Disclosure title={`Choose days & meals · ${selectedDays.length} days`}>
+        <ChipRow>{Array.from({ length: 7 }, (_, i) => {
+          const date = new Date(`${addDays(week, i)}T12:00:00`);
+          return <Chip key={i} label={date.toLocaleDateString(undefined, { weekday: 'short' })} selected={selectedDays.includes(i)}
+            onPress={() => setSelectedDays((old) => old.includes(i) ? old.filter((d) => d !== i) : [...old, i])} />;
+        })}</ChipRow>
+        <ChipRow>{MEALS.map((meal) => <Chip key={meal.key} label={meal.label} selected={selectedMeals.includes(meal.key)}
+          onPress={() => setSelectedMeals((old) => old.includes(meal.key) ? old.filter((m) => m !== meal.key) : [...old, meal.key])} />)}</ChipRow>
+      </Disclosure>
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {error ? <Button title="Retry preview" variant="secondary" onPress={() => { void build(); }} /> : null}
       {items === null && !error ? <Loading /> : null}
       {items ? (
         <>

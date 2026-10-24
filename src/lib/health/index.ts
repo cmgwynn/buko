@@ -85,13 +85,22 @@ export async function maybeWriteNutrition(entryId: string): Promise<void> {
   }
 }
 
-export async function removeNutritionFromHealth(externalId: string | null): Promise<void> {
+export type HealthRemoval = 'removed' | 'none' | 'failed';
+
+/**
+ * Remove a mirrored nutrition sample. Never throws; reports 'failed' when the linked sample may
+ * still exist in the health app so callers can avoid writing a duplicate copy.
+ */
+export async function removeNutritionFromHealth(externalId: string | null): Promise<HealthRemoval> {
   const a = getAdapter();
-  if (!externalId || !a) return;
+  if (!externalId) return 'none';
+  if (!a) return 'failed';
   try {
-    if (await a.isAvailable()) await a.deleteNutrition(externalId);
+    if (!(await a.isAvailable())) return 'failed';
+    await a.deleteNutrition(externalId);
+    return 'removed';
   } catch {
-    // ignore
+    return 'failed';
   }
 }
 

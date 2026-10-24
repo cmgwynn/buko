@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BarcodeScanner } from '../../src/components/BarcodeScanner';
-import { Notice } from '../../src/components/ui';
+import { Button, Notice } from '../../src/components/ui';
 import { getProductByBarcode } from '../../src/lib/api/openFoodFacts';
 import { spacing } from '../../src/theme';
 
@@ -13,6 +13,7 @@ export default function LogScan() {
   const { meal, date } = useLocalSearchParams<{ meal?: string; date?: string }>();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   async function onScanned(code: string) {
     setBusy(true);
@@ -29,8 +30,12 @@ export default function LogScan() {
 
   return (
     <SafeAreaView style={{ flex: 1 }} edges={['bottom', 'left', 'right']}>
-      {message ? <View style={{ padding: spacing.lg, paddingBottom: 0 }}><Notice tone="danger">{message}</Notice></View> : null}
-      <BarcodeScanner onScanned={onScanned} busy={busy} />
+      {message ? <View style={{ padding: spacing.lg, paddingBottom: 0 }}>
+        <Notice tone="danger">{message}</Notice>
+        <Button title="Try scanning again" variant="secondary" onPress={() => { setMessage(null); setAttempt((n) => n + 1); }} />
+        <Button title="Search by name" variant="secondary" onPress={() => router.replace({ pathname: '/log/search', params: { meal, date } })} />
+        <Button title="Enter nutrition manually" variant="ghost" onPress={() => router.replace({ pathname: '/log/manual', params: { meal, date } })} />
+      </View> : <BarcodeScanner key={attempt} onScanned={onScanned} busy={busy} />}
     </SafeAreaView>
   );
 }

@@ -2,7 +2,9 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../supabase';
 import type { RecipeDraft } from './draft';
-import { detectTimerSeconds } from './timers';
+import { clearDraft, getDraft } from './draft';
+import { savePrivateRecipe } from './saving';
+export { RecipePhotoSaveError } from './saving';
 import type { IngredientDraft, Recipe, RecipeIngredient, RecipeStep } from './types';
 
 export interface RecipeFull {
@@ -43,55 +45,27 @@ export function draftFromFull(full: RecipeFull): RecipeDraft {
 
 /** Insert or update a recipe with its ingredients and steps; returns the recipe id. */
 export async function saveRecipe(userId: string, d: RecipeDraft): Promise<string> {
-  const row = {
-    user_id: userId,
-    title: d.title.trim(),
-    servings: d.servings,
-    prep_minutes: d.prepMinutes,
-    cook_minutes: d.cookMinutes,
-    source_url: d.sourceUrl,
-    source_name: d.sourceName,
-    updated_at: new Date().toISOString(),
-    ...(d.communityParentId !== undefined ? { community_parent_id: d.communityParentId } : {}),
-  };
-  let id = d.id;
-  if (id) {
-    const { error } = await supabase.from('recipes').update(row).eq('id', id);
-    if (error) throw new Error(error.message);
-    await supabase.from('recipe_ingredients').delete().eq('recipe_id', id);
-    await supabase.from('recipe_steps').delete().eq('recipe_id', id);
-  } else {
-    const { data, error } = await supabase.from('recipes').insert(row).select('id').single();
-    if (error) throw new Error(error.message);
-    id = data.id as string;
-  }
-
-  const ingredients = d.ingredients
-    .filter((i) => i.raw_text.trim())
-    .map((i, idx) => ({ ...i, position: idx, recipe_id: id, user_id: userId }));
-  if (ingredients.length) {
-    const { error } = await supabase.from('recipe_ingredients').insert(ingredients);
-    if (error) throw new Error(error.message);
-  }
-  const steps = d.steps
-    .filter((s) => s.text.trim())
-    .map((s, idx) => ({ position: idx, text: s.text.trim(), timer_seconds: s.timer_seconds ?? detectTimerSeconds(s.text), recipe_id: id, user_id: userId }));
-  if (steps.length) {
-    const { error } = await supabase.from('recipe_steps').insert(steps);
-    if (error) throw new Error(error.message);
-  }
-
-  if (d.photoUri) {
-    const path = await uploadPhoto(userId, id as string, d.photoUri);
-    await supabase.from('recipes').update({ photo_path: path }).eq('id', id);
-  }
-  return id as string;
+  const { data: auth } = await supabase.auth.getSession();
+  if (auth.session?.user.id !== userId) throw new Error('The signed-in account changed. Reopen this recipe and try again.');
+  return savePrivateRecipe({
+    save: async (payload) => {
+      const { data, error } = await supabase.rpc('save_private_recipe', payload);
+      return { id: typeof data === 'string' ? data : null, error };
+    },
+    uploadPhoto,
+    setPhoto: async (owner, id, path) => {
+      const { data, error } = await supabase.from('recipes').update({ photo_path: path }).eq('id', id).eq('user_id', owner).select('id').maybeSingle();
+      if (error) throw new Error(error.message);
+      if (!data) throw new Error('The recipe is no longer available. It has not been recreated.');
+    },
+  }, userId, d);
 }
 
 export async function deleteRecipe(recipe: Recipe) {
   if (recipe.photo_path) await supabase.storage.from('recipe-photos').remove([recipe.photo_path]);
   const { error } = await supabase.from('recipes').delete().eq('id', recipe.id);
   if (error) throw new Error(error.message);
+  if (getDraft().id === recipe.id) await clearDraft();
 }
 
 /** Pick one of the user's own photos (no web images). */

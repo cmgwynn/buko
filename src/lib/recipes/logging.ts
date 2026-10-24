@@ -2,7 +2,7 @@ import { round1 } from '../diary';
 import { maybeWriteNutrition } from '../health';
 import { supabase } from '../supabase';
 import type { Meal } from '../../types';
-import { computeRecipeNutrition } from './nutrition';
+import { computeRecipeNutrition, recipeLoggingError } from './nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from './types';
 
 export type RecipeWithNutrition = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'grams' | 'nutrition'>[] };
@@ -14,7 +14,8 @@ export async function logRecipeServings(
   opts: { servings: number; meal: Meal; date: string; planEntryId?: string },
 ): Promise<string | null> {
   const n = computeRecipeNutrition(recipe.recipe_ingredients, recipe.servings);
-  if (n.counted === 0) return 'This recipe has no nutrition data yet. Edit it and match its ingredients first.';
+  const incomplete = recipeLoggingError(n, opts.servings);
+  if (incomplete) return incomplete;
   const ps = n.perServing;
   const { data: inserted, error } = await supabase.from('food_log_entries').insert({
     user_id: userId,
@@ -35,7 +36,8 @@ export async function logRecipeServings(
   if (error) return error.message;
   maybeWriteNutrition((inserted as { id: string }).id);
   if (opts.planEntryId) {
-    await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', opts.planEntryId);
+    const { error: planError } = await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', opts.planEntryId);
+    if (planError) return 'Your food was logged, but the plan could not be marked eaten. Do not log it again; refresh the diary to check it.';
   }
   return null;
 }

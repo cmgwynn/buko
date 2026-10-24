@@ -19,7 +19,8 @@ describe('deleted-account device cleanup', () => {
     const f = fixture();
     await cleanupDeletedAccount('alice', f.deps);
     assert.deepEqual(f.events, [
-      'buko:diagnostics:alice', 'reset-draft-and-workout', 'signout',
+      'buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice',
+      'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'reset-draft-and-workout', 'signout',
       'sb-project-auth-token', 'sb-project-auth-token-code-verifier', 'sb-project-auth-token-user',
     ]);
   });
@@ -27,13 +28,13 @@ describe('deleted-account device cleanup', () => {
     const f = fixture();
     f.switchUser('bob');
     await cleanupDeletedAccount('alice', f.deps);
-    assert.deepEqual(f.events, ['buko:diagnostics:alice']);
+    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice']);
   });
   it('does not erase a new session created while signout completes', async () => {
     const f = fixture();
     f.deps.signOut = async () => { f.switchUser('bob'); };
     await cleanupDeletedAccount('alice', f.deps);
-    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'reset-draft-and-workout']);
+    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'reset-draft-and-workout']);
   });
   it('still removes the dead session when signout fails and makes the partial cleanup explicit', async () => {
     const f = fixture();

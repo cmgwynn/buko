@@ -6,6 +6,7 @@ import { Attribution } from '../../src/components/Attribution';
 import { FactorCard } from '../../src/components/FactorCard';
 import { ScoreBadge, scoreColor } from '../../src/components/ScoreBadge';
 import { Body, Button, Card, Heading, Loading, Notice, Screen } from '../../src/components/ui';
+import { incompleteNutritionMessage, mainScoreReasons } from '../../src/lib/foodLogging';
 import { findAlternatives, type Alternative } from '../../src/lib/api/alternatives';
 import { getProductByBarcode } from '../../src/lib/api/openFoodFacts';
 import { dietConflicts } from '../../src/lib/diet';
@@ -26,6 +27,9 @@ export default function ProductScreen() {
   const [error, setError] = useState<string | null>(null);
   const [alts, setAlts] = useState<Alternative[] | null>(null);
   const [added, setAdded] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [showFactors, setShowFactors] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -34,12 +38,14 @@ export default function ProductScreen() {
     setProduct(null);
     setAlts(null);
     setAdded(false);
+    setAddError(null);
+    setShowFactors(false);
     getProductByBarcode(barcode)
       .then((p) => { if (!cancelled) setProduct(p); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Something went wrong.'); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [barcode]);
+  }, [barcode, attempt]);
 
   const result = useMemo(() => (product ? scoreProduct(product) : null), [product]);
 
@@ -59,7 +65,7 @@ export default function ProductScreen() {
       name: product.brand ? `${product.name} (${product.brand})` : product.name,
       barcode: product.barcode, source: 'off', source_id: product.sourceId,
     });
-    if (e) setError(e.message);
+    if (e) setAddError(`Could not add to your grocery list: ${e.message}`);
     else setAdded(true);
   }
 
@@ -71,7 +77,9 @@ export default function ProductScreen() {
         <Notice tone={error ? 'danger' : 'warning'}>
           {error ?? `We couldn't find barcode ${barcode} in Open Food Facts. It may not have been added yet.`}
         </Notice>
-        <Button title="Go back" variant="secondary" onPress={() => router.back()} />
+        <Button title="Try again" icon="refresh" onPress={() => setAttempt((n) => n + 1)} />
+        <Button title="Search by name" icon="search" variant="secondary" onPress={() => router.push('/log/search')} />
+        <Button title="Enter nutrition manually" icon="create-outline" variant="secondary" onPress={() => router.push({ pathname: '/log/manual', params: { barcode } })} />
         <Attribution />
       </Screen>
     );
@@ -80,6 +88,8 @@ export default function ProductScreen() {
   const totalWeight = result.factors.reduce((s, f) => s + f.weight, 0);
   const conflicts = profile ? dietConflicts(product, profile.diet_prefs) : [];
   const color = scoreColor(result.rating);
+  const reasons = mainScoreReasons(result.factors, 3);
+  const incomplete = incompleteNutritionMessage(product.per100g);
 
   return (
     <Screen edges={[]}>
@@ -107,35 +117,47 @@ export default function ProductScreen() {
         </View>
       </Card>
 
+      {reasons.length ? (
+        <Card>
+          <Text style={[typography.label, { marginBottom: spacing.sm }]}>Main reasons</Text>
+          {reasons.map((f) => (
+            <View key={f.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.xs }}>
+              <Ionicons name={f.points! >= 50 ? 'checkmark-circle' : 'alert-circle'} size={18} color={f.points! >= 50 ? colors.score.excellent : colors.score.poor} style={{ marginRight: spacing.sm, marginTop: 2 }} />
+              <Text style={[typography.body, { flex: 1 }]}><Text style={{ fontWeight: '600' }}>{f.label}:</Text> {f.value}</Text>
+            </View>
+          ))}
+        </Card>
+      ) : null}
+
       {conflicts.length ? (
         <Notice tone="danger">
           Conflicts with your preferences: {conflicts.join(' ')}
         </Notice>
       ) : null}
 
+      {incomplete ? <Notice>{incomplete}</Notice> : null}
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}>
-          <Button title="Log food" icon="add-circle-outline" onPress={() => router.push({ pathname: '/log/add', params: { food: JSON.stringify(product) } })} />
+          {incomplete ? (
+            <Button title="Enter nutrition" icon="create-outline" onPress={() => router.push({ pathname: '/log/manual', params: { barcode: product.barcode, food: JSON.stringify(product) } })} />
+          ) : (
+            <Button title="Log food" icon="add-circle-outline" onPress={() => router.push({ pathname: '/log/add', params: { food: JSON.stringify(product) } })} />
+          )}
         </View>
         <View style={{ flex: 1 }}>
           <Button title={added ? 'Added ✓' : 'Add to list'} icon="cart-outline" variant="secondary" disabled={added} onPress={addToGrocery} />
         </View>
       </View>
-
-      <View style={{ marginVertical: spacing.md }}><Heading>Why this score</Heading></View>
-      {result.factors.map((f) => <FactorCard key={f.id} factor={f} totalWeight={totalWeight} />)}
-      <Body muted>
-        Buko&apos;s score is an estimate that combines the factors above. It is not medical advice, and each factor links to its source.
-      </Body>
+      {addError ? <Notice tone="danger">{addError}</Notice> : null}
 
       {result.score !== null && result.score < 50 ? (
-        <View style={{ marginTop: spacing.xl }}>
+        <View style={{ marginTop: spacing.lg }}>
           <Heading>Better alternatives</Heading>
           <View style={{ height: spacing.md }} />
           {alts === null ? <Body muted>Looking for higher-scoring products in the same category…</Body> : null}
           {alts?.length === 0 ? <Body muted>We couldn&apos;t find clearly better products in this category.</Body> : null}
           {alts?.map(({ product: a, result: r }) => (
-            <Pressable key={a.barcode} onPress={() => router.push({ pathname: '/product/[barcode]', params: { barcode: a.barcode } })}>
+            <Pressable key={a.barcode} accessibilityRole="button" accessibilityLabel={`${a.name}, score ${r.score ?? 'unknown'}`} onPress={() => router.push({ pathname: '/product/[barcode]', params: { barcode: a.barcode } })}>
               <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <ScoreBadge score={r.score} rating={r.rating} size={52} />
                 <View style={{ flex: 1, marginHorizontal: spacing.md }}>
@@ -148,6 +170,24 @@ export default function ProductScreen() {
           ))}
         </View>
       ) : null}
+
+      <Pressable
+        onPress={() => setShowFactors(!showFactors)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: showFactors }}
+        aria-expanded={showFactors}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, marginTop: spacing.md }}
+      >
+        <Heading>Why this score</Heading>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          <Text style={[typography.small, { color: colors.primary, marginRight: spacing.xs }]}>{showFactors ? 'Hide' : `All ${result.factors.length} factors`}</Text>
+          <Ionicons name={showFactors ? 'chevron-up' : 'chevron-down'} size={20} color={colors.primary} />
+        </View>
+      </Pressable>
+      {showFactors ? result.factors.map((f) => <FactorCard key={f.id} factor={f} totalWeight={totalWeight} />) : null}
+      <Body muted>
+        Buko&apos;s score is an estimate that combines these factors. It is not medical advice, and each factor links to its source.
+      </Body>
 
       <Attribution />
     </Screen>

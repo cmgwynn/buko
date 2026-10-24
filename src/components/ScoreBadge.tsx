@@ -11,10 +11,10 @@ export function ScoreBadge({ score, rating, size = 72 }: { score: number | null;
   const color = scoreColor(rating);
   return (
     <View
-      accessibilityLabel={score === null ? 'No score' : `Health score ${score} out of 100`}
+      accessibilityLabel={score === null ? 'No score' : `Health score ${score} out of 100, ${rating}`}
       style={[styles.badge, { width: size, height: size, borderRadius: size / 2, borderColor: color, backgroundColor: color + '1F' }]}
     >
-      <Text style={{ fontSize: size * 0.38, fontWeight: '700', color }}>{score ?? '–'}</Text>
+      <Text style={{ fontSize: size * 0.38, fontWeight: '700', color: colors.text }}>{score ?? '–'}</Text>
     </View>
   );
 }

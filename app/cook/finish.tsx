@@ -1,10 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, Heading, Label, Loading, Notice, Screen } from '../../src/components/ui';
 import { defaultMeal, MEALS, round1, toDateString } from '../../src/lib/diary';
 import { maybeWriteNutrition } from '../../src/lib/health';
+import { recordRecipeCooked } from '../../src/lib/recipes/activityClient';
 import { loadRecipe, type RecipeFull } from '../../src/lib/recipes/db';
 import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import { supabase } from '../../src/lib/supabase';
@@ -24,6 +25,22 @@ export default function FinishCooking() {
   const [date, setDate] = useState(dateParam ?? toDateString(new Date()));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cooked, setCooked] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [cookedError, setCookedError] = useState<string | null>(null);
+  const recordedFor = useRef<string | null>(null);
+
+  // Reaching this screen from cook mode means cooking finished; direct "Log a recipe" is not a cook.
+  async function recordCooked() {
+    if (direct || !session || !full) return;
+    recordedFor.current = full.recipe.id;
+    setCooked('saving'); setCookedError(null);
+    try { await recordRecipeCooked(session.user.id, full.recipe.id); setCooked('saved'); }
+    catch (e) { setCookedError(e instanceof Error ? e.message : null); setCooked('failed'); }
+  }
+  useEffect(() => {
+    if (full && !direct && session && recordedFor.current !== full.recipe.id) void recordCooked();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [full, direct, session?.user.id]);
 
   useEffect(() => {
     loadRecipe(id).then(setFull).catch((e) => setError(e.message));
@@ -108,6 +125,9 @@ export default function FinishCooking() {
       </ChipRow>
       <View style={{ height: spacing.lg }} />
       {!canLog ? <Notice>This recipe has no nutrition data yet, so it can&apos;t be logged. Edit the recipe and match its ingredients first.</Notice> : null}
+      {cooked === 'saved' ? <Body muted>Added to your recently cooked recipes.</Body> : null}
+      {cooked === 'failed' ? <Notice tone="danger">Couldn&apos;t add this to recently cooked{cookedError ? ` (${cookedError})` : ''}. Logging still works.</Notice> : null}
+      {cooked === 'failed' ? <Button title="Retry recently cooked" variant="secondary" onPress={() => void recordCooked()} /> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       <Button title="Log to diary" onPress={log} loading={busy} disabled={!canLog} />
       {direct ? null : <Button title="Skip logging" variant="ghost" onPress={() => { router.dismissAll(); router.navigate('/(tabs)'); }} />}

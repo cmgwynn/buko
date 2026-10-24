@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Linking, Switch, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Attribution } from '../src/components/Attribution';
-import { Body, Button, Card, Heading, Notice, Screen } from '../src/components/ui';
+import { Body, Button, Card, Disclosure, Heading, NavigationRow, Notice, Screen } from '../src/components/ui';
 import { config } from '../src/lib/config';
 import { legalUrl } from '../src/lib/legal';
 import { loadDiagnosticConsent, saveDiagnosticConsent } from '../src/lib/diagnostics/client';
@@ -10,6 +10,7 @@ import { useAuth } from '../src/providers/AuthProvider';
 import { spacing } from '../src/theme';
 export default function Settings() {
   const router = useRouter();
+  const { section } = useLocalSearchParams<{ section?: string }>();
   const { session } = useAuth();
   const [diagnostics, setDiagnostics] = useState(false);
   const [busy, setBusy] = useState(true);
@@ -34,25 +35,41 @@ export default function Settings() {
     try { await Linking.openURL(url); } catch { setError('Could not open the document. Try your browser.'); }
   }
   return <Screen>
-    <Heading>Settings & privacy</Heading>
+    <Heading>{section === 'help' ? 'Help & about' : 'Settings & privacy'}</Heading>
     {error ? <Notice tone="danger">{error}</Notice> : null}
+    {section !== 'help' ? <>
+    <Card><Heading>Account & subscription</Heading>
+      <NavigationRow title="Account & data" subtitle="Export data or delete account" onPress={() => router.push('/account')} />
+      <NavigationRow title="Subscription" subtitle="Premium, restore and manage" onPress={() => router.push('/premium')} />
+      <Body muted>Account deletion does not cancel store subscriptions. Manage your store subscription before deleting.</Body>
+    </Card>
     <Card><Heading>Your choices</Heading>
-      <Button title="Coach consent, weight sharing & history" variant="secondary" onPress={() => router.push('/coach')} />
-      <Button title="Health permissions & connections" variant="secondary" onPress={() => router.push('/health')} />
-      <Button title="Goals, units & dietary preferences" variant="ghost" onPress={() => router.push('/edit-profile')} />
+      <NavigationRow title="Coach consent & history" onPress={() => router.push('/coach')} />
+      <NavigationRow title="Health connections" onPress={() => router.push('/health')} />
+      <NavigationRow title="Goals, units & dietary preferences" onPress={() => router.push('/edit-profile')} />
     </Card>
     <Card><Heading>Optional diagnostics</Heading>
       <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
-        <View style={{ flex: 1 }}><Body>Share limited crash signals</Body><Body muted>Off by default, per account on this device. Sends a fixed error category, platform and app release through Supabase to the configured crash service. No raw messages, stacks, health values, chat, screenshots, breadcrumbs or user IDs are forwarded.</Body></View>
+        <View style={{ flex: 1 }}><Body>Share limited crash signals</Body><Body muted>Off by default. No health content or account identifiers are forwarded.</Body></View>
         <Switch accessibilityLabel="Share limited crash signals" disabled={busy} value={diagnostics} onValueChange={(value) => { void toggle(value); }} />
       </View>
-      <Body muted>Automatic native crash dumps and session replay are disabled. Technical reports cannot diagnose every crash. Network providers still process connection metadata; Supabase receives your authenticated request, while the crash service sees the relay connection rather than your device connection. Reporting requires owner configuration.</Body>
+      <Disclosure title="What diagnostic reports contain">
+        <Body muted>Off by default, per account on this device. Sends a fixed error category, platform and app release through Supabase to the configured crash service. No raw messages, stacks, health values, chat, screenshots, breadcrumbs or user IDs are forwarded.</Body>
+        <Body muted>Automatic native crash dumps and session replay are disabled. Network providers process connection metadata; Supabase receives your authenticated request, while the crash service sees the relay connection. Reporting requires owner configuration.</Body>
+      </Disclosure>
     </Card>
-    <Card><Heading>Account & subscription</Heading>
-      <Button title="Premium, restore & manage subscription" variant="secondary" onPress={() => router.push('/premium')} />
-      <Button title="Export data or delete account" variant="secondary" onPress={() => router.push('/account')} />
-      <Body muted>Exported files contain sensitive personal/health data. Store them securely. Account deletion does not cancel store subscriptions or remove original records held in Apple Health or Health Connect.</Body>
+    <Card><Disclosure title="Privacy & data processing">
+      <Body muted>No ads, behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials.</Body>
+      <Body muted>Coach is optional. With consent, minimized context and chat may go to Anthropic; names, email and birthday are excluded from structured context. Avoid identifiers in free text. Imported health-app workouts and energy are excluded; weight sharing is a separate choice.</Body>
+      <Body muted>Store subscriptions use RevenueCat with a pseudonymous identifier and purchase/device metadata. Exported files contain sensitive personal and health data. Deletion does not remove original Apple Health or Health Connect records.</Body>
+    </Disclosure></Card>
+    </> : null}
+    {section === 'help' ? <Card><Heading>Getting around</Heading>
+      <Body>Diary: log food with Search, Scan, Recipes or Recent. Plan: choose a day and meal, then find a recipe. Groceries: generate a list from selected meals or add items yourself. Train: start or resume a workout.</Body>
+      <Disclosure title="Scores and nutrition estimates"><Body muted>Nutrition scores describe listed ingredients, not medical suitability. Missing nutrition is not zero. Member stars describe the recipe experience, not its nutritional quality. Check ingredient labels for allergies and cross-contact.</Body></Disclosure>
+      <Disclosure title="Saving and recovery"><Body muted>Recipe drafts and unfinished workouts are kept temporarily on this device for your account. They are not a server backup. Completed actions need a successful save. Sign-out clears recoverable work on this device.</Body></Disclosure>
     </Card>
+    : null}
     <Card><Heading>Legal & data sources</Heading>
       <Button title="Privacy policy" variant="ghost" onPress={() => { void open(config.privacyUrl); }} />
       <Button title="Terms of service" variant="ghost" onPress={() => { void open(config.termsUrl); }} />

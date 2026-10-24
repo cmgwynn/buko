@@ -3,12 +3,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, Empty, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, Empty, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
 import { toDateString } from '../../src/lib/diary';
 import { loadRecentWorkouts, loadRoutines, loadTraining, routineToItems, type RoutineRow, type WorkoutListRow } from '../../src/lib/fitness/data';
 import { setVolume } from '../../src/lib/fitness/calc';
 import { toDisplayWeight, weightUnit } from '../../src/lib/fitness/format';
-import { startSession, useWorkoutSession } from '../../src/lib/fitness/session';
+import { startSession, useWorkoutRecovery, useWorkoutSession } from '../../src/lib/fitness/session';
 import { loadActivityForDay, syncIfDue } from '../../src/lib/health';
 import { weekStart } from '../../src/lib/recipes/week';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -22,6 +22,7 @@ export default function Train() {
   const { profile } = useProfile();
   const { settings } = useSettings();
   const active = useWorkoutSession();
+  const recovery = useWorkoutRecovery();
   const units = profile?.units ?? 'metric';
   const [recent, setRecent] = useState<WorkoutListRow[]>([]);
   const [routines, setRoutines] = useState<RoutineRow[]>([]);
@@ -63,6 +64,7 @@ export default function Train() {
   );
 
   function start(routine?: RoutineRow) {
+    if (!recovery.ready) { setError('Wait for your saved workout to finish loading.'); return; }
     if (!active.active) startSession(routine ? routine.name : 'Workout', routine?.id ?? null, routine ? routineToItems(routine) : []);
     router.push('/workout/active');
   }
@@ -78,35 +80,23 @@ export default function Train() {
         }
       />
       {error ? <Notice tone="danger">{error}</Notice> : null}
-
-      <Card>
-        <Text style={typography.label}>This week</Text>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: spacing.sm }}>
-          <Stat value={String(week.workouts)} label="workouts" />
-          <Stat value={String(week.minutes)} label="minutes" />
-          <Stat value={Math.round(toDisplayWeight(week.volumeKg, units)).toLocaleString()} label={`${weightUnit(units)} lifted`} />
-          {steps != null ? <Stat value={steps.toLocaleString()} label="steps today" /> : null}
-        </View>
-      </Card>
+      {recovery.error ? <Notice tone="danger">{recovery.error} Open your workout to retry the device save.</Notice> : null}
 
       {active.active ? (
-        <Button title="Resume workout" icon="play" onPress={() => start()} />
+        <Button title="Resume workout" icon="play" disabled={!recovery.ready} onPress={() => start()} />
       ) : (
-        <Button title="Start workout" icon="barbell-outline" onPress={() => start()} />
+        <Button title="Start workout" icon="barbell-outline" disabled={!recovery.ready} onPress={() => start()} />
       )}
-      <View style={{ height: spacing.sm }} />
-      <Button title="Browse workout library" icon="library-outline" variant="secondary" onPress={() => router.push('/workout/library')} />
-      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-        <View style={{ flex: 1 }}><Button title="Progress" icon="stats-chart-outline" variant="secondary" onPress={() => router.push('/progress')} /></View>
-        <View style={{ flex: 1 }}><Button title="Exercises" icon="search-outline" variant="secondary" onPress={() => router.push('/workout/exercises')} /></View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
+        <Text style={typography.heading}>Your routines</Text>
+        <Button title="Create" icon="add" variant="ghost" onPress={() => router.push('/routine/edit')} />
       </View>
-      <View style={{ height: spacing.sm }} />
-      <Button title="Log weight & measurements" icon="body-outline" variant="secondary" onPress={() => router.push('/body')} />
-
-      <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>Routines</Text>
-      <Button title="Create routine" icon="add" variant="secondary" onPress={() => router.push('/routine/edit')} />
-      {routines.length === 0 ? (
-        <Text style={typography.small}>Create your own routine, customize an idea from the workout library, or save one when finishing a workout.</Text>
+      {!loaded ? <Loading /> : null}
+      {loaded && routines.length === 0 ? (
+        <Card>
+          <Text style={typography.body}>Start with a workout idea or create your own routine.</Text>
+          <NavigationRow title="Browse workout library" icon="library-outline" onPress={() => router.push('/workout/library')} />
+        </Card>
       ) : (
         routines.map((r) => (
             <Card key={r.id} style={{ padding: spacing.md }}>
@@ -115,13 +105,28 @@ export default function Train() {
                 <Text style={typography.small} numberOfLines={1}>{r.routine_exercises.map((x) => x.exercises.name).join(' · ')}</Text>
               </View>
               <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                <View style={{ flex: 1 }}><Button title="Start" icon="play-outline" disabled={active.active} onPress={() => start(r)} /></View>
+                <View style={{ flex: 1 }}><Button title="Start" icon="play-outline" disabled={active.active || !recovery.ready} onPress={() => start(r)} /></View>
                 <View style={{ flex: 1 }}><Button title="Edit" icon="create-outline" variant="secondary" onPress={() => router.push({ pathname: '/routine/edit', params: { id: r.id } })} /></View>
               </View>
             </Card>
         ))
       )}
 
+      <Card>
+        <Text style={typography.label}>This week</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, justifyContent: 'space-between', marginTop: spacing.sm }}>
+          <Stat value={String(week.workouts)} label="workouts" />
+          <Stat value={String(week.minutes)} label="minutes" />
+          <Stat value={Math.round(toDisplayWeight(week.volumeKg, units)).toLocaleString()} label={`${weightUnit(units)} lifted`} />
+          {steps != null ? <Stat value={steps.toLocaleString()} label="steps today" /> : null}
+        </View>
+      </Card>
+      <Card>
+        <NavigationRow title="Workout library" icon="library-outline" onPress={() => router.push('/workout/library')} />
+        <NavigationRow title="Exercises" icon="search-outline" onPress={() => router.push('/workout/exercises')} />
+        <NavigationRow title="Progress" icon="stats-chart-outline" onPress={() => router.push('/progress')} />
+        <NavigationRow title="Weight & measurements" icon="body-outline" onPress={() => router.push('/body')} />
+      </Card>
       <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>Recent</Text>
       {loaded && recent.length === 0 ? <Empty icon="barbell-outline" text="No workouts yet. Start one above." /> : null}
       {recent.map((w) => (

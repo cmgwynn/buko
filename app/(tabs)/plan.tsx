@@ -1,19 +1,24 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View, type View as RNView } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type View as RNView } from 'react-native';
 import { Gesture, GestureDetector, ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, Empty, Notice } from '../../src/components/ui';
+import { Button, Card, Disclosure, Loading, Notice } from '../../src/components/ui';
+import { PlanRecipePicker, type PlanChoice } from '../../src/components/PlanRecipePicker';
+import { useConfirm } from '../../src/components/ConfirmProvider';
 import { MEALS, toDateString } from '../../src/lib/diary';
 import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
 import { dayStatus, weekDays, weekStart } from '../../src/lib/recipes/week';
 import { addDays } from '../../src/lib/diary';
 import { logPlanEntry } from '../../src/lib/recipes/logging';
+import { saveRecipe } from '../../src/lib/recipes/db';
+import { repeatPlanRows } from '../../src/lib/recipes/repeat';
+import type { RecipeDraft } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
@@ -31,6 +36,7 @@ export default function Plan() {
 }
 function PlanContent() {
   const router = useRouter();
+  const confirm = useConfirm();
   const { session } = useAuth();
   const { targets } = useProfile();
   const today = toDateString(new Date());
@@ -41,15 +47,25 @@ function PlanContent() {
   const [picker, setPicker] = useState<Meal | null>(null);
   const [dragging, setDragging] = useState<RecipeRow | null>(null);
   const [hover, setHover] = useState<Meal | null>(null);
+  const [pending, setPending] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [removed, setRemoved] = useState<EntryRow | null>(null);
+  const copies = useRef(new WeakMap<RecipeDraft, string>());
+  const requestVersion = useRef(0);
+  const mutation = useRef(false);
 
   const start = weekStart(selected);
   const days = weekDays(start);
 
   const load = useCallback(async () => {
+    const request = ++requestVersion.current;
     const [r, e] = await Promise.all([
       supabase.from('recipes').select('*, recipe_ingredients(grams, nutrition)').order('title'),
       supabase.from('meal_plan_entries').select('*').gte('planned_on', start).lte('planned_on', addDays(start, 6)).order('created_at'),
     ]);
+    if (request !== requestVersion.current) return;
+    setLoaded(true);
     if (r.error || e.error) setError((r.error ?? e.error)!.message);
     else {
       setError(null);
@@ -73,7 +89,7 @@ function PlanContent() {
       entries.filter((e) => e.planned_on === date).reduce(
         (t, e) => {
           const n = perServing.get(e.recipe_id)?.perServing;
-          if (!n) return t;
+          if (!n || !perServing.get(e.recipe_id)?.complete) return t;
           return { calories: t.calories + n.calories * e.servings, protein: t.protein + n.protein_g * e.servings, carbs: t.carbs + n.carbs_g * e.servings, fat: t.fat + n.fat_g * e.servings };
         },
         { calories: 0, protein: 0, carbs: 0, fat: 0 },
@@ -82,28 +98,82 @@ function PlanContent() {
   );
 
   async function addEntry(recipeId: string, meal: Meal) {
-    if (!session) return;
+    if (!session || mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
     const { error: e } = await supabase.from('meal_plan_entries').insert({ user_id: session.user.id, planned_on: selected, meal, recipe_id: recipeId, servings: 1 });
-    if (e) setError(e.message);
-    load();
+    if (e) setError(`Meal was not saved: ${e.message}`);
+    else { setMessage('Meal saved.'); await load(); }
+    mutation.current = false; setPending(false);
   }
 
   async function logEntry(entry: EntryRow, recipe: RecipeRow) {
-    if (!session) return;
+    if (!session || mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
     const err = await logPlanEntry(session.user.id, recipe, entry);
     if (err) setError(err);
-    load();
+    else { setMessage('Meal logged to Diary.'); await load(); }
+    mutation.current = false; setPending(false);
   }
 
   async function setServings(entry: EntryRow, servings: number) {
-    if (servings < 0.5) return;
-    setEntries((cur) => cur.map((x) => (x.id === entry.id ? { ...x, servings } : x)));
-    await supabase.from('meal_plan_entries').update({ servings }).eq('id', entry.id);
+    if (servings < 0.5 || servings > 100 || mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
+    const { error: e } = await supabase.from('meal_plan_entries').update({ servings }).eq('id', entry.id);
+    if (e) setError(`Portion change was not saved: ${e.message}`);
+    else { setEntries((cur) => cur.map((x) => (x.id === entry.id ? { ...x, servings } : x))); setMessage('Servings saved.'); }
+    mutation.current = false; setPending(false);
   }
 
   async function removeEntry(entry: EntryRow) {
-    setEntries((cur) => cur.filter((x) => x.id !== entry.id));
-    await supabase.from('meal_plan_entries').delete().eq('id', entry.id);
+    if (mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
+    const { error: e } = await supabase.from('meal_plan_entries').delete().eq('id', entry.id);
+    if (e) setError(`Meal was not removed: ${e.message}`);
+    else { setEntries((cur) => cur.filter((x) => x.id !== entry.id)); setRemoved(entry); setMessage('Meal removed.'); }
+    mutation.current = false; setPending(false);
+  }
+
+  async function undoRemove() {
+    if (!removed || mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
+    const { error: e } = await supabase.from('meal_plan_entries').insert(removed);
+    if (e) setError(`Could not restore meal: ${e.message}`);
+    else { setRemoved(null); setMessage('Meal restored.'); await load(); }
+    mutation.current = false; setPending(false);
+  }
+  async function addChoice(choice: PlanChoice, servings: number) {
+    if (!session || !picker || mutation.current) return false;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
+    try {
+      let id = choice.id;
+      if (choice.draft) {
+        id = copies.current.get(choice.draft);
+        if (!id) { id = await saveRecipe(session.user.id, choice.draft); copies.current.set(choice.draft, id); }
+      }
+      const { error: e } = await supabase.from('meal_plan_entries').insert({ user_id: session.user.id, planned_on: selected, meal: picker, recipe_id: id, servings });
+      if (e) throw new Error(`${choice.draft ? 'Your private copy was saved, but the meal was not added. Retry without making another copy. ' : ''}${e.message}`);
+      setMessage('Recipe saved to your meal plan.'); await load();
+      return true;
+    } finally { mutation.current = false; setPending(false); }
+  }
+  async function repeat(scope: 'day' | 'week' | Meal) {
+    if (!session || mutation.current) return;
+    const isMeal = scope !== 'day' && scope !== 'week';
+    const sourceDate = isMeal ? addDays(selected, -1) : selected;
+    let source = entries.filter((e) => scope === 'week' || e.planned_on === sourceDate);
+    if (isMeal) {
+      const result = await supabase.from('meal_plan_entries').select('*').eq('planned_on', sourceDate).eq('meal', scope);
+      if (result.error) { setError(result.error.message); return; }
+      source = result.data as EntryRow[];
+    }
+    if (!source.length) { setError('There are no meals to copy from that day or week.'); return; }
+    if (!await confirm({ title: 'Copy planned meals?', message: `${source.length} meal${source.length === 1 ? '' : 's'} will be added ${scope === 'week' ? 'to next week' : isMeal ? 'to this meal today' : 'to tomorrow'}. Existing meals stay; copied meals are not marked as logged.`, confirmLabel: 'Copy meals' })) return;
+    if (mutation.current) return;
+    mutation.current = true; setPending(true); setError(null); setMessage(null);
+    const { error: e } = await supabase.from('meal_plan_entries').insert(repeatPlanRows(source, session.user.id, scope === 'week' ? 7 : 1));
+    if (e) setError(`Meals were not copied: ${e.message}`);
+    else { setMessage('Meals copied.'); if (scope === 'week') setSelected(addDays(selected, 7)); else if (scope === 'day') setSelected(addDays(selected, 1)); else await load(); }
+    mutation.current = false; setPending(false);
   }
 
   // Drag and drop ------------------------------------------------------------------------------
@@ -157,8 +227,6 @@ function PlanContent() {
   };
 
   const totals = dayTotals(selected);
-  const status = targets ? dayStatus(totals.calories, targets.calories) : 'empty';
-  const diff = targets ? Math.round(totals.calories - targets.calories) : 0;
 
   return (
     <View ref={rootRef} style={{ flex: 1, backgroundColor: colors.background }} collapsable={false}>
@@ -168,24 +236,22 @@ function PlanContent() {
             title="Plan"
             right={
               <>
-                <Pressable onPress={() => router.push('/(tabs)/grocery')} hitSlop={10} accessibilityLabel="Open grocery list">
-                  <Ionicons name="list-outline" size={26} color={colors.primary} />
-                </Pressable>
-                <Pressable onPress={() => router.push({ pathname: '/grocery/generate', params: { week: start } })} hitSlop={10} accessibilityLabel="Make grocery list from this week">
-                  <Ionicons name="cart-outline" size={26} color={colors.primary} />
+                <Pressable accessibilityRole="button" onPress={() => router.push('/(tabs)/grocery')} style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 4 }} accessibilityLabel="Open groceries">
+                  <Ionicons name="cart-outline" size={22} color={colors.primary} />
+                  <Text style={{ ...typography.small, color: colors.primary }}>Groceries</Text>
                 </Pressable>
               </>
             }
           />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <Pressable onPress={() => setSelected(addDays(selected, -7))} hitSlop={12} accessibilityLabel="Previous week">
+            <Pressable accessibilityRole="button" onPress={() => setSelected(addDays(selected, -7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityLabel="Previous week">
               <Ionicons name="chevron-back" size={22} color={colors.primary} />
             </Pressable>
             <Text style={typography.subheading}>
               {new Date(start + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}
               {new Date(addDays(start, 6) + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
             </Text>
-            <Pressable onPress={() => setSelected(addDays(selected, 7))} hitSlop={12} accessibilityLabel="Next week">
+            <Pressable accessibilityRole="button" onPress={() => setSelected(addDays(selected, 7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityLabel="Next week">
               <Ionicons name="chevron-forward" size={22} color={colors.primary} />
             </Pressable>
           </View>
@@ -196,7 +262,7 @@ function PlanContent() {
               const isSel = d === selected;
               const dt = new Date(d + 'T00:00:00');
               return (
-                <Pressable key={d} onPress={() => setSelected(d)} accessibilityLabel={dt.toDateString()}
+                <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: isSel }} aria-selected={isSel} onPress={() => setSelected(d)} accessibilityLabel={dt.toDateString()}
                   style={{ alignItems: 'center', paddingVertical: 8, flex: 1, maxWidth: 64, borderRadius: radius.md, backgroundColor: isSel ? colors.primary : 'transparent' }}>
                   <Text style={[typography.small, isSel && { color: colors.onPrimary }]}>{dt.toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
                   <Text style={[typography.subheading, isSel && { color: colors.onPrimary }, d === today && !isSel && { color: colors.primary }]}>{dt.getDate()}</Text>
@@ -209,18 +275,25 @@ function PlanContent() {
 
         <GHScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}>
           {error ? <Notice tone="danger">{error}</Notice> : null}
+          {error ? <Button title="Retry loading plan" variant="ghost" onPress={() => { void load(); }} /> : null}
+          {pending ? <Notice tone="info">Saving…</Notice> : message ? <Notice tone="info">{message}</Notice> : null}
+          {removed ? <Button title="Undo remove meal" variant="ghost" disabled={pending} onPress={() => { void undoRemove(); }} /> : null}
+          {!loaded ? <Loading /> : null}
           {targets ? (
             <Card>
-              <Text style={typography.label}>Planned for this day vs. your targets</Text>
-              <Text style={[typography.body, { marginVertical: spacing.sm, color: status === 'over' ? colors.danger : colors.text }]}>
+              <Text style={typography.label}>Planned today</Text>
+              <Text style={[typography.body, { marginVertical: spacing.sm }]}>
                 {totals.calories === 0
                   ? 'Nothing planned yet.'
-                  : `${Math.round(totals.calories).toLocaleString()} of ${targets.calories.toLocaleString()} kcal · ${Math.abs(diff).toLocaleString()} ${diff > 0 ? 'over' : 'under'}`}
+                  : `${Math.round(totals.calories).toLocaleString()} kcal · Target ${targets.calories.toLocaleString()} kcal`}
               </Text>
+              {entries.some((e) => e.planned_on === selected && !perServing.get(e.recipe_id)?.complete) ? <Text style={typography.small}>Partial estimate: meals with incomplete nutrition are excluded.</Text> : null}
+              <Disclosure title="Macro breakdown">
               <MacroBar label="Calories" unit="kcal" value={totals.calories} target={targets.calories} color={colors.macro.calories} />
               <MacroBar label="Protein" value={totals.protein} target={targets.protein_g} color={colors.macro.protein} />
               <MacroBar label="Carbs" value={totals.carbs} target={targets.carbs_g} color={colors.macro.carbs} />
               <MacroBar label="Fat" value={totals.fat} target={targets.fat_g} color={colors.macro.fat} />
+              </Disclosure>
             </Card>
           ) : null}
 
@@ -231,11 +304,11 @@ function PlanContent() {
                 <Card style={hover === key ? { borderColor: colors.primary, borderWidth: 2, backgroundColor: colors.primarySoft } : undefined}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Text style={typography.subheading}>{label}</Text>
-                    <Pressable onPress={() => setPicker(key)} hitSlop={10} accessibilityLabel={`Add recipe to ${label}`}>
+                    <Pressable accessibilityRole="button" onPress={() => setPicker(key)} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel={`Add recipe to ${label}`}>
                       <Ionicons name="add-circle" size={26} color={colors.primary} />
                     </Pressable>
                   </View>
-                  {items.length === 0 ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Drop a recipe here or tap +</Text> : null}
+                  {items.length === 0 ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Tap + to find a recipe. Dragging saved recipes is optional.</Text> : null}
                   {items.map((e) => {
                     const r = recipeById.get(e.recipe_id);
                     const n = perServing.get(e.recipe_id);
@@ -245,11 +318,11 @@ function PlanContent() {
                         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                           <Pressable style={{ flex: 1 }} onPress={() => router.push({ pathname: '/recipe/[id]', params: { id: r.id } })}>
                             <Text style={typography.body} numberOfLines={1}>{e.logged_at ? '✓ ' : ''}{r.title}</Text>
-                            <Text style={typography.small}>{n && n.counted > 0 ? `${e.servings} serving${e.servings === 1 ? '' : 's'} · ${Math.round(n.perServing.calories * e.servings)} kcal` : 'No nutrition yet'}</Text>
+                            <Text style={typography.small}>{n?.complete ? `${e.servings} serving${e.servings === 1 ? '' : 's'} · ${Math.round(n.perServing.calories * e.servings)} kcal` : `${e.servings} servings · Nutrition incomplete`}</Text>
                           </Pressable>
-                          <Pressable onPress={() => setServings(e, e.servings - 0.5)} hitSlop={8} accessibilityLabel="Fewer servings"><Ionicons name="remove-circle-outline" size={24} color={colors.primary} /></Pressable>
+                          <Pressable accessibilityRole="button" disabled={pending} onPress={() => setServings(e, e.servings - 0.5)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="Fewer servings"><Ionicons name="remove-circle-outline" size={24} color={colors.primary} /></Pressable>
                           <Text style={[typography.body, { marginHorizontal: 6, minWidth: 28, textAlign: 'center' }]}>{e.servings}</Text>
-                          <Pressable onPress={() => setServings(e, e.servings + 0.5)} hitSlop={8} accessibilityLabel="More servings"><Ionicons name="add-circle-outline" size={24} color={colors.primary} /></Pressable>
+                          <Pressable accessibilityRole="button" disabled={pending} onPress={() => setServings(e, e.servings + 0.5)} style={{ minHeight: 44, minWidth: 44, alignItems: 'center', justifyContent: 'center' }} accessibilityLabel="More servings"><Ionicons name="add-circle-outline" size={24} color={colors.primary} /></Pressable>
                         </View>
                         <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: spacing.lg, marginTop: 4 }}>
                           {!e.logged_at ? (
@@ -264,7 +337,7 @@ function PlanContent() {
                               <Text style={[typography.small, { color: colors.primary, marginLeft: 4 }]}>Log to diary</Text>
                             </Pressable>
                           ) : null}
-                          <Pressable onPress={() => removeEntry(e)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Pressable accessibilityRole="button" disabled={pending} onPress={() => removeEntry(e)} hitSlop={8} style={{ flexDirection: 'row', alignItems: 'center', minHeight: 44 }}>
                             <Ionicons name="trash-outline" size={16} color={colors.textMuted} />
                             <Text style={[typography.small, { marginLeft: 4 }]}>Remove</Text>
                           </Pressable>
@@ -272,13 +345,20 @@ function PlanContent() {
                       </View>
                     );
                   })}
+                  <Button title="Copy from previous day" variant="ghost" disabled={pending} onPress={() => { void repeat(key); }} />
                 </Card>
               </View>
             );
           })}
+          <Disclosure title="Repeat your plan">
+            <Button title="Copy this day to tomorrow" variant="secondary" disabled={pending} onPress={() => { void repeat('day'); }} />
+            <Button title="Repeat this week next week" variant="secondary" disabled={pending} onPress={() => { void repeat('week'); }} />
+          </Disclosure>
+          <Button title="Generate groceries" icon="cart-outline" variant="secondary" onPress={() => router.push({ pathname: '/grocery/generate', params: { week: start } })} />
         </GHScrollView>
 
-        <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.surface, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+        {recipes.length ? <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.surface, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
+          <Disclosure title="Drag saved recipes (optional)">
           <Text style={[typography.small, { paddingHorizontal: spacing.lg, marginBottom: spacing.xs }]}>
             {recipes.length ? 'Press and hold a recipe, then drag it onto a meal' : 'Add recipes in the Recipes tab to plan with them'}
           </Text>
@@ -287,7 +367,8 @@ function PlanContent() {
               <DraggableChip key={r.id} recipe={r} dragX={dragX} dragY={dragY} handlers={handlers} />
             ))}
           </GHScrollView>
-        </View>
+          </Disclosure>
+        </View> : null}
       </SafeAreaView>
 
       {dragging ? (
@@ -296,24 +377,7 @@ function PlanContent() {
         </Animated.View>
       ) : null}
 
-      <Modal visible={picker !== null} animationType="slide" transparent onRequestClose={() => setPicker(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.3)' }} onPress={() => setPicker(null)} />
-        <SafeAreaView edges={['bottom', 'left', 'right']} style={{ width: '100%', maxWidth: layout.formMaxWidth, alignSelf: 'center', backgroundColor: colors.background, maxHeight: '80%', padding: spacing.lg, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg }}>
-          <Text style={[typography.heading, { marginBottom: spacing.md }]}>Choose a recipe</Text>
-          <GHScrollView>
-            {recipes.length === 0 ? <Empty icon="restaurant-outline" text="No recipes yet." /> : null}
-            {recipes.map((r) => (
-              <Pressable key={r.id} onPress={() => { addEntry(r.id, picker!); setPicker(null); }}>
-                <Card style={{ padding: spacing.md }}>
-                  <Text style={typography.body}>{r.title}</Text>
-                  <Text style={typography.small}>{(perServing.get(r.id)?.counted ?? 0) > 0 ? `${Math.round(perServing.get(r.id)!.perServing.calories)} kcal per serving` : 'No nutrition yet'}</Text>
-                </Card>
-              </Pressable>
-            ))}
-          </GHScrollView>
-          <Button title="Cancel" variant="ghost" onPress={() => setPicker(null)} />
-        </SafeAreaView>
-      </Modal>
+      <PlanRecipePicker visible={picker !== null} recipes={recipes} mealLabel={MEALS.find((m) => m.key === picker)?.label ?? 'meal'} onClose={() => setPicker(null)} onAdd={addChoice} />
     </View>
   );
 }

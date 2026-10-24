@@ -1,13 +1,14 @@
 import { Link, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Body, Button, Card, CardGrid, Chip, ChipRow, Heading, Screen, TextField } from '../../src/components/ui';
+import { RecipeSourceNav } from '../../src/components/RecipeSourceNav';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { setDraft } from '../../src/lib/recipes/draft';
 import { filterLibraryRecipes, libraryIngredientText, libraryRecipeSummary, RECIPE_CUISINES, RECIPE_MEAL_TYPES, STARTER_RECIPES, starterRecipeDraft, type RecipeCuisine, type RecipeMealType } from '../../src/lib/recipes/library';
 import { LIBRARY_FOODS } from '../../src/lib/recipes/libraryFoods';
 import { CUISINE_REFERENCES } from '../../src/lib/recipes/libraryReferences';
-import { spacing, typography } from '../../src/theme';
+import { colors, radius, spacing, typography } from '../../src/theme';
 
 export default function RecipeLibrary() {
   const router = useRouter();
@@ -17,29 +18,26 @@ export default function RecipeLibrary() {
   const [visibleCount, setVisibleCount] = useState(12);
   const [about, setAbout] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const recipes = useMemo(() => filterLibraryRecipes({ meal, cuisine, search }), [meal, cuisine, search]);
   function reset() {
     setMeal(null); setCuisine(null); setSearch(''); setExpanded(null); setVisibleCount(12);
   }
   return (
     <Screen>
-      <Heading>Simple ideas for every meal</Heading>
-      <Body muted>{STARTER_RECIPES.length} original Buko recipes with pre-matched nutrition. Browse by meal and cuisine, or choose Everyday for general combinations. All library originals have an estimated Excellent score. Check ingredients for allergies and preferences.</Body>
-      <View style={{ height: spacing.lg }} />
+      <RecipeSourceNav active="library" />
+      <Heading>Find a recipe</Heading>
+      <Body muted>{STARTER_RECIPES.length} original Buko recipes. Estimated scores are not personal suitability advice.</Body>
       <TextField label="Search recipes or ingredients" placeholder="Try chicken, lentils or tofu" value={search} onChangeText={(value) => { setSearch(value); setVisibleCount(12); setExpanded(null); }} autoCorrect={false} />
-      <Text style={typography.subheading}>Meal type</Text>
-      <ChipRow>
-        <Chip label="All meals" selected={!meal} onPress={() => { setMeal(null); setVisibleCount(12); setExpanded(null); }} />
-        {RECIPE_MEAL_TYPES.map((type) => <Chip key={type} label={type} selected={meal === type} onPress={() => { setMeal(type); setVisibleCount(12); setExpanded(null); }} />)}
-      </ChipRow>
-      <Text style={[typography.subheading, { marginTop: spacing.md }]}>Cuisine</Text>
-      <ChipRow>
-        <Chip label="All cuisines" selected={!cuisine} onPress={() => { setCuisine(null); setVisibleCount(12); setExpanded(null); }} />
-        {RECIPE_CUISINES.map((type) => <Chip key={type} label={type} selected={cuisine === type} onPress={() => { setCuisine(type); setVisibleCount(12); setExpanded(null); }} />)}
-      </ChipRow>
-      <View style={{ height: spacing.lg }} />
-      <Body>{recipes.length} recipe{recipes.length === 1 ? '' : 's'} found{meal ? ` · ${meal}` : ''}{cuisine ? ` · ${cuisine}` : ''}</Body>
-      {meal || cuisine || search ? <Button title="Clear filters" variant="ghost" onPress={reset} /> : null}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
+        <Body>{recipes.length} found</Body>
+        <Button title={`Filters${meal || cuisine ? ' (1+)' : ''}`} variant="secondary" onPress={() => setShowFilters(true)} />
+      </View>
+      {meal || cuisine ? <ChipRow>
+        {meal ? <Chip label={`${meal} ×`} selected onPress={() => { setMeal(null); setVisibleCount(12); setExpanded(null); }} /> : null}
+        {cuisine ? <Chip label={`${cuisine} ×`} selected onPress={() => { setCuisine(null); setVisibleCount(12); setExpanded(null); }} /> : null}
+        <Chip label="Clear" onPress={reset} />
+      </ChipRow> : null}
       <Button title={about ? 'Hide score & preparation notes' : 'About scores & preparation'} variant="ghost" onPress={() => setAbout(!about)} />
       {about ? <Card>
         <Body>Scores are out of 100; Excellent starts at 75. Every unmodified library recipe meets that threshold under Buko&apos;s unchanged scoring model. Scores do not rank cultures or guarantee personal dietary suitability.</Body>
@@ -78,7 +76,7 @@ export default function RecipeLibrary() {
                 {recipe.steps.map((text, index) => <Text key={text} style={[typography.body, { marginBottom: spacing.sm }]}>{index + 1}. {text}</Text>)}
               </View>
             ) : null}
-            <Button title={`Use ${recipe.title}`} onPress={() => {
+            <Button title="Save a copy" onPress={() => {
               setDraft(starterRecipeDraft(recipe));
               router.push('/recipe/edit');
             }} />
@@ -88,7 +86,30 @@ export default function RecipeLibrary() {
       </CardGrid>
       {visibleCount < recipes.length ? <Button title={`Show more recipes (${recipes.length - visibleCount} remaining)`} variant="secondary" onPress={() => setVisibleCount((count) => count + 12)} /> : null}
       <Body muted>Keep perishable foods refrigerated. Cool cooked rice and grains promptly and refrigerate; reheat until steaming hot. Use separate utensils for raw meat and check the cooking temperatures in each recipe.</Body>
-      <Body muted>Use opens a private editable draft. Nothing is added to your recipe book until you tap Save recipe.</Body>
+      <Body muted>Save a copy opens a private, editable recipe. It is added to My recipes only when you save it.</Body>
+      <Modal transparent visible={showFilters} animationType="slide" onRequestClose={() => setShowFilters(false)}>
+        <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
+          <Pressable accessibilityLabel="Close filters" onPress={() => setShowFilters(false)} style={{ flex: 1 }} />
+          <View style={{ maxHeight: '78%', backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg }}>
+            <ScrollView keyboardShouldPersistTaps="handled">
+              <Heading>Filter recipes</Heading>
+              <Text style={[typography.subheading, { marginTop: spacing.md }]}>Meal</Text>
+              <ChipRow>
+                <Chip label="All meals" selected={!meal} onPress={() => { setMeal(null); setVisibleCount(12); }} />
+                {RECIPE_MEAL_TYPES.map((type) => <Chip key={type} label={type} selected={meal === type} onPress={() => { setMeal(type); setVisibleCount(12); }} />)}
+              </ChipRow>
+              <Text style={[typography.subheading, { marginTop: spacing.md }]}>Cuisine</Text>
+              <ChipRow>
+                <Chip label="All cuisines" selected={!cuisine} onPress={() => { setCuisine(null); setVisibleCount(12); }} />
+                {RECIPE_CUISINES.map((type) => <Chip key={type} label={type} selected={cuisine === type} onPress={() => { setCuisine(type); setVisibleCount(12); }} />)}
+              </ChipRow>
+              <View style={{ height: spacing.md }} />
+              <Button title="Show recipes" onPress={() => setShowFilters(false)} />
+              <Button title="Clear filters" variant="ghost" onPress={reset} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </Screen>
   );
 }
