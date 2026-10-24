@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from '@jest/globals';
+import { describe, expect, test } from '@jest/globals';
 import {
   addLocalDays,
   assertDateString,
@@ -8,15 +8,7 @@ import {
 } from './dates';
 
 describe('local calendar date boundaries', () => {
-  const priorTimezone = process.env.TZ;
-
-  afterEach(() => {
-    if (priorTimezone === undefined) delete process.env.TZ;
-    else process.env.TZ = priorTimezone;
-  });
-
   test('calendar-day addition stays on local midnight across daylight-saving transitions', () => {
-    process.env.TZ = 'America/Los_Angeles';
     const beforeSpringShift = parseLocalDate('2026-03-08');
     const afterSpringShift = parseLocalDate(addLocalDays('2026-03-08', 1));
     expect(formatLocalDate(afterSpringShift)).toBe('2026-03-09');

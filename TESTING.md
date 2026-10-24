@@ -17,3 +17,6 @@ it.
 GitHub Actions runs `npm ci` and `npm run verify` with Node 24 for pull requests
 and manual test runs. The main-branch web deployment workflow also runs this
 verification gate before exporting the app.
+
+Jest's configuration sets `America/Los_Angeles` before starting workers so DST
+tests exercise 23- and 25-hour days consistently, even on UTC CI machines.
