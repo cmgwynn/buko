@@ -2,9 +2,9 @@
 
 Scan products, rate them, track what you eat. See [PROJECT.md](./PROJECT.md) for the vision, phase plan and decisions log.
 
-Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records current app IDs, proposed listing text, account/health declarations and unresolved release blockers; Buko is not yet marked ready for public launch.
+Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records app IDs, listing text, account/health declarations and independent device/store acceptance work.
 
-Latest Phase 5 validation report: 174 tests across 31 suites, typecheck, five Deno entry-point checks, and web/native JavaScript exports pass. Synthetic browser checks cover selected account export/deletion, diagnostics, legal-link and staged premium flows; export Blob/anchor construction was confirmed but actual OS file-save was not. This does not verify deployed Phase 5 backend changes, App Store/Google Play billing, or signed native builds/devices.
+Phases 1-5 are complete and live with subscriptions according to the owner, who also verified account export and deletion. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks. Phase 6 is built and locally verified; the owner confirmed successful application of migration `0012` on 2026-10-24.
 
 Phase 1 includes: email sign-up and onboarding with calorie/macro targets, a barcode scanner with an explainable 0–100 health score and better-product suggestions, a food diary with daily dashboard, and a grocery list.
 
@@ -172,7 +172,20 @@ Before public release, Apple and Google each require a published privacy policy,
 
 ## Scripts
 - `npm run typecheck` – TypeScript check
-- `npm test` - scoring, targets, recipes, browser barcode decoding, coach facts/safety/handler and PostgreSQL authorization/quota/action tests
+- `npm test` - both the existing Node logic/PostgreSQL tests and Jest/React Native component tests
+- `npm run test:unit` - Node logic and PostgreSQL authorization/transaction tests
+- `npm run test:components` - Jest/React Native Testing Library tests
+- `npm run verify` - both test runners followed by TypeScript
+
+See [TESTING.md](./TESTING.md) for focused commands and test conventions. Run the tests before reporting any phase complete.
+
+## Phase 6: dates and diary shortcuts
+- Verification: 289 Node tests and 43 Jest tests pass, plus TypeScript and production web/iOS/Android JavaScript exports. Browser visual checks, native gesture/screen-reader acceptance and live migration application are not implied by these results.
+- Diary, Plan and Train share one account-scoped selected date. Diary/Plan show a Monday-start week strip, day arrows and a month/year calendar picker. Swipe the strip to change weeks and main content to change days; buttons provide keyboard/screen-reader alternatives. Today returns to the current local day. Browsing history does not backdate a live workout.
+- Calendar dots mark dates with logged food or workouts (not planned meals). Queries cover the visible calendar range only. Shared dates use local calendar arithmetic rather than UTC day slicing.
+- Diary offers confirmed duplicate-aware copying of yesterday's meals and whole days. Long press a food, or open its labeled actions, to favorite, move or copy it to a different meal/date. Copies retain nutrition/portion snapshots, append rather than replace and do not copy health-app links. Retrying the same transfer request cannot create another batch.
+- Food favorites sync across devices, separately from device-local recipe favorites. Find them beside Recent in food search. Diary history search searches only your own saved food names/brands, literally (including `%` and `_`), newest date first, with pagination, View day and Log again.
+- **Before deploying Phase 6:** run [0012_diary_navigation.sql](./supabase/migrations/0012_diary_navigation.sql) once in Supabase SQL Editor after migrations through `0011`. It adds owner-only food favorites, transfer receipts, atomic move/copy operations and bounded history search. Favorites/receipts cascade with account deletion; favorites are included by account export's user-table discovery. SQL tabs may be closed after success. No Edge Function redeployment is needed for this migration. A failed migration must be resolved before deploying; GitHub Pages never applies SQL.
 
 ## Tuning the health score
 All weights, thresholds, flagged additives and source citations live in [`src/lib/scoring/config.ts`](./src/lib/scoring/config.ts). Each factor's logic is in `factors.ts`. Change a number, run `npm test`, and the app picks it up. Scores are never stored, so there is nothing to migrate.

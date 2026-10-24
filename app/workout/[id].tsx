@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { Button, Card, Loading, Notice, Screen } from '../../src/components/ui';
 import { distanceUnit, toDisplayDistance, toDisplayWeight, weightUnit } from '../../src/lib/fitness/format';
 import { deleteWorkout } from '../../src/lib/fitness/data';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 import { startSession, useWorkoutSession } from '../../src/lib/fitness/session';
 import type { Exercise, WorkoutSet } from '../../src/lib/fitness/types';
 import { removeWorkoutFromHealth } from '../../src/lib/health';
@@ -68,6 +69,7 @@ export default function WorkoutDetail() {
     setError(null);
     try {
       await deleteWorkout(w.id);
+      invalidateDateHistory();
       void removeWorkoutFromHealth(w.exported_external_id).catch((err) => console.warn('Could not remove the workout copy from Health:', err));
       router.dismissTo('/(tabs)/train');
     } catch (err) {

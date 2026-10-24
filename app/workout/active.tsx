@@ -8,6 +8,7 @@ import { RecoveryNotice } from '../../src/components/RecoveryNotice';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { estimateCalories, estimateStrengthMinutes, newRecordsFor, type DatedSet } from '../../src/lib/fitness/calc';
 import { exerciseHistory, saveRoutine, saveWorkout } from '../../src/lib/fitness/data';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 import {
   distanceUnit, formatDuration, fromDisplayDistance, fromDisplayWeight, parseNum, toDisplayDistance, toDisplayWeight, weightUnit,
 } from '../../src/lib/fitness/format';
@@ -154,6 +155,7 @@ export default function ActiveWorkout() {
       const sum = summary();
       await prepareWorkoutSave();
       const id = await saveWorkout(auth.user.id, w, { durationMin: sum.duration, calories: sum.calories || null, caloriesEstimated: true });
+      invalidateDateHistory();
       if (workoutSessionStore.getAccount() !== auth.user.id || getSession() !== w) return;
       await endSession();
       const completed = getSession();

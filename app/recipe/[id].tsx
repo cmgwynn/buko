@@ -8,7 +8,7 @@ import { RecipeImage } from '../../src/components/RecipeImage';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Label, Loading, Notice, Screen } from '../../src/components/ui';
-import { addDays, defaultMeal, MEALS, toDateString } from '../../src/lib/diary';
+import { addDays, defaultMeal, MEALS } from '../../src/lib/diary';
 import { getFavoriteRecipeIds, getRecentlyCookedRecipes, recordRecipeCooked, setRecipeFavorite } from '../../src/lib/recipes/activityClient';
 import { deleteRecipe, draftFromFull, loadRecipe, type RecipeFull } from '../../src/lib/recipes/db';
 import { setDraft } from '../../src/lib/recipes/draft';
@@ -16,6 +16,7 @@ import { computeRecipeNutrition, recipeNutritionMessage, scoreRecipe } from '../
 import { formatQuantity, scaleQuantity } from '../../src/lib/recipes/units';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { useBilling } from '../../src/providers/BillingProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
@@ -27,13 +28,14 @@ export default function RecipeScreen() {
   const router = useRouter();
   const confirm = useConfirm();
   const { session } = useAuth();
+  const { selectedDate, setSelectedDate } = useSelectedDate();
   const billing = useBilling();
   const [full, setFull] = useState<RecipeFull | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
   const [servings, setServings] = useState<number | null>(null);
   const [planning, setPlanning] = useState(false);
-  const [planDate, setPlanDate] = useState(toDateString(new Date()));
+  const [planDate, setPlanDate] = useState(selectedDate);
   const [planMeal, setPlanMeal] = useState<Meal>(defaultMeal());
   const [planned, setPlanned] = useState(false);
   const [favorite, setFavorite] = useState(false);
@@ -128,12 +130,13 @@ export default function RecipeScreen() {
     });
     if (e) setError(e.message);
     else {
+      setSelectedDate(planDate);
       setPlanned(true);
       setPlanning(false);
     }
   }
 
-  const days = Array.from({ length: 14 }, (_, k) => addDays(toDateString(new Date()), k));
+  const days = Array.from({ length: 14 }, (_, k) => addDays(selectedDate, k));
 
   return (
     <Screen edges={[]}>

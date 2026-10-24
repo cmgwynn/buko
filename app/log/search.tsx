@@ -18,10 +18,16 @@ import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Food, FoodLogEntry, Meal } from '../../src/types';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
+import { favoriteFood, type FoodFavorite } from '../../src/lib/diaryActions';
+import { diaryRpc, loadFoodFavorites } from '../../src/lib/diaryActionsClient';
+import { isDateString } from '../../src/lib/dates';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 
 const FILTERS: { key: SearchFilter; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'recent', label: 'Recent' },
+  { key: 'favorites', label: 'Favorites' },
   { key: 'whole', label: 'Whole foods' },
   { key: 'packaged', label: 'Packaged' },
   { key: 'recipes', label: 'Recipes' },
@@ -56,7 +62,8 @@ export default function SearchFood() {
   const router = useRouter();
   const { session } = useAuth();
   const params = useLocalSearchParams<{ meal?: string; date?: string; filter?: string }>();
-  const date = params.date ?? toDateString(new Date());
+  const { selectedDate } = useSelectedDate();
+  const date = params.date ?? selectedDate;
   const initialFilter = FILTERS.find((f) => f.key === params.filter)?.key ?? 'all';
   const [filter, setFilter] = useState<SearchFilter>(initialFilter);
   const [query, setQuery] = useState('');
@@ -66,6 +73,9 @@ export default function SearchFood() {
   const [errors, setErrors] = useState<string[]>([]);
   const [recent, setRecent] = useState<RecentFood[] | null>(null);
   const [recentError, setRecentError] = useState<string | null>(null);
+  const [favorites, setFavorites] = useState<FoodFavorite[] | null>(null);
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const [removingFavorite, setRemovingFavorite] = useState<string | null>(null);
   const [recipes, setRecipes] = useState<RecipeWithNutrition[] | null>(null);
   const [recipeError, setRecipeError] = useState<string | null>(null);
   const [selecting, setSelecting] = useState(false);
@@ -80,6 +90,8 @@ export default function SearchFood() {
   useFocusEffect(
     useCallback(() => {
       let active = true;
+      loadFoodFavorites().then((rows) => { if (active) { setFavorites(rows); setFavoriteError(null); } })
+        .catch((e: Error) => { if (active) setFavoriteError(e.message); });
       supabase.from('food_log_entries').select('*').order('created_at', { ascending: false }).limit(150).then(({ data, error }) => {
         if (!active) return;
         if (error) setRecentError(`Could not load recent foods: ${error.message}`);
@@ -157,6 +169,18 @@ export default function SearchFood() {
   const recipeList = (recipes ?? []).filter((r) => !q || matchesQuery(r.title, q));
   const recentShown = filter === 'all' && q ? recentList.slice(0, 5) : recentList;
   const recipeShown = filter === 'all' ? (q ? recipeList.slice(0, 5) : []) : recipeList;
+  const favoriteList = (favorites ?? []).map((row) => ({ row, rebuilt: favoriteFood(row) }))
+    .filter(({ rebuilt }) => rebuilt && (!q || matchesQuery(`${rebuilt.food.name} ${rebuilt.food.brand ?? ''}`, q)));
+
+  async function removeFavorite(id: string) {
+    if (!session || removingFavorite) return;
+    setRemovingFavorite(id); setFavoriteError(null);
+    try {
+      await diaryRpc('diary_remove_favorite', { p_id: id, p_expected_user_id: session.user.id });
+      setFavorites((rows) => rows?.filter((row) => row.id !== id) ?? []);
+    } catch (e) { setFavoriteError(e instanceof Error ? e.message : 'Could not remove this favorite.'); }
+    finally { setRemovingFavorite(null); }
+  }
 
   function toggle(r: RecentFood) {
     setSelected((s) => {
@@ -172,6 +196,7 @@ export default function SearchFood() {
 
   async function addSelected() {
     if (!session || !selectedFoods.length) return;
+    if (!isDateString(date) || date > toDateString(new Date())) { setAddError('Choose a valid past or current diary date. Use Plan for future meals.'); return; }
     const rows: EntryInsert[] = [];
     for (const r of selectedFoods) {
       const built = buildEntryInsert(r.food, { userId: session.user.id, date, meal, amount: selected[r.key], unit: r.last.unit });
@@ -187,13 +212,15 @@ export default function SearchFood() {
       return;
     }
     for (const { id } of (data as { id: string }[]) ?? []) maybeWriteNutrition(id);
+    invalidateDateHistory();
     router.navigate({ pathname: '/(tabs)', params: { date } });
   }
 
   const remoteHeading = (title: string) => <><View style={{ height: spacing.sm }} /><Heading>{title}</Heading><View style={{ height: spacing.md }} /></>;
   const noResults = !loading && searchedQ !== null && !errors.length
     && (!show.whole || !remote?.whole?.length) && (!show.packaged || !remote?.packaged?.length)
-    && (!show.recent || !recentList.length) && (!show.recipes || !recipeList.length);
+    && (!show.recent || !recentList.length) && (!show.recipes || !recipeList.length)
+    && (!(filter === 'all' || filter === 'favorites') || !favoriteList.length);
 
   return (
     <Screen edges={[]}>
@@ -246,6 +273,20 @@ export default function SearchFood() {
 
       {loading ? <View style={{ flexDirection: 'row', alignItems: 'center', margin: spacing.md }}><ActivityIndicator color={colors.primary} /><Text style={[typography.small, { marginLeft: spacing.sm }]}>Searching…</Text></View> : null}
       {errors.map((e) => <Notice key={e} tone="danger">{e}</Notice>)}
+      {filter === 'all' || filter === 'favorites' ? <View>
+        <Heading>Favorite foods</Heading>
+        <Text style={[typography.small, { marginVertical: spacing.sm }]}>Long press logged food in Diary (or open its actions) to save a favorite. Favorites sync across your devices.</Text>
+        {favoriteError ? <Notice tone="danger">{favoriteError}</Notice> : null}
+        {favorites === null && !favoriteError ? <ActivityIndicator color={colors.primary} /> : null}
+        {favorites?.length === 0 ? <Empty icon="heart-outline" text="Your favorite foods will appear here alongside recents." /> : null}
+        {favorites?.length && !favoriteList.length ? <Text style={typography.small}>No favorites match your search.</Text> : null}
+        {(filter === 'all' ? favoriteList.slice(0, 5) : favoriteList).map(({ row, rebuilt }) => rebuilt ? <View key={row.id}>
+          <Row title={rebuilt.food.name} subtitle={`Saved portion: ${Math.round(rebuilt.lastGrams)} g`} label={`Log favorite ${rebuilt.food.name}`}
+            onPress={() => pick(rebuilt.food, { amount: String(rebuilt.last.quantity), unit: rebuilt.last.unit })} />
+          <Button title={`Unfavorite ${rebuilt.food.name}`} variant="ghost" disabled={removingFavorite !== null} onPress={() => { void removeFavorite(row.id); }} />
+        </View> : null)}
+        {filter === 'all' && favoriteList.length > 5 ? <Button title="Show all favorites" variant="ghost" onPress={() => chooseFilter('favorites')} /> : null}
+      </View> : null}
 
       {show.recent ? (
         <>

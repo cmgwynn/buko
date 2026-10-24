@@ -1,14 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState, type ComponentProps } from 'react';
+import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
 import { CoachDiaryPanel } from '../../src/components/CoachDiaryPanel';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, CardGrid, Heading, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, CardGrid, Notice, Screen } from '../../src/components/ui';
 import { addDays, defaultMeal, formatDay, MEALS, toDateString } from '../../src/lib/diary';
-import { copyEntryRows, planMealCopy, restoreEntryRow, sumEntries } from '../../src/lib/foodLogging';
+import { planMealCopy, restoreEntryRow, sumEntries } from '../../src/lib/foodLogging';
 import { activityAdjustedTargets } from '../../src/lib/fitness/calc';
 import { loadBurnedForDay } from '../../src/lib/fitness/data';
 import { loadActivityForDay, maybeWriteNutrition, removeNutritionFromHealth, syncIfDue, type HealthRemoval } from '../../src/lib/health';
@@ -21,10 +21,20 @@ import { useProfile } from '../../src/providers/ProfileProvider';
 import { useSettings } from '../../src/providers/SettingsProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { FoodLogEntry, Meal } from '../../src/types';
+import { randomUUID } from 'expo-crypto';
+import { diaryRpc, mirrorDiaryTransfer } from '../../src/lib/diaryActionsClient';
+import type { DiaryTransferResult } from '../../src/lib/diaryActions';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
+import { isDateString } from '../../src/lib/dates';
+import { DateNavigator } from '../../src/components/date/DateNavigator';
+import { DaySwipe } from '../../src/components/date/DaySwipe';
+import { DiaryHistorySearch } from '../../src/components/diary/DiaryHistorySearch';
+import { EntryActionsSheet } from '../../src/components/diary/EntryActionsSheet';
+import { DiaryTransferSheet, type TransferSelection } from '../../src/components/diary/DiaryTransferSheet';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 
 type IconName = ComponentProps<typeof Ionicons>['name'];
 const mealLabel = (m: Meal) => MEALS.find((x) => x.key === m)!.label;
-const isDateString = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
 
 /** Four ways to add to a meal: Search, Scan, Recipes, Recent. */
 function AddOptions({ onPick }: { onPick(target: 'search' | 'scan' | 'recipes' | 'recent'): void }) {
@@ -56,15 +66,18 @@ export default function Diary() {
   const router = useRouter();
   const confirm = useConfirm();
   const params = useLocalSearchParams<{ date?: string }>();
-  const { targets: baseTargets, profile, age, today, birthdayError } = useProfile();
+  const { targets: baseTargets, profile, age, birthdayError } = useProfile();
+  const { selectedDate: date, setSelectedDate: setDate, today } = useSelectedDate();
   const { settings } = useSettings();
   const [burned, setBurned] = useState(0);
   const { session } = useAuth();
-  const [planned, setPlanned] = useState<MealPlanEntry[]>([]);
+  const [loadedPlans, setPlanned] = useState<MealPlanEntry[]>([]);
   const [recipes, setRecipes] = useState<RecipeWithNutrition[]>([]);
-  const [date, setDate] = useState(toDateString(new Date()));
-  const [entries, setEntries] = useState<FoodLogEntry[]>([]);
+  const [loadedEntries, setEntries] = useState<FoodLogEntry[]>([]);
+  const entries = loadedEntries.filter((entry) => entry.logged_on === date && entry.user_id === session?.user.id);
+  const planned = loadedPlans.filter((entry) => entry.planned_on === date && entry.user_id === session?.user.id);
   const [error, setError] = useState<string | null>(null);
+  const [routeError, setRouteError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [details, setDetails] = useState(false);
@@ -74,10 +87,19 @@ export default function Diary() {
   const [menuFor, setMenuFor] = useState<Meal | null>(null);
   const [undo, setUndo] = useState<{ entry: FoodLogEntry; removal: Promise<HealthRemoval> } | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [actionEntry, setActionEntry] = useState<FoodLogEntry | null>(null);
+  const [transfer, setTransfer] = useState<TransferSelection | null>(null);
+  const loadVersion = useRef(0);
+  const viewKey = `${session?.user.id ?? ''}:${date}`;
+  const activeView = useRef(viewKey);
+  activeView.current = viewKey;
 
   useEffect(() => {
-    if (isDateString(params.date) && params.date <= toDateString(new Date())) setDate(params.date);
-  }, [params.date]);
+    if (!params.date) return;
+    if (isDateString(params.date)) { setDate(params.date); setRouteError(null); }
+    else setRouteError('The requested diary date is invalid. Your selected day was kept.');
+    router.setParams({ date: undefined });
+  }, [params.date, router, setDate]);
 
   useEffect(() => {
     setActionError(null);
@@ -85,14 +107,19 @@ export default function Diary() {
     setAddFor(null);
     setMenuFor(null);
     setUndo(null);
+    setActionEntry(null);
   }, [date]);
 
   const load = useCallback(async () => {
+    if (activeView.current !== viewKey || !session) return;
+    const version = ++loadVersion.current;
+    setEntries([]); setPlanned([]); setBurned(0);
     const [log, plan, rec] = await Promise.all([
       supabase.from('food_log_entries').select('*').eq('logged_on', date).order('created_at'),
       supabase.from('meal_plan_entries').select('*').eq('planned_on', date).is('logged_at', null).order('created_at'),
       supabase.from('recipes').select('*, recipe_ingredients(grams, nutrition)'),
     ]);
+    if (version !== loadVersion.current || activeView.current !== viewKey) return;
     if (log.error) setError(`Could not load your diary: ${log.error.message}`);
     else {
       setError(null);
@@ -101,15 +128,17 @@ export default function Diary() {
     if (settings?.activity_adjust) {
       // Prefer the health app's active-energy total for the day; otherwise count workouts logged in Buko.
       const act = await loadActivityForDay(date);
-      setBurned(act?.active_kcal != null ? Number(act.active_kcal) : await loadBurnedForDay(date));
+      const energy = act?.active_kcal != null ? Number(act.active_kcal) : await loadBurnedForDay(date);
+      if (version !== loadVersion.current || activeView.current !== viewKey) return;
+      setBurned(energy);
     } else {
       setBurned(0);
     }
     if (!plan.error && !rec.error) {
       setPlanned(plan.data as MealPlanEntry[]);
       setRecipes(rec.data as RecipeWithNutrition[]);
-    }
-  }, [date, settings?.activity_adjust]);
+    } else setError(`Could not load your planned meals: ${plan.error?.message ?? rec.error?.message}`);
+  }, [date, settings?.activity_adjust, session, viewKey]);
 
   useFocusEffect(
     useCallback(() => {
@@ -119,6 +148,7 @@ export default function Diary() {
           if (did) load();
         });
       }
+      return () => { loadVersion.current++; };
     }, [load, session, settings]),
   );
 
@@ -146,6 +176,7 @@ export default function Diary() {
     setNotice(null);
     const removal = removeNutritionFromHealth(entry.health_external_id ?? null);
     setUndo({ entry, removal });
+    invalidateDateHistory();
     load();
     if (await removal === 'failed') setNotice(`${entry.name} was removed from Buko, but its copy in your health app couldn't be removed. Delete it there if needed.`);
   }
@@ -172,6 +203,7 @@ export default function Diary() {
     setActionError(null);
     setNotice(null);
     if (!keepLink) maybeWriteNutrition((data as { id: string }).id);
+    invalidateDateHistory();
     load();
   }
 
@@ -222,42 +254,36 @@ export default function Diary() {
       setCopying(null);
       return;
     }
-    const { data: inserted, error: insertError } = await supabase
-      .from('food_log_entries')
-      .insert(copyEntryRows(toAdd, { userId: session.user.id, date, meal }))
-      .select('id');
-    setCopying(null);
-    if (insertError) {
-      setActionError(`Nothing was copied: ${insertError.message}`);
-      return;
-    }
-    for (const { id } of (inserted as { id: string }[]) ?? []) maybeWriteNutrition(id);
-    load();
+    try {
+      const result = await diaryRpc<DiaryTransferResult>('diary_transfer', {
+        p_request_id: randomUUID(), p_expected_user_id: session.user.id, p_mode: 'meal',
+        p_target_date: date, p_today: toDateString(new Date()), p_entry: null, p_source_date: from, p_target_meal: meal,
+      });
+      const warning = await mirrorDiaryTransfer(result);
+      invalidateDateHistory();
+      setNotice(`${result.changed} food${result.changed === 1 ? '' : 's'} copied. ${result.skipped} matching portion${result.skipped === 1 ? '' : 's'} skipped.${warning ? ` ${warning}` : ''}`);
+      void load();
+    } catch (e) { setActionError(`Could not copy this meal: ${e instanceof Error ? e.message : 'Please retry.'}`); }
+    finally { setCopying(null); }
   }
 
   function openAdd(meal: Meal, target: 'search' | 'scan' | 'recipes' | 'recent') {
+    if (date > today) { setActionError('Use Plan for future meals. Completed food can be logged on today or an earlier date.'); return; }
     setAddFor(null);
     if (target === 'scan') router.push({ pathname: '/log/scan', params: { meal, date } });
     else if (target === 'recipes') router.push({ pathname: '/log/recipes', params: { meal, date } });
     else router.push({ pathname: '/log/search', params: { meal, date, filter: target === 'recent' ? 'recent' : 'all' } });
   }
 
-  const isToday = date === toDateString(new Date());
   const pct = (v: number, t: number) => (t > 0 ? `${Math.round(v)}/${Math.round(t)} g` : `${Math.round(v)} g`);
 
   return (
-    <Screen>
+    <DaySwipe><Screen>
       <TabHeader title="Diary" />
       {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.md }}>
-        <Pressable onPress={() => setDate(addDays(date, -1))} hitSlop={12} accessibilityRole="button" accessibilityLabel="Previous day">
-          <Ionicons name="chevron-back" size={24} color={colors.primary} />
-        </Pressable>
-        <Heading>{formatDay(date)}</Heading>
-        <Pressable onPress={() => setDate(addDays(date, 1))} disabled={isToday} hitSlop={12} accessibilityRole="button" accessibilityLabel="Next day" accessibilityState={{ disabled: isToday }} aria-disabled={isToday} style={{ opacity: isToday ? 0.25 : 1 }}>
-          <Ionicons name="chevron-forward" size={24} color={colors.primary} />
-        </Pressable>
-      </View>
+      <DateNavigator />
+      {routeError ? <View><Notice tone="danger">{routeError}</Notice><Button title="Dismiss date warning" variant="ghost" onPress={() => setRouteError(null)} /></View> : null}
+      {date > today ? <Notice tone="info">Future date: use Plan to schedule meals. Log completed meals on today or an earlier date.</Notice> : null}
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
@@ -327,6 +353,8 @@ export default function Diary() {
       ) : null}
       <View style={{ height: spacing.md }} />
 
+      <DiaryHistorySearch key={session?.user.id} />
+      {entries.length ? <Button title="Copy this day to another date" variant="ghost" icon="copy-outline" onPress={() => setTransfer({ mode: 'day', sourceDate: date })} /> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {undo ? (
         <View accessibilityLiveRegion="polite" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, marginBottom: spacing.md, borderRadius: radius.md, backgroundColor: colors.text }}>
@@ -396,8 +424,9 @@ export default function Diary() {
               <Pressable
                 key={e.id}
                 onPress={() => router.push({ pathname: '/log/add', params: { entry: e.id } })}
+                onLongPress={() => setActionEntry(e)}
                 accessibilityRole="button"
-                accessibilityHint="Edit amount or meal"
+                accessibilityHint="Tap to edit. Long press for favorites, move or copy."
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, minHeight: 44 }}
               >
                 <View style={{ flex: 1 }}>
@@ -407,7 +436,10 @@ export default function Diary() {
                   </Text>
                 </View>
                 <Text style={typography.body}>{Math.round(e.calories)}</Text>
-                <Pressable onPress={() => confirmDelete(e)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${e.name}`} style={{ marginLeft: spacing.md }}>
+                <Pressable onPress={(event) => { event.stopPropagation(); setActionEntry(e); }} hitSlop={8} accessibilityRole="button" accessibilityLabel={`Actions for ${e.name}`} style={{ marginLeft: spacing.md, minHeight: 44, justifyContent: 'center' }}>
+                  <Ionicons name="ellipsis-horizontal" size={20} color={colors.primary} />
+                </Pressable>
+                <Pressable onPress={(event) => { event.stopPropagation(); void confirmDelete(e); }} hitSlop={10} accessibilityRole="button" accessibilityLabel={`Remove ${e.name}`} style={{ marginLeft: spacing.md }}>
                   <Ionicons name="close-circle-outline" size={20} color={colors.textMuted} />
                 </Pressable>
               </Pressable>
@@ -442,6 +474,8 @@ export default function Diary() {
 
       <View style={{ height: spacing.md }} />
       <CoachDiaryPanel day={date} today={today} targets={targets} />
-    </Screen>
+      <EntryActionsSheet entry={actionEntry} onClose={() => setActionEntry(null)} onTransfer={(mode, entry) => { setActionEntry(null); setTransfer({ mode, entry }); }} />
+      <DiaryTransferSheet selection={transfer} onClose={() => setTransfer(null)} onSaved={(message) => { setNotice(message); void load(); }} />
+    </Screen></DaySwipe>
   );
 }

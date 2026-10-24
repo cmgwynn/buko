@@ -9,11 +9,14 @@ import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Button, Card, Disclosure, Loading, Notice } from '../../src/components/ui';
 import { PlanRecipePicker, type PlanChoice } from '../../src/components/PlanRecipePicker';
+import { DateNavigator } from '../../src/components/date/DateNavigator';
+import { DaySwipe } from '../../src/components/date/DaySwipe';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 import { useConfirm } from '../../src/components/ConfirmProvider';
-import { MEALS, toDateString } from '../../src/lib/diary';
+import { formatDay, MEALS } from '../../src/lib/diary';
 import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
-import { dayStatus, weekDays, weekStart } from '../../src/lib/recipes/week';
+import { mondayOfWeek } from '../../src/lib/dates';
 import { addDays } from '../../src/lib/diary';
 import { logPlanEntry } from '../../src/lib/recipes/logging';
 import { saveRecipe } from '../../src/lib/recipes/db';
@@ -22,14 +25,13 @@ import type { RecipeDraft } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { colors, layout, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
 import { PremiumGate } from '../../src/components/PremiumGate';
 
 type RecipeRow = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'grams' | 'nutrition'>[] };
 type EntryRow = MealPlanEntry;
-
-const STATUS_COLOR = { empty: colors.border, under: colors.score.mediocre, on: colors.score.excellent, over: colors.danger } as const;
 
 export default function Plan() {
   return <PremiumGate feature="Meal planning"><PlanContent /></PremiumGate>;
@@ -39,8 +41,7 @@ function PlanContent() {
   const confirm = useConfirm();
   const { session } = useAuth();
   const { targets } = useProfile();
-  const today = toDateString(new Date());
-  const [selected, setSelected] = useState(today);
+  const { selectedDate: selected, setSelectedDate: setSelected } = useSelectedDate();
   const [recipes, setRecipes] = useState<RecipeRow[]>([]);
   const [entries, setEntries] = useState<EntryRow[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -55,26 +56,33 @@ function PlanContent() {
   const requestVersion = useRef(0);
   const mutation = useRef(false);
 
-  const start = weekStart(selected);
-  const days = weekDays(start);
+  const start = mondayOfWeek(selected);
 
   const load = useCallback(async () => {
     const request = ++requestVersion.current;
-    const [r, e] = await Promise.all([
-      supabase.from('recipes').select('*, recipe_ingredients(grams, nutrition)').order('title'),
-      supabase.from('meal_plan_entries').select('*').gte('planned_on', start).lte('planned_on', addDays(start, 6)).order('created_at'),
-    ]);
-    if (request !== requestVersion.current) return;
-    setLoaded(true);
-    if (r.error || e.error) setError((r.error ?? e.error)!.message);
-    else {
-      setError(null);
-      setRecipes(r.data as RecipeRow[]);
-      setEntries(e.data as EntryRow[]);
+    if (!session) { setRecipes([]); setEntries([]); return; }
+    try {
+      const [r, e] = await Promise.all([
+        supabase.from('recipes').select('*, recipe_ingredients(grams, nutrition)').eq('user_id', session.user.id).order('title'),
+        supabase.from('meal_plan_entries').select('*').eq('user_id', session.user.id).gte('planned_on', start).lte('planned_on', addDays(start, 6)).order('created_at'),
+      ]);
+      if (request !== requestVersion.current) return;
+      if (r.error || e.error) setError((r.error ?? e.error)!.message);
+      else {
+        setError(null);
+        setRecipes(r.data as RecipeRow[]);
+        setEntries(e.data as EntryRow[]);
+      }
+    } catch (err) {
+      if (request === requestVersion.current) setError((err as Error).message);
     }
-  }, [start]);
+    if (request === requestVersion.current) setLoaded(true);
+  }, [session?.user.id, start]);
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
+  useFocusEffect(useCallback(() => {
+    void load();
+    return () => { requestVersion.current += 1; };
+  }, [load]));
 
   // Per-serving nutrition for every recipe, computed once per load.
   const perServing = useMemo(() => {
@@ -111,7 +119,7 @@ function PlanContent() {
     mutation.current = true; setPending(true); setError(null); setMessage(null);
     const err = await logPlanEntry(session.user.id, recipe, entry);
     if (err) setError(err);
-    else { setMessage('Meal logged to Diary.'); await load(); }
+    else { invalidateDateHistory(); setMessage('Meal logged to Diary.'); await load(); }
     mutation.current = false; setPending(false);
   }
 
@@ -243,36 +251,10 @@ function PlanContent() {
               </>
             }
           />
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-            <Pressable accessibilityRole="button" onPress={() => setSelected(addDays(selected, -7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityLabel="Previous week">
-              <Ionicons name="chevron-back" size={22} color={colors.primary} />
-            </Pressable>
-            <Text style={typography.subheading}>
-              {new Date(start + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}
-              {new Date(addDays(start, 6) + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-            </Text>
-            <Pressable accessibilityRole="button" onPress={() => setSelected(addDays(selected, 7))} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }} accessibilityLabel="Next week">
-              <Ionicons name="chevron-forward" size={22} color={colors.primary} />
-            </Pressable>
-          </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
-            {days.map((d) => {
-              const t = dayTotals(d);
-              const st = targets ? dayStatus(t.calories, targets.calories) : 'empty';
-              const isSel = d === selected;
-              const dt = new Date(d + 'T00:00:00');
-              return (
-                <Pressable key={d} accessibilityRole="button" accessibilityState={{ selected: isSel }} aria-selected={isSel} onPress={() => setSelected(d)} accessibilityLabel={dt.toDateString()}
-                  style={{ alignItems: 'center', paddingVertical: 8, flex: 1, maxWidth: 64, borderRadius: radius.md, backgroundColor: isSel ? colors.primary : 'transparent' }}>
-                  <Text style={[typography.small, isSel && { color: colors.onPrimary }]}>{dt.toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
-                  <Text style={[typography.subheading, isSel && { color: colors.onPrimary }, d === today && !isSel && { color: colors.primary }]}>{dt.getDate()}</Text>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 3, backgroundColor: isSel ? colors.onPrimary : STATUS_COLOR[st] }} />
-                </Pressable>
-              );
-            })}
-          </View>
+          <DateNavigator />
         </View>
 
+        <DaySwipe>
         <GHScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.xl }}>
           {error ? <Notice tone="danger">{error}</Notice> : null}
           {error ? <Button title="Retry loading plan" variant="ghost" onPress={() => { void load(); }} /> : null}
@@ -281,7 +263,7 @@ function PlanContent() {
           {!loaded ? <Loading /> : null}
           {targets ? (
             <Card>
-              <Text style={typography.label}>Planned today</Text>
+              <Text style={typography.label}>Planned {formatDay(selected)}</Text>
               <Text style={[typography.body, { marginVertical: spacing.sm }]}>
                 {totals.calories === 0
                   ? 'Nothing planned yet.'
@@ -356,6 +338,7 @@ function PlanContent() {
           </Disclosure>
           <Button title="Generate groceries" icon="cart-outline" variant="secondary" onPress={() => router.push({ pathname: '/grocery/generate', params: { week: start } })} />
         </GHScrollView>
+        </DaySwipe>
 
         {recipes.length ? <View style={{ borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, backgroundColor: colors.surface, paddingTop: spacing.sm, paddingBottom: spacing.sm }}>
           <Disclosure title="Drag saved recipes (optional)">

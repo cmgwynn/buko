@@ -3,31 +3,34 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Body, Button, Card, Chip, ChipRow, Heading, Label, Loading, Notice, Screen } from '../../src/components/ui';
-import { defaultMeal, MEALS, round1, toDateString } from '../../src/lib/diary';
-import { maybeWriteNutrition } from '../../src/lib/health';
+import { defaultMeal, MEALS } from '../../src/lib/diary';
+import { logRecipeServings } from '../../src/lib/recipes/logging';
 import { recordRecipeCooked } from '../../src/lib/recipes/activityClient';
 import { loadRecipe, type RecipeFull } from '../../src/lib/recipes/db';
-import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
+import { computeRecipeNutrition, recipeLoggingError } from '../../src/lib/recipes/nutrition';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 
 const stepBtn = { width: 44, height: 44, borderRadius: radius.pill, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' } as const;
 
 export default function FinishCooking() {
   const router = useRouter();
   const { session } = useAuth();
+  const { selectedDate, setSelectedDate } = useSelectedDate();
   const { id, entry, direct, meal: mealParam, date: dateParam } = useLocalSearchParams<{ id: string; servings?: string; entry?: string; direct?: string; meal?: string; date?: string }>();
   const [full, setFull] = useState<RecipeFull | null>(null);
   const [eaten, setEaten] = useState(1);
   const [meal, setMeal] = useState<Meal>((MEALS.find((m) => m.key === mealParam)?.key ?? defaultMeal()) as Meal);
-  const [date, setDate] = useState(dateParam ?? toDateString(new Date()));
+  const [date, setDate] = useState(dateParam ?? selectedDate);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cooked, setCooked] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [cookedError, setCookedError] = useState<string | null>(null);
   const recordedFor = useRef<string | null>(null);
+  const [logged, setLogged] = useState(false);
 
   // Reaching this screen from cook mode means cooking finished; direct "Log a recipe" is not a cook.
   async function recordCooked() {
@@ -60,38 +63,25 @@ export default function FinishCooking() {
   if (!full || !nutrition) return error ? <Screen><Notice tone="danger">{error}</Notice></Screen> : <Loading />;
 
   const kcal = nutrition.perServing.calories * eaten;
-  const canLog = nutrition.counted > 0;
+  const nutritionError = recipeLoggingError(nutrition, eaten);
+  const canLog = nutritionError === null;
 
   async function log() {
     if (!session || !full || !nutrition) return;
     setBusy(true);
     setError(null);
-    const ps = nutrition.perServing;
-    const { data: inserted, error: e } = await supabase.from('food_log_entries').insert({
-      user_id: session.user.id,
-      logged_on: date,
-      meal,
-      source: 'recipe',
-      source_id: full.recipe.id,
-      name: full.recipe.title,
-      brand: null,
-      quantity: eaten,
-      unit: 'serving',
-      grams: round1(Math.max(1, nutrition.perServingGrams * eaten)),
-      calories: round1(ps.calories * eaten),
-      protein_g: round1(ps.protein_g * eaten),
-      carbs_g: round1(ps.carbs_g * eaten),
-      fat_g: round1(ps.fat_g * eaten),
-    }).select('id').single();
+    const e = await logRecipeServings(session.user.id, { ...full.recipe, recipe_ingredients: full.ingredients }, {
+      date, meal, servings: eaten, planEntryId: entry,
+    });
     if (e) {
-      setError(e.message);
+      setError(e);
+      if (e.startsWith('Your food was logged')) setLogged(true);
       setBusy(false);
       return;
     }
-    maybeWriteNutrition((inserted as { id: string }).id);
-    if (entry) await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', entry);
+    setSelectedDate(date);
     router.dismissAll();
-    router.navigate('/(tabs)');
+    router.navigate({ pathname: '/(tabs)', params: { date } });
   }
 
   return (
@@ -124,12 +114,12 @@ export default function FinishCooking() {
         {MEALS.map((m) => <Chip key={m.key} label={m.label} selected={meal === m.key} onPress={() => setMeal(m.key)} />)}
       </ChipRow>
       <View style={{ height: spacing.lg }} />
-      {!canLog ? <Notice>This recipe has no nutrition data yet, so it can&apos;t be logged. Edit the recipe and match its ingredients first.</Notice> : null}
+      {!canLog ? <Notice>{nutritionError}</Notice> : null}
       {cooked === 'saved' ? <Body muted>Added to your recently cooked recipes.</Body> : null}
       {cooked === 'failed' ? <Notice tone="danger">Couldn&apos;t add this to recently cooked{cookedError ? ` (${cookedError})` : ''}. Logging still works.</Notice> : null}
       {cooked === 'failed' ? <Button title="Retry recently cooked" variant="secondary" onPress={() => void recordCooked()} /> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <Button title="Log to diary" onPress={log} loading={busy} disabled={!canLog} />
+      <Button title={logged ? 'View diary' : 'Log to diary'} onPress={logged ? () => router.navigate({ pathname: '/(tabs)', params: { date } }) : log} loading={busy} disabled={!canLog} />
       {direct ? null : <Button title="Skip logging" variant="ghost" onPress={() => { router.dismissAll(); router.navigate('/(tabs)'); }} />}
     </Screen>
   );

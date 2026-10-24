@@ -13,6 +13,11 @@ import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, spacing, typography } from '../../src/theme';
 import type { Food, FoodLogEntry, Meal } from '../../src/types';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
+import { isDateString } from '../../src/lib/dates';
+import { EntryActionsSheet } from '../../src/components/diary/EntryActionsSheet';
+import { DiaryTransferSheet, type TransferSelection } from '../../src/components/diary/DiaryTransferSheet';
+import { invalidateDateHistory } from '../../src/components/date/dateHistory';
 
 function parseFoodParam(raw: string | undefined): Food | null {
   if (!raw) return null;
@@ -32,6 +37,7 @@ export default function AddEntry() {
   const router = useRouter();
   const confirm = useConfirm();
   const { session } = useAuth();
+  const { selectedDate } = useSelectedDate();
   const params = useLocalSearchParams<{ food?: string; meal?: string; date?: string; entry?: string; amount?: string; unit?: string }>();
   const paramFood = useMemo(() => parseFoodParam(params.food), [params.food]);
   const editing = Boolean(params.entry);
@@ -44,6 +50,10 @@ export default function AddEntry() {
   const [meal, setMeal] = useState<Meal>((MEALS.find((m) => m.key === params.meal)?.key ?? defaultMeal()) as Meal);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [actions, setActions] = useState(false);
+  const [transfer, setTransfer] = useState<TransferSelection | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (editing || !paramFood) return;
@@ -97,7 +107,7 @@ export default function AddEntry() {
   const incomplete = incompleteNutritionMessage(food.per100g);
   const grams = amountToGrams(amount, unit, food);
   const macros = grams === null ? null : completeMacrosForGrams(food.per100g, grams);
-  const date = existing?.logged_on ?? params.date ?? toDateString(new Date());
+  const date = existing?.logged_on ?? params.date ?? selectedDate;
 
   function switchUnit(next: AmountUnit) {
     if (next === unit || !food) return;
@@ -107,28 +117,36 @@ export default function AddEntry() {
   }
 
   async function save() {
-    if (!session || !food) return;
+    if (!session || !food || saved) return;
+    if (!isDateString(date) || date > toDateString(new Date())) return setError('Choose a valid past or current diary date. Use Plan for future meals.');
     const built = buildEntryInsert(food, { userId: session.user.id, date, meal, amount, unit });
     if ('error' in built) return setError(built.error);
     setBusy(true);
     setError(null);
     if (existing) {
       const { user_id: _u, logged_on: _d, source: _s, source_id: _i, name: _n, brand: _b, ...changes } = built.row;
-      const { error: e } = await supabase.from('food_log_entries').update({ ...changes, health_external_id: null }).eq('id', existing.id);
+      const { error: e } = await supabase.from('food_log_entries').update(changes).eq('id', existing.id);
       if (e) {
         setError(`Could not save your changes: ${e.message}`);
         setBusy(false);
         return;
       }
+      setSaved(true);
+      invalidateDateHistory();
       if (existing.health_external_id) {
-        const oldSample = existing.health_external_id;
-        const entryId = existing.id;
-        removeNutritionFromHealth(oldSample).then(async (status) => {
-          // Keep the link if the old sample couldn't be removed, so a later delete retries and no duplicate is written.
-          if (status === 'failed') await supabase.from('food_log_entries').update({ health_external_id: oldSample }).eq('id', entryId);
-          else await maybeWriteNutrition(entryId);
-        });
+        const removal = await removeNutritionFromHealth(existing.health_external_id);
+        if (removal === 'failed') {
+          setStatus('Changes saved in Buko. The old health sample could not be removed; its link is kept and no duplicate was written. Check your health app before exporting again.');
+          setBusy(false); return;
+        }
+        const cleared = await supabase.from('food_log_entries').update({ health_external_id: null }).eq('id', existing.id);
+        if (cleared.error) {
+          setStatus(`Changes saved, but the old health link could not be cleared: ${cleared.error.message}`);
+          setBusy(false); return;
+        }
       }
+      const healthStatus = await maybeWriteNutrition(existing.id);
+      if (healthStatus === 'failed') { setStatus('Changes saved in Buko, but the health copy could not be updated. Check your health permissions and connection.'); setBusy(false); return; }
       router.back();
       return;
     }
@@ -139,6 +157,7 @@ export default function AddEntry() {
       return;
     }
     maybeWriteNutrition((inserted as { id: string }).id);
+    invalidateDateHistory();
     router.navigate({ pathname: '/(tabs)', params: { date } });
   }
 
@@ -154,6 +173,7 @@ export default function AddEntry() {
       return;
     }
     removeNutritionFromHealth(existing.health_external_id ?? null);
+    invalidateDateHistory();
     router.back();
   }
 
@@ -163,6 +183,15 @@ export default function AddEntry() {
     <Screen variant="form" edges={[]}>
       <Stack.Screen options={{ title: editing ? 'Edit entry' : 'Log food' }} />
       <Heading>{food.name}</Heading>
+      {existing ? <Button title="Favorite, move or copy food" variant="ghost" disabled={busy || saved} onPress={() => setActions(true)} /> : null}
+      <EntryActionsSheet entry={actions ? existing : null} onClose={() => setActions(false)} onTransfer={(mode, entry) => { setActions(false); setTransfer({ mode, entry }); }} />
+      <DiaryTransferSheet selection={transfer} onClose={() => setTransfer(null)} onSaved={(message) => {
+        setStatus(message);
+        if (existing) supabase.from('food_log_entries').select('*').eq('id', existing.id).single().then(({ data, error: refreshError }) => {
+          if (refreshError) setError(`Action saved, but this entry could not be refreshed: ${refreshError.message}`);
+          else { setExisting(data as FoodLogEntry); setMeal(data.meal as Meal); }
+        });
+      }} />
       {food.brand ? <Body muted>{food.brand}</Body> : null}
       <View style={{ height: spacing.lg }} />
 
@@ -212,10 +241,11 @@ export default function AddEntry() {
             </View>
           </Card>
           {error ? <Notice tone="danger">{error}</Notice> : null}
-          <Button title={editing ? 'Save changes' : 'Add to diary'} onPress={save} loading={busy} disabled={!macros || busy} />
+          {status ? <Notice tone="info">{status}</Notice> : null}
+          <Button title={saved ? 'View diary' : editing ? 'Save changes' : 'Add to diary'} onPress={saved ? () => router.navigate({ pathname: '/(tabs)', params: { date } }) : save} loading={busy} disabled={!macros || busy} />
         </>
       )}
-      {editing ? <Button title="Remove entry" variant="ghost" onPress={remove} disabled={busy} /> : null}
+      {editing ? <Button title="Remove entry" variant="ghost" onPress={remove} disabled={busy || saved} /> : null}
     </Screen>
   );
 }

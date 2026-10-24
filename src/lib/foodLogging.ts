@@ -1,6 +1,7 @@
 import type { Factor } from './scoring/factors.ts';
 import type { Food, FoodLogEntry, FoodSource, Meal, Nutrients } from '../types/index.ts';
 import { round1, type Macros } from './diary.ts';
+import { isDateString } from './dates.ts';
 
 /** Nutrients that must be known before a food can be logged; unknown values are never stored as zero. */
 export const REQUIRED_MACROS = ['calories', 'protein', 'carbs', 'fat'] as const;
@@ -135,6 +136,7 @@ export function buildEntryInsert(
   food: Food,
   opts: { userId: string; date: string; meal: Meal; amount: string; unit: AmountUnit },
 ): { row: EntryInsert } | { error: string } {
+  if (!isDateString(opts.date)) return { error: 'Choose a valid diary date.' };
   const incomplete = incompleteNutritionMessage(food.per100g);
   if (incomplete) return { error: incomplete };
   const grams = amountToGrams(opts.amount, opts.unit, food);
@@ -286,7 +288,7 @@ export function manualFormFromFood(food: Food | null, barcode?: string): ManualF
   };
 }
 
-export type SearchFilter = 'all' | 'recent' | 'whole' | 'packaged' | 'recipes';
+export type SearchFilter = 'all' | 'recent' | 'favorites' | 'whole' | 'packaged' | 'recipes';
 
 /** Case-insensitive match of every query word in the text (used for recent foods and recipes). */
 export function matchesQuery(text: string, query: string): boolean {

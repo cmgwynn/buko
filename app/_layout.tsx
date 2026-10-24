@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from '../src/providers/AuthProvider';
 import { ProfileProvider, useProfile } from '../src/providers/ProfileProvider';
 import { SettingsProvider } from '../src/providers/SettingsProvider';
 import { BillingProvider } from '../src/providers/BillingProvider';
+import { SelectedDateProvider } from '../src/providers/SelectedDateProvider';
 import { DiagnosticBoundary, DiagnosticLifecycle } from '../src/components/DiagnosticBoundary';
 import { BackButton } from '../src/components/BackButton';
 import { ConfirmProvider } from '../src/components/ConfirmProvider';
@@ -126,6 +127,7 @@ export default function RootLayout() {
       <StatusBar style="dark" />
       {isSupabaseConfigured ? (
         <AuthProvider>
+          <SelectedDateProvider>
           <ProfileProvider>
             <SettingsProvider>
               <BillingProvider>
@@ -138,6 +140,7 @@ export default function RootLayout() {
               </BillingProvider>
             </SettingsProvider>
           </ProfileProvider>
+          </SelectedDateProvider>
         </AuthProvider>
       ) : (
         <SetupNeeded />

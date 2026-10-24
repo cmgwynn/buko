@@ -6,6 +6,7 @@ import { healthConnectAdapter } from './android';
 import { healthKitAdapter } from './ios';
 import type { ActivityHint, HealthAdapter, HealthFeature } from './types';
 import { checkHealthAccess } from '../billing/client';
+import { invalidateDateHistory } from '../../components/date/dateHistory';
 
 export type { HealthFeature } from './types';
 
@@ -44,7 +45,8 @@ export function activityHintFor(exercises: { name: string; category: 'strength' 
 }
 
 async function loadSettings(): Promise<UserSettings | null> {
-  const { data } = await supabase.from('user_settings').select('*').maybeSingle();
+  const { data, error } = await supabase.from('user_settings').select('*').maybeSingle();
+  if (error) throw new Error(error.message);
   return (data as UserSettings | null) ?? null;
 }
 
@@ -66,22 +68,38 @@ export async function removeWorkoutFromHealth(exportedId: string | null): Promis
   await a.deleteWorkout(exportedId).catch(() => {});
 }
 
-/** If "save food to Health" is on, copy one diary entry across. Safe to call without awaiting. */
-export async function maybeWriteNutrition(entryId: string): Promise<void> {
+export type NutritionWriteResult = 'written' | 'disabled' | 'failed';
+const nutritionWrites = new Map<string, Promise<NutritionWriteResult>>();
+/** If "save food to Health" is on, copy one diary entry across without duplicating its linked sample. */
+export function maybeWriteNutrition(entryId: string): Promise<NutritionWriteResult> {
+  const pending = nutritionWrites.get(entryId);
+  if (pending) return pending;
+  const write = writeNutrition(entryId).finally(() => { nutritionWrites.delete(entryId); });
+  nutritionWrites.set(entryId, write);
+  return write;
+}
+async function writeNutrition(entryId: string): Promise<NutritionWriteResult> {
   try {
     const s = await loadSettings();
     const a = getAdapter();
-    if (!s?.health_write_nutrition || !a || !(await a.isAvailable())) return;
-    if (!await checkHealthAccess()) return;
-    const { data } = await supabase.from('food_log_entries').select('name, calories, protein_g, carbs_g, fat_g, logged_on, created_at').eq('id', entryId).single();
-    if (!data) return;
+    if (!s?.health_write_nutrition) return 'disabled';
+    if (!a || !(await a.isAvailable()) || !await checkHealthAccess()) return 'failed';
+    const { data, error } = await supabase.from('food_log_entries').select('name, calories, protein_g, carbs_g, fat_g, logged_on, created_at, health_external_id').eq('id', entryId).single();
+    if (error || !data) return 'failed';
+    if (data.health_external_id) return 'written';
     const e = data as { name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; logged_on: string; created_at: string };
     // Use now for today's entries so the sample sits at a sensible time; noon for other days.
     const at = e.logged_on === toDateString(new Date()) ? new Date() : new Date(`${e.logged_on}T12:00:00`);
     const id = await a.writeNutrition({ name: e.name, at, calories: Number(e.calories), protein_g: Number(e.protein_g), carbs_g: Number(e.carbs_g), fat_g: Number(e.fat_g) });
-    if (id) await supabase.from('food_log_entries').update({ health_external_id: id }).eq('id', entryId);
+    if (!id) return 'failed';
+    const saved = await supabase.from('food_log_entries').update({ health_external_id: id }).eq('id', entryId);
+    if (saved.error) {
+      await a.deleteNutrition(id);
+      return 'failed';
+    }
+    return 'written';
   } catch {
-    // Health is a convenience copy; a failure must never block logging food.
+    return 'failed';
   }
 }
 
@@ -135,7 +153,7 @@ export async function syncFromHealth(userId: string, s: UserSettings): Promise<v
       const have = new Set(((data as { external_id: string }[] | null) ?? []).map((r) => r.external_id));
       const fresh = found.filter((f) => !have.has(f.externalId));
       if (fresh.length) {
-        await supabase.from('workouts').insert(
+        const saved = await supabase.from('workouts').insert(
           fresh.map((f) => ({
             user_id: userId,
             name: f.name,
@@ -147,6 +165,8 @@ export async function syncFromHealth(userId: string, s: UserSettings): Promise<v
             external_id: f.externalId,
           })),
         );
+        if (saved.error) throw new Error(`Could not import health workouts: ${saved.error.message}`);
+        invalidateDateHistory();
       }
     }
   }

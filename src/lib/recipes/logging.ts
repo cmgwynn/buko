@@ -1,9 +1,11 @@
-import { round1 } from '../diary';
+import { round1, toDateString } from '../diary';
+import { isDateString } from '../dates';
 import { maybeWriteNutrition } from '../health';
 import { supabase } from '../supabase';
 import type { Meal } from '../../types';
 import { computeRecipeNutrition, recipeLoggingError } from './nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from './types';
+import { invalidateDateHistory } from '../../components/date/dateHistory';
 
 export type RecipeWithNutrition = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'grams' | 'nutrition'>[] };
 
@@ -13,6 +15,7 @@ export async function logRecipeServings(
   recipe: RecipeWithNutrition,
   opts: { servings: number; meal: Meal; date: string; planEntryId?: string },
 ): Promise<string | null> {
+  if (!isDateString(opts.date) || opts.date > toDateString(new Date())) return 'Choose a valid past or current diary date. Use Plan for future meals.';
   const n = computeRecipeNutrition(recipe.recipe_ingredients, recipe.servings);
   const incomplete = recipeLoggingError(n, opts.servings);
   if (incomplete) return incomplete;
@@ -34,6 +37,7 @@ export async function logRecipeServings(
     fat_g: round1(ps.fat_g * opts.servings),
   }).select('id').single();
   if (error) return error.message;
+  invalidateDateHistory();
   maybeWriteNutrition((inserted as { id: string }).id);
   if (opts.planEntryId) {
     const { error: planError } = await supabase.from('meal_plan_entries').update({ logged_at: new Date().toISOString() }).eq('id', opts.planEntryId);

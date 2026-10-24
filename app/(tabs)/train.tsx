@@ -1,18 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { TabHeader } from '../../src/components/TabHeader';
+import { DateNavigator } from '../../src/components/date/DateNavigator';
+import { DaySwipe } from '../../src/components/date/DaySwipe';
 import { Button, Card, Empty, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
-import { toDateString } from '../../src/lib/diary';
-import { loadRecentWorkouts, loadRoutines, loadTraining, routineToItems, type RoutineRow, type WorkoutListRow } from '../../src/lib/fitness/data';
+import { addLocalDays, localDateStartIso, mondayOfWeek, parseLocalDate } from '../../src/lib/dates';
+import { loadRoutines, routineToItems, type RoutineRow, type TrainingRow, type WorkoutListRow } from '../../src/lib/fitness/data';
 import { setVolume } from '../../src/lib/fitness/calc';
 import { toDisplayWeight, weightUnit } from '../../src/lib/fitness/format';
 import { startSession, useWorkoutRecovery, useWorkoutSession } from '../../src/lib/fitness/session';
 import { loadActivityForDay, syncIfDue } from '../../src/lib/health';
-import { weekStart } from '../../src/lib/recipes/week';
+import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
+import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { useSettings } from '../../src/providers/SettingsProvider';
 import { colors, spacing, typography } from '../../src/theme';
 
@@ -21,6 +24,7 @@ export default function Train() {
   const { session } = useAuth();
   const { profile } = useProfile();
   const { settings } = useSettings();
+  const { selectedDate, today } = useSelectedDate();
   const active = useWorkoutSession();
   const recovery = useWorkoutRecovery();
   const units = profile?.units ?? 'metric';
@@ -30,36 +34,72 @@ export default function Train() {
   const [steps, setSteps] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const requestVersion = useRef(0);
 
   const load = useCallback(async () => {
+    const request = ++requestVersion.current;
+    if (!session) {
+      setRecent([]);
+      setRoutines([]);
+      setWeek({ workouts: 0, minutes: 0, volumeKg: 0 });
+      setSteps(null);
+      setLoaded(true);
+      return;
+    }
+    setRecent([]);
+    setWeek({ workouts: 0, minutes: 0, volumeKg: 0 });
+    setSteps(null);
+    setLoaded(false);
     try {
-      const monday = weekStart(toDateString(new Date()));
-      const since = new Date(`${monday}T00:00:00`).toISOString();
-      const [r, ro, t] = await Promise.all([loadRecentWorkouts(15), loadRoutines(), loadTraining(since)]);
+      const monday = mondayOfWeek(selectedDate);
+      const weekStartIso = localDateStartIso(monday);
+      const weekEndIso = localDateStartIso(addLocalDays(monday, 7));
+      const dayStartIso = localDateStartIso(selectedDate);
+      const dayEndIso = localDateStartIso(addLocalDays(selectedDate, 1));
+      const [recentResult, weekResult, routinesResult, trainingResult] = await Promise.all([
+        supabase.from('workouts').select('id, name, started_at, duration_min, calories_burned, calories_estimated, source, workout_exercises(exercises(name))')
+          .eq('user_id', session.user.id).gte('started_at', dayStartIso).lt('started_at', dayEndIso).order('started_at', { ascending: false }).limit(100),
+        supabase.from('workouts').select('id, duration_min')
+          .eq('user_id', session.user.id).gte('started_at', weekStartIso).lt('started_at', weekEndIso).limit(1000),
+        loadRoutines(),
+        supabase.from('workout_exercises').select('exercise_id, exercises(name, muscle_groups, category), workouts!inner(started_at), workout_sets(reps, weight_kg, is_warmup)')
+          .eq('user_id', session.user.id).gte('workouts.started_at', weekStartIso).lt('workouts.started_at', weekEndIso).limit(1000),
+      ]);
+      if (request !== requestVersion.current) return;
+      if (recentResult.error || weekResult.error || trainingResult.error) {
+        throw new Error(recentResult.error?.message ?? weekResult.error?.message ?? trainingResult.error?.message);
+      }
+      const r = recentResult.data as unknown as WorkoutListRow[];
+      const weekWorkouts = weekResult.data as { id: string; duration_min: number | null }[];
+      const t = trainingResult.data as unknown as TrainingRow[];
       setRecent(r);
-      setRoutines(ro);
-      const thisWeek = r.filter((w) => w.started_at >= since);
+      setRoutines(routinesResult);
       setWeek({
-        workouts: thisWeek.length,
-        minutes: Math.round(thisWeek.reduce((s, w) => s + (w.duration_min ?? 0), 0)),
+        workouts: weekWorkouts.length,
+        minutes: Math.round(weekWorkouts.reduce((s, w) => s + (w.duration_min ?? 0), 0)),
         volumeKg: t.reduce((s, row) => s + row.workout_sets.filter((x) => !x.is_warmup).reduce((a, x) => a + setVolume(x), 0), 0),
       });
-      if (settings?.health_read_steps) setSteps((await loadActivityForDay(toDateString(new Date())))?.steps ?? null);
-      setError(null);
+      if (settings?.health_read_steps) {
+        const activity = await loadActivityForDay(selectedDate);
+        if (request === requestVersion.current) setSteps(activity?.steps ?? null);
+      } else setSteps(null);
+      if (request === requestVersion.current) setError(null);
     } catch (e) {
-      setError((e as Error).message);
+      if (request === requestVersion.current) setError((e as Error).message);
     }
-    setLoaded(true);
-  }, [settings?.health_read_steps]);
+    if (request === requestVersion.current) setLoaded(true);
+  }, [selectedDate, session, settings?.health_read_steps]);
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      let focused = true;
+      void load();
       if (session && settings) {
         syncIfDue(session.user.id, settings).then((did) => {
-          if (did) load();
-        });
+          if (did && focused) void load();
+        }).catch((err) => { if (focused) setError((err as Error).message); });
       }
+      return () => { focused = false; requestVersion.current += 1; };
     }, [load, session, settings]),
   );
 
@@ -70,6 +110,7 @@ export default function Train() {
   }
 
   return (
+    <DaySwipe>
     <Screen>
       <TabHeader
         title="Train"
@@ -79,13 +120,17 @@ export default function Train() {
           </Pressable>
         }
       />
+      <DateNavigator />
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {recovery.error ? <Notice tone="danger">{recovery.error} Open your workout to retry the device save.</Notice> : null}
+      {selectedDate !== today ? (
+        <Notice tone="info">Browsing {new Date(`${selectedDate}T00:00:00`).toLocaleDateString()}. Starting a workout always records the actual current time, not the selected date.</Notice>
+      ) : null}
 
       {active.active ? (
         <Button title="Resume workout" icon="play" disabled={!recovery.ready} onPress={() => start()} />
       ) : (
-        <Button title="Start workout" icon="barbell-outline" disabled={!recovery.ready} onPress={() => start()} />
+        <Button title={selectedDate === today ? 'Start workout' : 'Start workout now'} icon="barbell-outline" disabled={!recovery.ready} onPress={() => start()} />
       )}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
         <Text style={typography.heading}>Your routines</Text>
@@ -113,12 +158,15 @@ export default function Train() {
       )}
 
       <Card>
-        <Text style={typography.label}>This week</Text>
+        <Text style={typography.label}>
+          Week of {parseLocalDate(mondayOfWeek(selectedDate)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}
+          {parseLocalDate(addLocalDays(mondayOfWeek(selectedDate), 6)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+        </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, justifyContent: 'space-between', marginTop: spacing.sm }}>
           <Stat value={String(week.workouts)} label="workouts" />
           <Stat value={String(week.minutes)} label="minutes" />
           <Stat value={Math.round(toDisplayWeight(week.volumeKg, units)).toLocaleString()} label={`${weightUnit(units)} lifted`} />
-          {steps != null ? <Stat value={steps.toLocaleString()} label="steps today" /> : null}
+          {steps != null ? <Stat value={steps.toLocaleString()} label={`steps ${selectedDate === today ? 'today' : `on ${parseLocalDate(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}`} /> : null}
         </View>
       </Card>
       <Card>
@@ -145,6 +193,7 @@ export default function Train() {
         </Pressable>
       ))}
     </Screen>
+    </DaySwipe>
   );
 }
 
