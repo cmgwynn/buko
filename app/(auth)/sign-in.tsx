@@ -1,12 +1,14 @@
-import { Link } from 'expo-router';
+import { Link, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Text, View, useWindowDimensions } from 'react-native';
 import { Body, Button, Card, Notice, Screen, TextField, Title } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { colors, spacing, typography } from '../../src/theme';
 import { CoconutLogo } from '../../src/components/CoconutLogo';
+import { SubscriptionManagement } from '../../src/components/SubscriptionManagement';
 
 export default function SignIn() {
+  const { accountDeleted } = useLocalSearchParams<{ accountDeleted?: string }>();
   const { height } = useWindowDimensions();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,6 +32,10 @@ export default function SignIn() {
         </View>
         <Body muted>Scan it. Plan it. Cook it. Log it.</Body>
       </View>
+      {accountDeleted === 'true' ? <Card>
+        <Notice tone="info">Your Buko account was permanently deleted and you are signed out.</Notice>
+        <SubscriptionManagement />
+      </Card> : null}
       <Card>
         <Title>Welcome back</Title>
         <View style={{ height: spacing.lg }} />

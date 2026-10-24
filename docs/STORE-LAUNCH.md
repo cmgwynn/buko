@@ -4,6 +4,8 @@
 
 Do not enable a public paid entitlement or publish paid paywalls as part of this preparation. Keep the paid rollout staged off until the native purchase flow, verified entitlement, restore/manage flows, account deletion/export and server-side premium gates pass the tests below.
 
+Successful account deletion now returns the signed-out user to Buko's welcome/sign-in screen with a deletion confirmation. Local-cleanup failures remain visible instead of redirecting away from the recovery instructions. Direct Apple and Google Play cancellation links are available before deletion, after deletion and on Premium, regardless of the current device. Store cancellation still requires the customer's confirmation; deleting a RevenueCat subscriber is not cancellation. Apple does not permit developer-initiated cancellation; Google supports server cancellation but it is not integrated here. Do not advertise automatic subscription cancellation on account deletion.
+
 ## App facts to use when preparing a listing
 
 These facts are grounded in the current app and native configuration. Recheck them against the release candidate before submitting:

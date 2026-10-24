@@ -6,6 +6,7 @@ import { config } from '../src/lib/config';
 import { legalUrl } from '../src/lib/legal';
 import { useAuth } from '../src/providers/AuthProvider';
 import { useBilling } from '../src/providers/BillingProvider';
+import { SubscriptionManagement } from '../src/components/SubscriptionManagement';
 export default function Premium() {
   const { session } = useAuth();
   const billing = useBilling();
@@ -58,10 +59,8 @@ export default function Premium() {
       {!billing.status.enforced && items.length ? <Body muted>Store purchases stay disabled during the unrestricted preview rollout.</Body> : null}
       <Button title="Restore purchases" variant="secondary" disabled={busy || Platform.OS === 'web'} onPress={() => { void transact(); }} />
       <Button title="Refresh subscription access" variant="secondary" loading={busy || billing.loading} onPress={() => { void billing.refresh(true); }} />
-      <Button title="Manage or cancel subscriptions" variant="ghost" onPress={() => { void open(Platform.OS === 'android'
-        ? 'https://play.google.com/store/account/subscriptions?package=com.cmgwynn.buko' : 'https://apps.apple.com/account/subscriptions'); }} />
-      {Platform.OS === 'web' ? <Button title="Manage Google Play subscription" variant="ghost" onPress={() => { void open('https://play.google.com/store/account/subscriptions?package=com.cmgwynn.buko'); }} /> : null}
-      <Body muted>Deleting your Buko account does not cancel store billing. Cancel in the store where you subscribed. RevenueCat processes a pseudonymous account ID and purchase/device metadata, not your food, health records or chat.</Body>
+      <SubscriptionManagement />
+      <Body muted>RevenueCat processes a pseudonymous account ID and purchase/device metadata, not your food, health records or chat.</Body>
       {privacy ? <Button title="Privacy policy" variant="ghost" onPress={() => { void open(privacy); }} /> : null}
       {terms ? <Button title="Terms of service" variant="ghost" onPress={() => { void open(terms); }} /> : null}
     </Card>

@@ -1,24 +1,33 @@
-import { Link } from 'expo-router';
-import { useState } from 'react';
+import { Link, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Body, Button, Card, Heading, TextField, Screen } from '../src/components/ui';
 import { deleteAccount, reauthenticate } from '../src/lib/account/client';
 import { useAuth } from '../src/providers/AuthProvider';
+import { SubscriptionManagement } from '../src/components/SubscriptionManagement';
 
 /** Public web entry for store account-deletion links; personal details are never shown. */
 export default function DeleteAccountScreen() {
   const { session } = useAuth();
+  const router = useRouter();
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [deleted, setDeleted] = useState(false);
+  const [cleanupError, setCleanupError] = useState<string | null>(null);
+  useEffect(() => {
+    if (deleted && !session && !cleanupError) {
+      router.replace({ pathname: '/(auth)/sign-in', params: { accountDeleted: 'true' } });
+    }
+  }, [deleted, session, cleanupError, router]);
   async function remove() {
     setBusy(true); setMessage('');
     try {
       if (password) await reauthenticate(password);
       setPassword('');
       const result = await deleteAccount(confirmation);
+      setCleanupError(result.cleanupError);
       setDeleted(true);
       setConfirmation('');
       setMessage(result.cleanupError ?? 'Your Buko account was permanently deleted. Your subscription, if any, was not cancelled.');
@@ -28,6 +37,12 @@ export default function DeleteAccountScreen() {
   return (
     <Screen>
       <View style={{ gap: 18 }}>
+        {deleted ? <>
+          <Heading>Your Buko account was deleted</Heading>
+          {!!message && <Text accessibilityRole="alert">{message}</Text>}
+          <SubscriptionManagement />
+          {!session ? <Button title="Back to Buko" onPress={() => router.replace({ pathname: '/(auth)/sign-in', params: { accountDeleted: 'true' } })} /> : null}
+        </> : <>
         <Heading>Delete your Buko account</Heading>
         <Body>You can request permanent account deletion here on the web or in the app at Profile → Settings, privacy &amp; account → Export data or delete account → Permanently delete account. No paid plan is required.</Body>
         <Card>
@@ -43,8 +58,8 @@ export default function DeleteAccountScreen() {
         </Card>
         <Card>
           <Heading>Subscriptions &amp; retained copies</Heading>
-          <Body>Deleting Buko does not cancel an active subscription or issue a refund. Manage Apple, Google or other store subscriptions separately to stop renewal. Restoring purchases does not restore deleted Buko data.</Body>
-          <Link href="/premium">Manage my subscription before deleting</Link>
+          <SubscriptionManagement />
+          <Body>Deletion does not issue a refund. Restoring purchases does not restore deleted Buko data.</Body>
           <Body>Apple Health and Health Connect originals and records already written there remain in the health app; manage them there. Downloads and copies you shared remain wherever you saved them.</Body>
           <Body>Infrastructure/security logs, backups and external provider records may remain under the relevant provider’s retention policy. This action does not promise immediate backup erasure or deletion of app-store/payment-provider transaction records. RevenueCat subscriber deletion is attempted only when the owner configured its server secret; this never cancels subscriptions. No unverified retention period is promised here.</Body>
         </Card>
@@ -59,6 +74,7 @@ export default function DeleteAccountScreen() {
           <Button title="Permanently delete my account" variant="danger" loading={busy} disabled={confirmation !== 'DELETE'} onPress={remove} />
         </Card>}
         {!!message && <Text accessibilityRole="alert">{message}</Text>}
+        </>}
       </View>
     </Screen>
   );
