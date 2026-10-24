@@ -30,6 +30,11 @@ Principles
 
 Store and beta submission notes, proposed listing copy, official references and the release go/no-go checklist are in [`docs/STORE-LAUNCH.md`](./docs/STORE-LAUNCH.md). Its status is deliberately not “launch ready”: do not infer policy compliance, account deletion readiness, purchase readiness or production eligibility from the guide.
 
+### Recipe library
+- 72 original recipes, with at least six per cuisine and every meal type represented in all ten cuisine inspirations. Meal/cuisine filters combine with title/ingredient search; browsing reveals 12 cards at a time.
+- All unmodified library recipes must score at least 75/100 (Excellent) under the unchanged Buko recipe-scoring model, with complete nutrient fields and no excluded ingredients. Ingredient weights and USDA SR Legacy snapshots retrieved 2026-10-24 are bundled, so previews and editable copies need no live nutrition lookup. Source records are linked in ingredient previews.
+- Scores use listed input weights, not measured cooked yield. They are estimates, not medical suitability certifications; ingredient brands, substitutions and edits can change scores. Each copy retains independently editable matched nutrients/weights, and existing private recipes are never rewritten.
+
 ### Phase 4 implementation and automation direction
 - Supabase authenticates every Coach request, reads owner-scoped bounded data, calculates facts and filters candidates before calling Anthropic from the Edge Function only. Model output is validated, not trusted as a calculator or database command.
 - Previous completed Monday-Sunday weekly reviews distinguish incomplete logging, current product scores and uncertain weight trends. Optional complete-day markers and observed target snapshots support comparisons only with at least four comparable days. Missing days are not zero intake.
