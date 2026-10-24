@@ -4,17 +4,52 @@ import { filterLibraryRecipes, libraryIngredientText, libraryRecipeSummary, RECI
 import { LIBRARY_FOODS } from '../libraryFoods';
 import { computeRecipeNutrition, scoreRecipe } from '../nutrition';
 import { reparse } from '../matching';
+import { CUISINE_REFERENCES } from '../libraryReferences';
 
 describe('starter recipe library', () => {
-  it('has at least 60 unique recipes, with every meal type in all ten cuisines', () => {
-    assert.ok(STARTER_RECIPES.length >= 60);
+  it('has at least 210 unique recipes across ten cuisines and Everyday', () => {
+    assert.ok(STARTER_RECIPES.length >= 210);
     assert.equal(new Set(STARTER_RECIPES.map((x) => x.id)).size, STARTER_RECIPES.length);
     assert.equal(new Set(STARTER_RECIPES.map((x) => x.title)).size, STARTER_RECIPES.length);
-    assert.equal(RECIPE_CUISINES.length, 10);
+    assert.equal(RECIPE_CUISINES.length, 11);
     for (const cuisine of RECIPE_CUISINES) {
       assert.ok(STARTER_RECIPES.filter((x) => x.cuisine === cuisine).length >= 6);
-      for (const meal of RECIPE_MEAL_TYPES) assert.ok(filterLibraryRecipes({ meal, cuisine }).length >= 1, `${cuisine} ${meal}`);
     }
+    for (const meal of RECIPE_MEAL_TYPES) assert.ok(filterLibraryRecipes({ meal }).length >= 1, meal);
+  });
+  it('includes safe doneness instructions for every raw poultry and fish recipe', () => {
+    for (const recipe of STARTER_RECIPES) {
+      const text = recipe.steps.join(' ');
+      if (recipe.ingredients.some((i) => i.food === 'chicken' || i.food === 'turkey')) assert.match(text, /165 F \(74 C\)/, recipe.id);
+      if (recipe.ingredients.some((i) => ['salmon', 'cod', 'shrimp'].includes(i.food))) assert.match(text, /145 F \(63 C\)/, recipe.id);
+    }
+  });
+  it('does not pad the collection with identical ingredient combinations', () => {
+    const combinations = new Map<string, string>();
+    for (const recipe of STARTER_RECIPES) {
+      const key = recipe.ingredients.map((i) => i.food).sort().join('|');
+      assert.equal(combinations.get(key), undefined, `${recipe.id} repeats ${combinations.get(key)}`);
+      combinations.set(key, recipe.id);
+    }
+  });
+  it('provides cuisine references and relocates generic dishes without cultural claims', () => {
+    for (const cuisine of RECIPE_CUISINES) {
+      const reference = CUISINE_REFERENCES[cuisine];
+      assert.ok(reference.context.length > 50);
+      assert.ok(reference.links.length > 0);
+      for (const link of reference.links) assert.equal(new URL(link.url).protocol, 'https:');
+    }
+    for (const id of ['thai-pineapple-breakfast-oats', 'thai-lime-peanut-cucumber', 'filipino-pineapple-yogurt-cups', 'japanese-salmon-cucumber-bowl']) {
+      assert.equal(STARTER_RECIPES.find((r) => r.id === id)?.cuisine, 'Everyday');
+    }
+    for (const id of ['thai-basil-chicken', 'japanese-chicken-egg-donburi', 'filipino-chicken-adobo-white-vinegar', 'middle-parsley-tabbouleh-plate']) {
+      const recipe = STARTER_RECIPES.find((r) => r.id === id)!;
+      assert.ok(recipe.adaptation && recipe.adaptation.length > 40, id);
+    }
+    const adobo = STARTER_RECIPES.find((r) => r.id === 'filipino-chicken-adobo-white-vinegar')!;
+    for (const food of ['whiteVinegar', 'soySauce', 'garlic', 'pepper']) assert.ok(adobo.ingredients.some((i) => i.food === food));
+    const parsleySalad = STARTER_RECIPES.find((r) => r.id === 'middle-parsley-tabbouleh-plate')!;
+    assert.ok(parsleySalad.ingredients.find((i) => i.food === 'parsley')!.grams >= parsleySalad.ingredients.find((i) => i.food === 'bulgur')!.grams);
   });
   it('has complete, independently editable instructions and matched ingredient copies', () => {
     for (const recipe of STARTER_RECIPES) {

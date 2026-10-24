@@ -962,6 +962,381 @@ export const LIBRARY_FOODS = {
       "sodiumMg": 8,
       "fiber": 1
     }
+  },
+  "scallion": {
+    "fdcId": "170005",
+    "description": "Onions, spring or scallions (includes tops and bulb), raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 32,
+      "protein": 1.83,
+      "carbs": 7.34,
+      "fat": 0.19,
+      "sugars": 2.33,
+      "saturatedFat": 0.032,
+      "sodiumMg": 16,
+      "fiber": 2.6
+    }
+  },
+  "sesameOil": {
+    "fdcId": "171016",
+    "description": "Oil, sesame, salad or cooking",
+    "category": "Fats and Oils",
+    "per100g": {
+      "calories": 884,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 100,
+      "sugars": 0,
+      "saturatedFat": 14.2,
+      "sodiumMg": 0,
+      "fiber": 0
+    }
+  },
+  "whiteVinegar": {
+    "fdcId": "172237",
+    "description": "Vinegar, distilled",
+    "category": "Spices and Herbs",
+    "per100g": {
+      "calories": 18,
+      "protein": 0,
+      "carbs": 0.04,
+      "fat": 0,
+      "sugars": 0.04,
+      "saturatedFat": 0,
+      "sodiumMg": 2,
+      "fiber": 0
+    }
+  },
+  "basil": {
+    "fdcId": "172232",
+    "description": "Basil, fresh",
+    "category": "Spices and Herbs",
+    "per100g": {
+      "calories": 23,
+      "protein": 3.15,
+      "carbs": 2.65,
+      "fat": 0.64,
+      "sugars": 0.3,
+      "saturatedFat": 0.041,
+      "sodiumMg": 4,
+      "fiber": 1.6
+    }
+  },
+  "celery": {
+    "fdcId": "169988",
+    "description": "Celery, raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 14,
+      "protein": 0.69,
+      "carbs": 2.97,
+      "fat": 0.17,
+      "sugars": 1.34,
+      "saturatedFat": 0.042,
+      "sodiumMg": 80,
+      "fiber": 1.6
+    }
+  },
+  "eggplant": {
+    "fdcId": "169228",
+    "description": "Eggplant, raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 25,
+      "protein": 0.98,
+      "carbs": 5.88,
+      "fat": 0.18,
+      "sugars": 3.53,
+      "saturatedFat": 0.034,
+      "sodiumMg": 2,
+      "fiber": 3
+    }
+  },
+  "quinoa": {
+    "fdcId": "168917",
+    "description": "Quinoa, cooked",
+    "category": "Cereal Grains and Pasta",
+    "per100g": {
+      "calories": 120,
+      "protein": 4.4,
+      "carbs": 21.3,
+      "fat": 1.92,
+      "sugars": 0.87,
+      "saturatedFat": 0.231,
+      "sodiumMg": 7,
+      "fiber": 2.8
+    }
+  },
+  "kidneyBeans": {
+    "fdcId": "175194",
+    "description": "Beans, kidney, red, mature seeds, cooked, boiled, without salt",
+    "category": "Legumes and Legume Products",
+    "per100g": {
+      "calories": 127,
+      "protein": 8.67,
+      "carbs": 22.8,
+      "fat": 0.5,
+      "sugars": 0.32,
+      "saturatedFat": 0.072,
+      "sodiumMg": 2,
+      "fiber": 7.4
+    }
+  },
+  "shrimp": {
+    "fdcId": "174210",
+    "description": "Crustaceans, shrimp, mixed species, raw (may contain additives to retain moisture)",
+    "category": "Finfish and Shellfish Products",
+    "per100g": {
+      "calories": 71,
+      "protein": 13.61,
+      "carbs": 0.91,
+      "fat": 1.01,
+      "sugars": 0,
+      "saturatedFat": 0.261,
+      "sodiumMg": 566,
+      "fiber": 0
+    }
+  },
+  "cod": {
+    "fdcId": "171955",
+    "description": "Fish, cod, Atlantic, raw",
+    "category": "Finfish and Shellfish Products",
+    "per100g": {
+      "calories": 82,
+      "protein": 17.8,
+      "carbs": 0,
+      "fat": 0.67,
+      "sugars": 0,
+      "saturatedFat": 0.131,
+      "sodiumMg": 54,
+      "fiber": 0
+    }
+  },
+  "turkey": {
+    "fdcId": "172850",
+    "description": "Turkey, ground, 93% lean, 7% fat, raw",
+    "category": "Poultry Products",
+    "per100g": {
+      "calories": 150,
+      "protein": 18.7,
+      "carbs": 0,
+      "fat": 8.34,
+      "sugars": 0,
+      "saturatedFat": 2.17,
+      "sodiumMg": 69,
+      "fiber": 0
+    }
+  },
+  "whiteRiceDry": {
+    "fdcId": "168877",
+    "description": "Rice, white, long-grain, regular, raw, enriched",
+    "category": "Cereal Grains and Pasta",
+    "per100g": {
+      "calories": 365,
+      "protein": 7.13,
+      "carbs": 80,
+      "fat": 0.66,
+      "sugars": 0.12,
+      "saturatedFat": 0.18,
+      "sodiumMg": 5,
+      "fiber": 1.3
+    }
+  },
+  "fishSauce": {
+    "fdcId": "174531",
+    "description": "Sauce, fish, ready-to-serve",
+    "category": "Soups, Sauces, and Gravies",
+    "per100g": {
+      "calories": 35,
+      "protein": 5.06,
+      "carbs": 3.64,
+      "fat": 0.01,
+      "sugars": 3.64,
+      "saturatedFat": 0.003,
+      "sodiumMg": 7850,
+      "fiber": 0
+    }
+  },
+  "sugar": {
+    "fdcId": "169655",
+    "description": "Sugars, granulated",
+    "category": "Sweets",
+    "per100g": {
+      "calories": 387,
+      "protein": 0,
+      "carbs": 100,
+      "fat": 0,
+      "sugars": 99.8,
+      "saturatedFat": 0,
+      "sodiumMg": 1,
+      "fiber": 0
+    }
+  },
+  "chayote": {
+    "fdcId": "170402",
+    "description": "Chayote, fruit, raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 19,
+      "protein": 0.82,
+      "carbs": 4.51,
+      "fat": 0.13,
+      "sugars": 1.66,
+      "saturatedFat": 0.028,
+      "sodiumMg": 2,
+      "fiber": 1.7
+    }
+  },
+  "mungBeans": {
+    "fdcId": "174257",
+    "description": "Mung beans, mature seeds, cooked, boiled, without salt",
+    "category": "Legumes and Legume Products",
+    "per100g": {
+      "calories": 105,
+      "protein": 7.02,
+      "carbs": 19.2,
+      "fat": 0.38,
+      "sugars": 2,
+      "saturatedFat": 0.116,
+      "sodiumMg": 2,
+      "fiber": 7.6
+    }
+  },
+  "squash": {
+    "fdcId": "169295",
+    "description": "Squash, winter, butternut, raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 45,
+      "protein": 1,
+      "carbs": 11.7,
+      "fat": 0.1,
+      "sugars": 2.2,
+      "saturatedFat": 0.021,
+      "sodiumMg": 4,
+      "fiber": 2
+    }
+  },
+  "pear": {
+    "fdcId": "169118",
+    "description": "Pears, raw",
+    "category": "Fruits and Fruit Juices",
+    "per100g": {
+      "calories": 57,
+      "protein": 0.36,
+      "carbs": 15.2,
+      "fat": 0.14,
+      "sugars": 9.75,
+      "saturatedFat": 0.022,
+      "sodiumMg": 1,
+      "fiber": 3.1
+    }
+  },
+  "strawberry": {
+    "fdcId": "167762",
+    "description": "Strawberries, raw",
+    "category": "Fruits and Fruit Juices",
+    "per100g": {
+      "calories": 32,
+      "protein": 0.67,
+      "carbs": 7.68,
+      "fat": 0.3,
+      "sugars": 4.89,
+      "saturatedFat": 0.015,
+      "sodiumMg": 1,
+      "fiber": 2
+    }
+  },
+  "orange": {
+    "fdcId": "169097",
+    "description": "Oranges, raw, all commercial varieties",
+    "category": "Fruits and Fruit Juices",
+    "per100g": {
+      "calories": 47,
+      "protein": 0.94,
+      "carbs": 11.8,
+      "fat": 0.12,
+      "sugars": 9.35,
+      "saturatedFat": 0.015,
+      "sodiumMg": 0,
+      "fiber": 2.4
+    }
+  },
+  "almond": {
+    "fdcId": "170567",
+    "description": "Nuts, almonds",
+    "category": "Nut and Seed Products",
+    "per100g": {
+      "calories": 579,
+      "protein": 21.2,
+      "carbs": 21.6,
+      "fat": 49.9,
+      "sugars": 4.35,
+      "saturatedFat": 3.8,
+      "sodiumMg": 1,
+      "fiber": 12.5
+    }
+  },
+  "raisin": {
+    "fdcId": "168165",
+    "description": "Raisins, dark, seedless (Includes foods for USDA's Food Distribution Program)",
+    "category": "Fruits and Fruit Juices",
+    "per100g": {
+      "calories": 299,
+      "protein": 3.3,
+      "carbs": 79.3,
+      "fat": 0.25,
+      "sugars": 65.2,
+      "saturatedFat": 0.094,
+      "sodiumMg": 26,
+      "fiber": 4.5
+    }
+  },
+  "parmesan": {
+    "fdcId": "170848",
+    "description": "Cheese, parmesan, hard",
+    "category": "Dairy and Egg Products",
+    "per100g": {
+      "calories": 392,
+      "protein": 35.8,
+      "carbs": 3.22,
+      "fat": 25,
+      "sugars": 0.11,
+      "saturatedFat": 14.8,
+      "sodiumMg": 1180,
+      "fiber": 0
+    }
+  },
+  "jalapeno": {
+    "fdcId": "168576",
+    "description": "Peppers, jalapeno, raw",
+    "category": "Vegetables and Vegetable Products",
+    "per100g": {
+      "calories": 29,
+      "protein": 0.91,
+      "carbs": 6.5,
+      "fat": 0.37,
+      "sugars": 4.12,
+      "saturatedFat": 0.092,
+      "sodiumMg": 3,
+      "fiber": 2.8
+    }
+  },
+  "paprika": {
+    "fdcId": "171329",
+    "description": "Spices, paprika",
+    "category": "Spices and Herbs",
+    "per100g": {
+      "calories": 282,
+      "protein": 14.1,
+      "carbs": 54,
+      "fat": 12.9,
+      "sugars": 10.3,
+      "saturatedFat": 2.14,
+      "sodiumMg": 68,
+      "fiber": 34.9
+    }
   }
 } satisfies Record<string, {
   fdcId: string; description: string; category: string; per100g: Nutrients;

@@ -1,11 +1,12 @@
 import { Link, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Body, Button, Card, CardGrid, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Body, Button, Card, CardGrid, Chip, ChipRow, Heading, Screen, TextField } from '../../src/components/ui';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { setDraft } from '../../src/lib/recipes/draft';
 import { filterLibraryRecipes, libraryIngredientText, libraryRecipeSummary, RECIPE_CUISINES, RECIPE_MEAL_TYPES, STARTER_RECIPES, starterRecipeDraft, type RecipeCuisine, type RecipeMealType } from '../../src/lib/recipes/library';
 import { LIBRARY_FOODS } from '../../src/lib/recipes/libraryFoods';
+import { CUISINE_REFERENCES } from '../../src/lib/recipes/libraryReferences';
 import { spacing, typography } from '../../src/theme';
 
 export default function RecipeLibrary() {
@@ -23,7 +24,7 @@ export default function RecipeLibrary() {
   return (
     <Screen>
       <Heading>Simple ideas for every meal</Heading>
-      <Body muted>{STARTER_RECIPES.length} original, cuisine-inspired recipes to make your own. Every library original scores at least 75/100 (Excellent) using Buko&apos;s recipe scoring. Review ingredients for allergies and preferences; green does not mean suitable for every diet.</Body>
+      <Body muted>{STARTER_RECIPES.length} original Buko recipes with pre-matched nutrition. Browse by meal and cuisine, or choose Everyday for general combinations. All library originals have an estimated Excellent score. Check ingredients for allergies and preferences.</Body>
       <View style={{ height: spacing.lg }} />
       <TextField label="Search recipes or ingredients" placeholder="Try chicken, lentils or tofu" value={search} onChangeText={(value) => { setSearch(value); setVisibleCount(12); setExpanded(null); }} autoCorrect={false} />
       <Text style={typography.subheading}>Meal type</Text>
@@ -31,23 +32,27 @@ export default function RecipeLibrary() {
         <Chip label="All meals" selected={!meal} onPress={() => { setMeal(null); setVisibleCount(12); setExpanded(null); }} />
         {RECIPE_MEAL_TYPES.map((type) => <Chip key={type} label={type} selected={meal === type} onPress={() => { setMeal(type); setVisibleCount(12); setExpanded(null); }} />)}
       </ChipRow>
-      <Text style={[typography.subheading, { marginTop: spacing.md }]}>Cuisine inspiration</Text>
+      <Text style={[typography.subheading, { marginTop: spacing.md }]}>Cuisine</Text>
       <ChipRow>
         <Chip label="All cuisines" selected={!cuisine} onPress={() => { setCuisine(null); setVisibleCount(12); setExpanded(null); }} />
         {RECIPE_CUISINES.map((type) => <Chip key={type} label={type} selected={cuisine === type} onPress={() => { setCuisine(type); setVisibleCount(12); setExpanded(null); }} />)}
       </ChipRow>
       <View style={{ height: spacing.lg }} />
-      <Body>{recipes.length} recipe{recipes.length === 1 ? '' : 's'} found{meal ? ` · ${meal}` : ''}{cuisine ? ` · ${cuisine}-inspired` : ''}</Body>
+      <Body>{recipes.length} recipe{recipes.length === 1 ? '' : 's'} found{meal ? ` · ${meal}` : ''}{cuisine ? ` · ${cuisine}` : ''}</Body>
       {meal || cuisine || search ? <Button title="Clear filters" variant="ghost" onPress={reset} /> : null}
       <Button title={about ? 'Hide score & preparation notes' : 'About scores & preparation'} variant="ghost" onPress={() => setAbout(!about)} />
-      {about ? <Notice tone="info">Scores and nutrition are estimates from listed ingredient weights and generic USDA foods, not lab-tested or medically certified. Cooking yield and brands can change results. Recipes use the general-food scoring model; processing level and additives are unknown and excluded. Editing a copy recalculates its score. Grain and bean weights marked cooked require advance cooking; times exclude advance preparation and chilling.</Notice> : null}
+      {about ? <Card>
+        <Body>Scores are out of 100; Excellent starts at 75. Every unmodified library recipe meets that threshold under Buko&apos;s unchanged scoring model. Scores do not rank cultures or guarantee personal dietary suitability.</Body>
+        <Body muted>Nutrition is estimated from input weights and generic USDA foods, not measured cooked yield or lab testing. Brands and edits can change results. Processing level and additives are unknown and excluded. Cooked grain and bean ingredients require advance preparation; times exclude advance cooking and chilling.</Body>
+        <Body muted>Recipes are original Buko formulations, not copied from the references or endorsed by their authors. Cuisine links explain dish identities and techniques; ingredient links provide nutrition. Adaptation notes identify important changes. These recipes have not been kitchen-tested or reviewed by representatives of every cuisine.</Body>
+      </Card> : null}
       {!recipes.length ? <Card><Heading>No recipes match</Heading><Body>Try another cuisine, meal type or ingredient, or clear the filters.</Body></Card> : null}
       <CardGrid>
         {recipes.slice(0, visibleCount).map((recipe) => {
           const { nutrition, result } = libraryRecipeSummary(recipe);
           return (
             <Card key={recipe.id}>
-            <Text style={typography.label}>{recipe.cuisine}-inspired · {recipe.meal} · {recipe.prepMinutes + recipe.cookMinutes} min · {recipe.servings} serving{recipe.servings === 1 ? '' : 's'}</Text>
+            <Text style={typography.label}>{recipe.cuisine} · {recipe.meal} · {recipe.prepMinutes + recipe.cookMinutes} min · {recipe.servings} serving{recipe.servings === 1 ? '' : 's'}</Text>
             <Heading>{recipe.title}</Heading>
             <Body muted>{recipe.description}</Body>
             <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginVertical: spacing.md }}>
@@ -60,6 +65,10 @@ export default function RecipeLibrary() {
             <Button title={expanded === recipe.id ? 'Hide ingredients and steps' : 'Preview ingredients and steps'} variant="ghost" onPress={() => setExpanded(expanded === recipe.id ? null : recipe.id)} />
             {expanded === recipe.id ? (
               <View style={{ marginBottom: spacing.md }}>
+                <Text style={typography.subheading}>Recipe context</Text>
+                {recipe.adaptation ? <Body>{recipe.adaptation}</Body> : null}
+                <Body muted>{CUISINE_REFERENCES[recipe.cuisine].context}</Body>
+                {CUISINE_REFERENCES[recipe.cuisine].links.map((source) => <Link key={source.url} href={source.url} target="_blank" style={{ marginVertical: spacing.xs }}>Cooking reference: {source.title}</Link>)}
                 <Text style={typography.subheading}>Ingredients</Text>
                 {recipe.ingredients.map((ingredient, index) => <View key={`${ingredient.food}-${index}`} style={{ marginBottom: spacing.sm }}>
                   <Text style={typography.body}>{'\u2022'} {libraryIngredientText(ingredient)}</Text>

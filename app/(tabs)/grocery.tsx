@@ -87,6 +87,7 @@ export default function Grocery() {
     <Screen>
       <TabHeader
         title="Grocery"
+        backFallback="/(tabs)/plan"
         right={
           <Pressable onPress={() => router.push('/pantry')} hitSlop={10} accessibilityLabel="Pantry">
             <Ionicons name="file-tray-full-outline" size={24} color={colors.primary} />

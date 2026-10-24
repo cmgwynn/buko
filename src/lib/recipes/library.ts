@@ -3,13 +3,14 @@ import { draftFromText } from './matching';
 import { detectTimerSeconds } from './timers';
 import { LIBRARY_FOODS, type LibraryFoodKey } from './libraryFoods';
 import { computeRecipeNutrition, scoreRecipe } from './nutrition';
+import { EXPANDED_RECIPES } from './libraryExpansion';
 
 export const RECIPE_MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'] as const;
 export type RecipeMealType = (typeof RECIPE_MEAL_TYPES)[number];
-export const RECIPE_CUISINES = ['Italian', 'Mexican', 'American', 'Filipino', 'Mediterranean', 'Indian', 'Chinese', 'Japanese', 'Thai', 'Middle Eastern'] as const;
+export const RECIPE_CUISINES = ['Italian', 'Mexican', 'American', 'Filipino', 'Mediterranean', 'Indian', 'Chinese', 'Japanese', 'Thai', 'Middle Eastern', 'Everyday'] as const;
 export type RecipeCuisine = (typeof RECIPE_CUISINES)[number];
 
-interface LibraryIngredient {
+export interface LibraryIngredient {
   food: LibraryFoodKey;
   grams: number;
   name: string;
@@ -26,6 +27,8 @@ export interface StarterRecipe {
   cookMinutes: number;
   ingredients: LibraryIngredient[];
   steps: string[];
+  /** Concrete changes or context, not a claim of traditional authenticity. */
+  adaptation?: string;
 }
 
 function portion(food: LibraryFoodKey, grams: number, name: string): LibraryIngredient {
@@ -45,7 +48,7 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Combine the oats, milk and cinnamon in a small saucepan.', 'Simmer gently for 5 minutes, stirring until the oats soften. Add a splash of water if needed.', 'Slice the banana over the oats and serve.'],
   },
   {
-    id: 'yogurt-berry-bowl', title: 'Berry yogurt bowl', meal: 'Breakfast', cuisine: 'American', description: 'No cooking, just a bowl and a spoon.',
+    id: 'yogurt-berry-bowl', title: 'Berry yogurt bowl', meal: 'Breakfast', cuisine: 'Everyday', description: 'No cooking, just a bowl and a spoon.',
     servings: 1, prepMinutes: 5, cookMinutes: 0,
     ingredients: [portion('yogurt', 170, 'plain nonfat Greek yogurt'), portion('blueberries', 75, 'blueberries'), portion('oats', 25, 'rolled oats'), portion('pumpkinSeeds', 10, 'unsalted pumpkin seeds')],
     steps: ['Spoon the yogurt into a bowl.', 'Rinse the berries and add them with the oats and pumpkin seeds. Stir before eating.'],
@@ -99,13 +102,13 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Toast the bread and thinly slice the washed apple.', 'Spread the peanut butter on the toast. Top with apple and cinnamon.'],
   },
   {
-    id: 'cucumber-cottage-bowl', title: 'Cucumber cottage cheese bowl', meal: 'Snack', cuisine: 'American', description: 'A cool, savory snack in minutes.',
+    id: 'cucumber-cottage-bowl', title: 'Cucumber cottage cheese bowl', meal: 'Snack', cuisine: 'Everyday', description: 'A cool, savory snack in minutes.',
     servings: 1, prepMinutes: 5, cookMinutes: 0,
     ingredients: [portion('cottageCheese', 120, '1% cottage cheese'), portion('cucumber', 120, 'cucumber with peel'), portion('pepper', 0.3, 'black pepper'), portion('lemon', 5, 'lemon juice')],
     steps: ['Dice the washed cucumber.', 'Spoon the cottage cheese into a bowl and top with cucumber, pepper and lemon juice. Serve chilled.'],
   },
   {
-    id: 'cocoa-banana-yogurt', title: 'Cocoa banana yogurt', meal: 'Snack', cuisine: 'American', description: 'A lightly sweet snack without cooking.',
+    id: 'cocoa-banana-yogurt', title: 'Cocoa banana yogurt', meal: 'Snack', cuisine: 'Everyday', description: 'A lightly sweet snack without cooking.',
     servings: 1, prepMinutes: 5, cookMinutes: 0,
     ingredients: [portion('yogurt', 120, 'plain nonfat Greek yogurt'), portion('banana', 100, 'peeled banana'), portion('cocoa', 3, 'unsweetened cocoa powder')],
     steps: ['Mash half the banana with the cocoa, then stir into the yogurt.', 'Slice the remaining banana on top and serve.'],
@@ -225,31 +228,32 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Finely chop garlic. Warm half the oil and cook garlic gently for 1 minute without burning.', 'Add rice, spinach and a splash of water; stir until steaming throughout.', 'In another pan, cook eggs in remaining oil until firm and 160 F (71 C). Serve with hot garlic rice and sliced tomato.'],
   },
   {
-    id: 'filipino-chicken-cabbage-rice', title: 'Ginger chicken cabbage bowl', meal: 'Lunch', cuisine: 'Filipino', description: 'Ginger and garlic bring flavor to a quick lunch bowl.',
+    id: 'filipino-chicken-cabbage-rice', title: 'Ginger chicken cabbage bowl', meal: 'Lunch', cuisine: 'Everyday', description: 'Ginger and garlic bring flavor to a quick lunch bowl.',
     servings: 2, prepMinutes: 10, cookMinutes: 20,
     ingredients: [portion('chicken', 280, 'raw skinless boneless chicken breast'), portion('cabbage', 250, 'cabbage'), portion('carrot', 120, 'carrot'), portion('brownRice', 300, 'cooked brown rice'), portion('ginger', 15, 'fresh ginger'), portion('garlic', 8, 'garlic'), portion('oliveOil', 8, 'olive oil'), portion('soySauce', 10, 'reduced-sodium soy sauce')],
     steps: ['Slice chicken on a separate board. Shred cabbage and carrot, and mince ginger and garlic.', 'Cook chicken in oil for 8 minutes, turning. Add vegetables, ginger, garlic and a splash of water.', 'Cover and cook until vegetables are tender and chicken reaches 165 F (74 C). Stir in soy sauce and serve over steaming rice.'],
   },
   {
-    id: 'filipino-tomato-white-beans', title: 'Tomato white bean rice bowl', meal: 'Lunch', cuisine: 'Filipino', description: 'A simple tomato-garlic bean bowl inspired by home-style stews.',
+    id: 'filipino-tomato-white-beans', title: 'Tomato white bean rice bowl', meal: 'Lunch', cuisine: 'Everyday', description: 'A simple tomato-garlic bean bowl.',
     servings: 2, prepMinutes: 10, cookMinutes: 18,
     ingredients: [portion('whiteBeans', 300, 'cooked white beans without salt'), portion('tomato', 300, 'tomato'), portion('spinach', 100, 'spinach'), portion('brownRice', 280, 'cooked brown rice'), portion('onion', 80, 'onion'), portion('garlic', 10, 'garlic'), portion('oliveOil', 8, 'olive oil')],
     steps: ['Dice onion and tomato; mince garlic. Soften onion in oil for 5 minutes.', 'Add garlic and tomato; simmer with a splash of water for 8 minutes.', 'Add beans and spinach and heat until steaming. Serve over hot rice.'],
   },
   {
-    id: 'filipino-adobo-inspired-chicken', title: 'Vinegar garlic chicken and greens', meal: 'Dinner', cuisine: 'Filipino', description: 'An adobo-inspired skillet with a smaller amount of soy sauce.',
+    id: 'filipino-adobo-inspired-chicken', title: 'Cider vinegar garlic chicken and greens', meal: 'Dinner', cuisine: 'Everyday', description: 'A tangy cider-vinegar chicken skillet.',
+    adaptation: 'Uses cider vinegar rather than the cane or white vinegar usual in Filipino adobo; moved to Everyday rather than presented as adobo.',
     servings: 2, prepMinutes: 10, cookMinutes: 25,
     ingredients: [portion('chicken', 300, 'raw skinless boneless chicken breast'), portion('greenBeans', 250, 'green beans'), portion('brownRice', 300, 'cooked brown rice'), portion('vinegar', 35, 'cider vinegar'), portion('soySauce', 15, 'reduced-sodium soy sauce'), portion('garlic', 15, 'garlic'), portion('oliveOil', 8, 'olive oil'), portion('pepper', 1, 'black pepper')],
     steps: ['Cut chicken into chunks on a separate board. Warm oil in a skillet and brown chicken for 5 minutes.', 'Add crushed garlic, vinegar, soy sauce, pepper and 120 ml water. Bring to a boil, cover and simmer for 12 minutes.', 'Add trimmed beans and simmer until beans are tender and chicken reaches 165 F (74 C). Serve with steaming rice.'],
   },
   {
-    id: 'filipino-ginger-fish-soup', title: 'Ginger salmon vegetable soup', meal: 'Dinner', cuisine: 'Filipino', description: 'A clear ginger broth with salmon, cabbage and rice.',
+    id: 'filipino-ginger-fish-soup', title: 'Ginger salmon vegetable soup', meal: 'Dinner', cuisine: 'Everyday', description: 'A clear ginger broth with salmon, cabbage and rice.',
     servings: 2, prepMinutes: 12, cookMinutes: 20,
     ingredients: [portion('salmon', 280, 'raw boneless salmon'), portion('cabbage', 220, 'cabbage'), portion('tomato', 220, 'tomato'), portion('spinach', 80, 'spinach'), portion('brownRice', 300, 'cooked brown rice'), portion('ginger', 20, 'fresh ginger'), portion('onion', 80, 'onion'), portion('lime', 20, 'lime juice')],
     steps: ['Slice ginger and onion. Simmer in 600 ml water for 8 minutes.', 'Add chopped tomato and cabbage; simmer for 5 minutes.', 'Add salmon pieces and simmer gently until they reach 145 F (63 C), about 6-8 minutes. Add spinach to wilt, check for bones and finish with lime juice.', 'Serve with rice reheated until steaming hot.'],
   },
   {
-    id: 'filipino-pineapple-yogurt-cups', title: 'Pineapple banana yogurt cups', meal: 'Snack', cuisine: 'Filipino', description: 'A tropical fruit snack with plain yogurt, not sweetened syrup.',
+    id: 'filipino-pineapple-yogurt-cups', title: 'Pineapple banana yogurt cups', meal: 'Snack', cuisine: 'Everyday', description: 'A tropical fruit snack with plain yogurt, not sweetened syrup.',
     servings: 2, prepMinutes: 8, cookMinutes: 0,
     ingredients: [portion('pineapple', 200, 'fresh pineapple flesh'), portion('banana', 100, 'peeled banana'), portion('yogurt', 200, 'plain nonfat Greek yogurt'), portion('pumpkinSeeds', 12, 'unsalted pumpkin seeds')],
     steps: ['Dice pineapple and slice banana.', 'Layer fruit and yogurt in two cups. Sprinkle with pumpkin seeds and serve chilled.'],
@@ -309,13 +313,15 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Cut the weighed potato into chunks and boil for about 20 minutes until tender. Drain.', 'Dice cucumber and tomato. Toss with lentils and warm potato, then add lemon juice, oil, cumin and chopped cilantro. Serve warm, or cool promptly and refrigerate.'],
   },
   {
-    id: 'indian-red-lentil-style-dal', title: 'Ginger lentil vegetable dal', meal: 'Dinner', cuisine: 'Indian', description: 'A gentle lentil bowl using ready-cooked lentils.',
+    id: 'indian-red-lentil-style-dal', title: 'Ginger whole-lentil vegetable dal', meal: 'Dinner', cuisine: 'Indian', description: 'A gentle lentil bowl using ready-cooked whole lentils.',
+    adaptation: 'Uses cooked whole brown lentils and cauliflower, not split red lentils or a specific regional dal preparation.',
     servings: 2, prepMinutes: 10, cookMinutes: 25,
     ingredients: [portion('lentils', 350, 'cooked lentils without salt'), portion('cannedTomato', 250, 'canned crushed tomatoes'), portion('cauliflower', 250, 'cauliflower'), portion('brownRice', 280, 'cooked brown rice'), portion('onion', 80, 'onion'), portion('ginger', 15, 'fresh ginger'), portion('garlic', 8, 'garlic'), portion('oliveOil', 8, 'olive oil'), portion('turmeric', 1, 'ground turmeric'), portion('cumin', 2, 'ground cumin')],
     steps: ['Chop onion, ginger and garlic. Cook gently in oil for 5 minutes with cumin and turmeric.', 'Add small cauliflower florets, tomatoes and 200 ml water; simmer for 12 minutes.', 'Add lentils and simmer for 8 minutes until cauliflower is tender. Mash lightly to thicken and serve with hot rice.'],
   },
   {
     id: 'indian-yogurt-chicken-tray', title: 'Yogurt spice chicken and cauliflower', meal: 'Dinner', cuisine: 'Indian', description: 'A yogurt-coated chicken tray with warm spices.',
+    adaptation: 'An oven tray with a simplified spice combination, not tandoori chicken cooked in a tandoor.',
     servings: 2, prepMinutes: 15, cookMinutes: 30,
     ingredients: [portion('chicken', 300, 'raw skinless boneless chicken breast'), portion('yogurt', 100, 'plain nonfat Greek yogurt'), portion('cauliflower', 350, 'cauliflower'), portion('brownRice', 300, 'cooked brown rice'), portion('lemon', 25, 'lemon juice'), portion('oliveOil', 10, 'olive oil'), portion('cumin', 3, 'ground cumin'), portion('turmeric', 1, 'ground turmeric'), portion('garlic', 8, 'garlic')],
     steps: ['Heat oven to 425 F (220 C). Mix yogurt, lemon juice, spices and minced garlic. Coat chicken using separate raw-meat utensils.', 'Place chicken on one side of a tray. Toss cauliflower with oil and place beside it.', 'Roast for about 30 minutes until chicken reaches 165 F (74 C) and cauliflower is tender. Serve over steaming rice. Discard any unused raw-chicken marinade.'],
@@ -369,13 +375,14 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Warm oil in a skillet and wilt spinach. Add beaten eggs and stir until firm and 160 F (71 C).', 'Reheat rice until steaming throughout. Divide between bowls, top with eggs and finish with soy sauce and sesame seeds.'],
   },
   {
-    id: 'japanese-salmon-cucumber-bowl', title: 'Cooked salmon cucumber bowl', meal: 'Lunch', cuisine: 'Japanese', description: 'A sushi-inspired rice bowl made with fully cooked fish.',
+    id: 'japanese-salmon-cucumber-bowl', title: 'Cooked salmon cucumber bowl', meal: 'Lunch', cuisine: 'Everyday', description: 'A brown rice bowl made with fully cooked fish.',
+    adaptation: 'Uses cider vinegar and brown rice; not presented as sushi or Japanese seasoned sushi rice.',
     servings: 2, prepMinutes: 12, cookMinutes: 18,
     ingredients: [portion('salmon', 260, 'raw boneless salmon'), portion('brownRice', 300, 'cooked brown rice'), portion('cucumber', 220, 'cucumber with peel'), portion('carrot', 120, 'carrot'), portion('avocado', 80, 'avocado flesh'), portion('vinegar', 20, 'cider vinegar'), portion('soySauce', 10, 'reduced-sodium soy sauce'), portion('sesame', 8, 'sesame seeds')],
     steps: ['Heat oven to 400 F (200 C). Bake salmon on parchment for about 18 minutes until it reaches 145 F (63 C).', 'Slice cucumber, grate carrot and dice avocado. Stir vinegar into hot rice.', 'Top rice with vegetables and cooked boneless salmon flakes. Add measured soy sauce and sesame seeds.'],
   },
   {
-    id: 'japanese-edamame-rice-salad', title: 'Edamame sesame rice salad', meal: 'Lunch', cuisine: 'Japanese', description: 'A vegetable-heavy rice salad for a chilled lunch.',
+    id: 'japanese-edamame-rice-salad', title: 'Edamame sesame rice salad', meal: 'Lunch', cuisine: 'Everyday', description: 'A vegetable-heavy rice salad for a chilled lunch.',
     servings: 2, prepMinutes: 15, cookMinutes: 0,
     ingredients: [portion('edamame', 260, 'cooked shelled edamame, cooled'), portion('brownRice', 300, 'cooked brown rice, safely cooled'), portion('cucumber', 200, 'cucumber with peel'), portion('carrot', 150, 'carrot'), portion('sesame', 12, 'sesame seeds'), portion('vinegar', 25, 'cider vinegar'), portion('soySauce', 12, 'reduced-sodium soy sauce')],
     steps: ['Use edamame cooked according to package directions and weighed after cooking, and rice that was cooled promptly and refrigerated. Advance cooking is not included.', 'Dice cucumber and grate carrot. Toss all ingredients together and keep chilled until serving.'],
@@ -399,55 +406,58 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     steps: ['Use shelled edamame cooked according to package directions and weighed after cooking. Advance cooking is not included.', 'Grate carrot and dice cucumber. Mix with cooled edamame, lemon juice and sesame seeds; divide into cups and keep chilled.'],
   },
   {
-    id: 'thai-pineapple-breakfast-oats', title: 'Pineapple lime breakfast oats', meal: 'Breakfast', cuisine: 'Thai', description: 'A tropical overnight bowl with yogurt and lime.',
+    id: 'thai-pineapple-breakfast-oats', title: 'Pineapple lime breakfast oats', meal: 'Breakfast', cuisine: 'Everyday', description: 'A tropical overnight bowl with yogurt and lime.',
     servings: 1, prepMinutes: 8, cookMinutes: 0,
     ingredients: [portion('oats', 45, 'rolled oats'), portion('yogurt', 170, 'plain nonfat Greek yogurt'), portion('milk', 120, 'skim milk'), portion('pineapple', 120, 'fresh pineapple flesh'), portion('lime', 8, 'lime juice'), portion('pumpkinSeeds', 10, 'unsalted pumpkin seeds')],
     steps: ['Mix oats, yogurt, milk and lime juice. Cover and chill for at least 4 hours; prep time excludes chilling.', 'Dice pineapple and spoon on top with pumpkin seeds before serving.'],
   },
   {
-    id: 'thai-lime-chicken-salad', title: 'Lime chicken cabbage salad', meal: 'Lunch', cuisine: 'Thai', description: 'Crunchy cabbage with lime, ginger and cooked chicken.',
+    id: 'thai-lime-chicken-salad', title: 'Lime chicken cabbage salad', meal: 'Lunch', cuisine: 'Everyday', description: 'Crunchy cabbage with lime, ginger and cooked chicken.',
     servings: 2, prepMinutes: 15, cookMinutes: 18,
     ingredients: [portion('chicken', 280, 'raw skinless boneless chicken breast'), portion('cabbage', 250, 'cabbage'), portion('carrot', 120, 'carrot'), portion('brownRice', 280, 'cooked brown rice'), portion('lime', 35, 'lime juice'), portion('ginger', 12, 'fresh ginger'), portion('cilantro', 15, 'fresh cilantro'), portion('oliveOil', 10, 'olive oil'), portion('soySauce', 10, 'reduced-sodium soy sauce')],
     steps: ['Slice chicken on a separate board. Cook in half the oil, turning, until it reaches 165 F (74 C), about 12-18 minutes.', 'Shred cabbage and carrot. Mix lime juice, grated ginger, soy sauce and remaining oil.', 'Toss vegetables and cooked chicken with dressing and cilantro. Serve with steaming rice.'],
   },
   {
-    id: 'thai-peanut-tofu-rice', title: 'Peanut lime tofu rice bowl', meal: 'Lunch', cuisine: 'Thai', description: 'A measured peanut sauce with tofu and vegetables.',
+    id: 'thai-peanut-tofu-rice', title: 'Peanut lime tofu rice bowl', meal: 'Lunch', cuisine: 'Everyday', description: 'A measured peanut sauce with tofu and vegetables.',
     servings: 2, prepMinutes: 12, cookMinutes: 18,
     ingredients: [portion('tofu', 300, 'firm calcium-set tofu, drained'), portion('brownRice', 300, 'cooked brown rice'), portion('cucumber', 200, 'cucumber with peel'), portion('carrot', 150, 'carrot'), portion('peanutButter', 24, 'unsalted peanut butter'), portion('lime', 30, 'lime juice'), portion('soySauce', 10, 'reduced-sodium soy sauce'), portion('oliveOil', 8, 'olive oil')],
     steps: ['Cube tofu and brown in oil for 12-15 minutes, turning.', 'Whisk peanut butter, lime juice and soy sauce with warm water a spoonful at a time to make a pourable sauce.', 'Slice cucumber and grate carrot. Serve with hot rice and tofu; drizzle measured sauce over both bowls.'],
   },
   {
-    id: 'thai-ginger-chicken-pot', title: 'Ginger lime chicken vegetable pot', meal: 'Dinner', cuisine: 'Thai', description: 'A light broth-style dinner without a coconut cream base.',
+    id: 'thai-ginger-chicken-pot', title: 'Ginger lime chicken vegetable pot', meal: 'Dinner', cuisine: 'Everyday', description: 'A light broth-style chicken and vegetable dinner.',
     servings: 2, prepMinutes: 12, cookMinutes: 25,
     ingredients: [portion('chicken', 300, 'raw skinless boneless chicken breast'), portion('mushrooms', 200, 'white mushrooms'), portion('bellPepper', 180, 'red bell pepper'), portion('spinach', 100, 'spinach'), portion('brownRice', 300, 'cooked brown rice'), portion('ginger', 20, 'fresh ginger'), portion('lime', 30, 'lime juice'), portion('oliveOil', 8, 'olive oil'), portion('soySauce', 12, 'reduced-sodium soy sauce')],
     steps: ['Slice chicken on a separate board. Warm oil in a pot and cook chicken with sliced ginger for 5 minutes.', 'Add sliced mushrooms, pepper and 500 ml water. Simmer for 15 minutes, until chicken reaches 165 F (74 C).', 'Add spinach and soy sauce; heat until wilted. Finish with lime juice and serve alongside steaming rice.'],
   },
   {
-    id: 'thai-pineapple-tofu-skillet', title: 'Pineapple tofu vegetable skillet', meal: 'Dinner', cuisine: 'Thai', description: 'Fresh pineapple adds sweetness without a bottled glaze.',
+    id: 'thai-pineapple-tofu-skillet', title: 'Pineapple tofu vegetable skillet', meal: 'Dinner', cuisine: 'Everyday', description: 'Fresh pineapple adds sweetness without a bottled glaze.',
     servings: 2, prepMinutes: 15, cookMinutes: 20,
     ingredients: [portion('tofu', 320, 'firm calcium-set tofu, drained'), portion('pineapple', 180, 'fresh pineapple flesh'), portion('bellPepper', 220, 'red bell pepper'), portion('broccoli', 250, 'broccoli'), portion('brownRice', 280, 'cooked brown rice'), portion('oliveOil', 10, 'olive oil'), portion('soySauce', 12, 'reduced-sodium soy sauce'), portion('lime', 20, 'lime juice'), portion('ginger', 12, 'fresh ginger')],
     steps: ['Dry and cube tofu. Cut pineapple and vegetables into bite-size pieces.', 'Brown tofu in oil for 10 minutes. Add broccoli, pepper, ginger and 60 ml water; cover and cook for 7 minutes.', 'Stir in pineapple, soy sauce and lime juice. Heat for 3 minutes and serve over steaming rice.'],
   },
   {
-    id: 'thai-lime-peanut-cucumber', title: 'Lime peanut cucumber cups', meal: 'Snack', cuisine: 'Thai', description: 'Crunchy vegetables with a small peanut lime dip.',
+    id: 'thai-lime-peanut-cucumber', title: 'Lime peanut cucumber cups', meal: 'Snack', cuisine: 'Everyday', description: 'Crunchy vegetables with a small peanut lime dip.',
     servings: 2, prepMinutes: 10, cookMinutes: 0,
     ingredients: [portion('peanutButter', 30, 'unsalted peanut butter'), portion('yogurt', 120, 'plain nonfat Greek yogurt'), portion('lime', 20, 'lime juice'), portion('cucumber', 220, 'cucumber with peel'), portion('carrot', 150, 'carrot')],
     steps: ['Stir peanut butter, yogurt and lime juice until smooth.', 'Cut cucumber and carrot into sticks. Divide dip into cups and serve with the vegetables; keep chilled.'],
   },
   {
     id: 'middle-eastern-tomato-eggs', title: 'Tomato chickpea breakfast eggs', meal: 'Breakfast', cuisine: 'Middle Eastern', description: 'A shakshuka-inspired skillet with chickpeas.',
+    adaptation: 'Adds chickpeas to a tomato-pepper egg skillet. Shakshuka has North African roots and is also widely cooked across the Middle East.',
     servings: 2, prepMinutes: 10, cookMinutes: 20,
     ingredients: [portion('egg', 200, 'egg without shells'), portion('chickpeas', 180, 'cooked chickpeas without salt'), portion('cannedTomato', 300, 'canned crushed tomatoes'), portion('bellPepper', 150, 'red bell pepper'), portion('onion', 80, 'onion'), portion('oliveOil', 8, 'olive oil'), portion('cumin', 2, 'ground cumin')],
     steps: ['Dice onion and pepper. Soften in oil for 7 minutes with cumin.', 'Add tomatoes and chickpeas; simmer for 5 minutes.', 'Make spaces for eggs. Add eggs, cover and cook gently until firm and 160 F (71 C).'],
   },
   {
-    id: 'middle-eastern-chickpea-parsley-salad', title: 'Chickpea parsley bulgur salad', meal: 'Lunch', cuisine: 'Middle Eastern', description: 'A tabbouleh-inspired lunch with extra chickpeas.',
+    id: 'middle-eastern-chickpea-parsley-salad', title: 'Chickpea bulgur tahini salad', meal: 'Lunch', cuisine: 'Middle Eastern', description: 'A grain-and-bean lunch with a lemon tahini dressing.',
+    adaptation: 'Not called tabbouleh: parsley is a garnish here rather than the defining main ingredient.',
     servings: 2, prepMinutes: 15, cookMinutes: 0,
-    ingredients: [portion('bulgur', 300, 'cooked bulgur without salt, cooled'), portion('chickpeas', 240, 'cooked chickpeas without salt'), portion('parsley', 40, 'fresh parsley'), portion('tomato', 220, 'tomato'), portion('cucumber', 200, 'cucumber with peel'), portion('lemon', 35, 'lemon juice'), portion('oliveOil', 12, 'olive oil')],
-    steps: ['Use safely cooled, refrigerated bulgur. Finely chop parsley, tomato and cucumber.', 'Toss with chickpeas, bulgur, lemon juice and oil. Divide into two bowls and keep chilled.'],
+    ingredients: [portion('bulgur', 300, 'cooked bulgur without salt, cooled'), portion('chickpeas', 240, 'cooked chickpeas without salt'), portion('parsley', 40, 'fresh parsley'), portion('tomato', 220, 'tomato'), portion('cucumber', 200, 'cucumber with peel'), portion('lemon', 35, 'lemon juice'), portion('oliveOil', 12, 'olive oil'), portion('tahini', 16, 'unsalted tahini')],
+    steps: ['Use safely cooled, refrigerated bulgur. Finely chop parsley, tomato and cucumber.', 'Whisk tahini, lemon juice and oil with a little water. Toss with chickpeas, bulgur and vegetables. Divide into two bowls and keep chilled.'],
   },
   {
-    id: 'middle-eastern-chicken-pita', title: 'Cumin chicken yogurt pita', meal: 'Lunch', cuisine: 'Middle Eastern', description: 'A shawarma-inspired pita with simple pantry spices.',
+    id: 'middle-eastern-chicken-pita', title: 'Cumin chicken yogurt pita', meal: 'Lunch', cuisine: 'Middle Eastern', description: 'A chicken pita with simple pantry spices.',
+    adaptation: 'Not called shawarma: uses a pan and a simplified cumin seasoning, not a rotisserie and a shawarma spice mixture.',
     servings: 2, prepMinutes: 15, cookMinutes: 18,
     ingredients: [portion('chicken', 280, 'raw skinless boneless chicken breast'), portion('pita', 120, 'whole-wheat pita'), portion('cucumber', 180, 'cucumber with peel'), portion('tomato', 180, 'tomato'), portion('yogurt', 100, 'plain nonfat Greek yogurt'), portion('lemon', 25, 'lemon juice'), portion('oliveOil', 8, 'olive oil'), portion('cumin', 3, 'ground cumin'), portion('garlic', 6, 'garlic')],
     steps: ['Slice chicken on a separate board. Cook in oil with cumin and half the minced garlic, turning, until it reaches 165 F (74 C), about 12-18 minutes.', 'Mix yogurt, lemon juice and remaining garlic. Slice cucumber and tomato.', 'Warm pita and fill with cooked chicken, vegetables and yogurt sauce.'],
@@ -470,6 +480,7 @@ export const STARTER_RECIPES: StarterRecipe[] = [
     ingredients: [portion('whiteBeans', 200, 'cooked white beans without salt'), portion('tahini', 15, 'unsalted tahini'), portion('lemon', 25, 'lemon juice'), portion('garlic', 3, 'garlic'), portion('carrot', 150, 'carrot'), portion('cucumber', 180, 'cucumber with peel')],
     steps: ['Mash or blend beans, tahini, lemon juice and finely grated garlic with a little water until smooth.', 'Cut carrot and cucumber into sticks. Divide dip into two bowls and serve with the vegetables. Keep chilled.'],
   },
+  ...EXPANDED_RECIPES,
 ];
 
 export function filterLibraryRecipes(filters: { meal?: RecipeMealType | null; cuisine?: RecipeCuisine | null; search?: string }): StarterRecipe[] {
@@ -485,7 +496,7 @@ export function filterLibraryRecipes(filters: { meal?: RecipeMealType | null; cu
 export function starterRecipeDraft(recipe: StarterRecipe): RecipeDraft {
   return {
     ...emptyDraft(), title: recipe.title, servings: recipe.servings,
-    prepMinutes: recipe.prepMinutes, cookMinutes: recipe.cookMinutes, sourceName: `Buko starter library - ${recipe.cuisine}-inspired`,
+    prepMinutes: recipe.prepMinutes, cookMinutes: recipe.cookMinutes, sourceName: `Buko recipe library - ${recipe.cuisine}`,
     ingredients: recipe.ingredients.map((ingredient, position) => {
       const food = LIBRARY_FOODS[ingredient.food];
       return {
