@@ -34,6 +34,10 @@ const workoutHeaderOptions = {
   ...headerOptions,
   headerLeft: () => <BackButton fallback="/(tabs)/train" />,
 };
+const communityHeaderOptions = {
+  ...headerOptions,
+  headerLeft: () => <BackButton fallback="/community" />,
+};
 
 function Gate() {
   const { session, loading } = useAuth();
@@ -66,6 +70,10 @@ function Gate() {
         <Stack.Screen name="recipe/edit" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
         <Stack.Screen name="recipe/import" options={{ ...recipeHeaderOptions, title: 'Import recipe' }} />
         <Stack.Screen name="recipe/library" options={{ ...recipeHeaderOptions, title: 'Recipe library' }} />
+        <Stack.Screen name="community/index" options={{ ...recipeHeaderOptions, title: 'Shared recipes' }} />
+        <Stack.Screen name="community/[id]" options={{ ...communityHeaderOptions, title: 'Shared recipe' }} />
+        <Stack.Screen name="community/publish" options={{ ...communityHeaderOptions, title: 'Share a recipe' }} />
+        <Stack.Screen name="community/moderation" options={{ ...communityHeaderOptions, title: 'Recipe reports' }} />
         <Stack.Screen name="recipe/match" options={{ ...recipeHeaderOptions, title: 'Match ingredient' }} />
         <Stack.Screen name="cook/[id]" options={{ ...recipeHeaderOptions, title: 'Cooking', gestureEnabled: false }} />
         <Stack.Screen name="cook/finish" options={{ ...recipeHeaderOptions, title: 'Log meal', gestureEnabled: false }} />

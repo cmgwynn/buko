@@ -1,4 +1,4 @@
-import type { Food, Meal, Nutrients } from '../types';
+import type { Food, Meal, Nutrients } from '../types/index.ts';
 
 export const MEALS: { key: Meal; label: string }[] = [
   { key: 'breakfast', label: 'Breakfast' },

@@ -1,8 +1,8 @@
-import type { Nutrients, Product } from '../../types';
-import { macrosForGrams, type Macros } from '../diary';
-import { computeNutriScore, type NutriScoreResult } from '../scoring/nutriscore';
-import { scoreProduct, type ScoreResult } from '../scoring';
-import type { RecipeIngredient } from './types';
+import type { Nutrients, Product } from '../../types/index.ts';
+import { macrosForGrams, type Macros } from '../diary.ts';
+import { computeNutriScore, type NutriScoreResult } from '../scoring/nutriscore.ts';
+import { scoreProduct, type ScoreResult } from '../scoring/index.ts';
+import type { RecipeIngredient } from './types.ts';
 
 type NutrIngredient = Pick<RecipeIngredient, 'grams' | 'nutrition'>;
 

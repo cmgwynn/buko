@@ -1,26 +1,6 @@
 import { useSyncExternalStore } from 'react';
-import type { IngredientDraft, Section, StepDraft } from './types';
-
-/** A recipe being created or edited. Lives in memory only until the user saves it. */
-export interface RecipeDraft {
-  /** Present when editing an existing recipe. */
-  id?: string;
-  title: string;
-  servings: number;
-  prepMinutes: number | null;
-  cookMinutes: number | null;
-  sourceUrl: string | null;
-  sourceName: string | null;
-  photoPath: string | null;
-  /** Local image chosen but not yet uploaded. */
-  photoUri: string | null;
-  ingredients: IngredientDraft[];
-  steps: StepDraft[];
-  /** Calories per serving the source site states, for comparison only. Not saved. */
-  siteCalories?: number | null;
-  /** True when the page gave no serving count and we assumed one. Not saved. */
-  servingsGuessed?: boolean;
-}
+import type { IngredientDraft, RecipeDraft, Section } from './types';
+export type { RecipeDraft } from './types';
 
 export const emptyDraft = (): RecipeDraft => ({
   title: '', servings: 4, prepMinutes: null, cookMinutes: null, sourceUrl: null, sourceName: null,

@@ -27,6 +27,7 @@ export function draftFromFull(full: RecipeFull): RecipeDraft {
   const { recipe } = full;
   return {
     id: recipe.id,
+    communityParentId: recipe.community_parent_id,
     title: recipe.title,
     servings: recipe.servings,
     prepMinutes: recipe.prep_minutes,
@@ -51,6 +52,7 @@ export async function saveRecipe(userId: string, d: RecipeDraft): Promise<string
     source_url: d.sourceUrl,
     source_name: d.sourceName,
     updated_at: new Date().toISOString(),
+    ...(d.communityParentId !== undefined ? { community_parent_id: d.communityParentId } : {}),
   };
   let id = d.id;
   if (id) {

@@ -101,6 +101,7 @@ export default function RecipeScreen() {
       <Stack.Screen options={{ title: 'Recipe' }} />
       <RecipeImage path={recipe.photo_path} style={{ height: 200, marginBottom: spacing.lg }} />
       <Heading>{recipe.title}</Heading>
+      <Button title={recipe.community_parent_id ? 'Share my variation with members' : 'Share recipe with members'} variant="ghost" onPress={() => router.push({ pathname: '/community/publish', params: { recipeId: recipe.id } })} />
       <Text style={typography.small}>
         {recipe.prep_minutes ? `Prep ${recipe.prep_minutes} min` : ''}
         {recipe.prep_minutes && recipe.cook_minutes ? ' · ' : ''}

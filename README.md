@@ -21,7 +21,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), [`0006_subscriptions.sql`](./supabase/migrations/0006_subscriptions.sql), [`0007_account.sql`](./supabase/migrations/0007_account.sql) and [`0008_diagnostics.sql`](./supabase/migrations/0008_diagnostics.sql). This creates the tables and owner-only policies plus billing, account and limited diagnostic support. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), [`0006_subscriptions.sql`](./supabase/migrations/0006_subscriptions.sql), [`0007_account.sql`](./supabase/migrations/0007_account.sql), [`0008_diagnostics.sql`](./supabase/migrations/0008_diagnostics.sql) and [`0009_community.sql`](./supabase/migrations/0009_community.sql). This creates private app data plus the separately shared members-only community. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun. Apply `0009` once; do not paste it again after success.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -181,6 +181,45 @@ After saving, the recipe detail page opens. The upper-left back arrow retraces i
 Cuisine references are bundled in [`libraryReferences.ts`](./src/lib/recipes/libraryReferences.ts) and shown in recipe previews. They include [Panlasang Pinoy on adobo](https://panlasangpinoy.com/filipino-chicken-adobo-recipe/), [Hot Thai Kitchen on laab and toasted rice](https://hot-thai-kitchen.com/laab-gai/), [Just One Cookbook on goma-ae](https://www.justonecookbook.com/spinach-with-sesame-sauce/), [Mexico in My Kitchen on a la mexicana](https://www.mexicoinmykitchen.com/nopales-easy-mexican-recipe/), [GialloZafferano on pasta e ceci](https://ricette.giallozafferano.it/Pasta-e-ceci.html), [The Mediterranean Dish on parsley-led tabbouleh](https://www.themediterraneandish.com/tabouli-salad/), and indexed references from Swasthi and The Woks of Life (their pages blocked direct retrieval). Dish identities, not their prose or exact formulations, inform Buko's original recipes. Brown rice, lean meats, simplified spice lists and vinegar substitutions are disclosed; generic tropical-fruit bowls and peanut dips have moved to Everyday. Regional categories are browsing aids, not claims to represent entire cultures. Recipe tasting and culturally knowledgeable editorial review remain release-quality work.
 
 Navigation follows [Apple's toolbar guidance](https://developer.apple.com/design/human-interface-guidelines/toolbars) on standard Back symbols and separating navigation from actions, [Material app bars](https://m3.material.io/components/app-bars/guidelines) on leading navigation controls, and [WCAG consistent navigation](https://www.w3.org/WAI/WCAG22/Understanding/consistent-navigation.html). The shared control has a 48-by-48 target, an accessible Back label, and an in-app deep-link fallback. Centered detail titles are a deliberate cross-platform Buko choice; native back gestures remain available where previously enabled.
+
+### Shared recipes (backend setup required)
+
+**Recipes → Shared recipes** is a separate, signed-in-members-only library. Visible labels use “Shared recipes,” “Ratings & reviews” and “Recipe variations,” not “community.” Technical route/table/function identifiers retain that internal name. The owner approved immediate publication (not pre-approval), all nutrition score bands with a green-only filter, 1–5-star member ratings, written cooking/modification notes, and author-declared dietary tags. The 210 curated originals remain a separate collection; no private recipe is automatically published.
+
+- Browse with combined meal, cuisine, dietary tags and literal title/description/ingredient search; 12 recipes per page. Top rated uses `(sum of stars + 5 × 3.5) / (review count + 5)` rather than letting one five-star review outrank consistently reviewed recipes. Actual average and review count are shown separately; unrated recipes say so.
+- Publishing requires a saved private recipe, a description and explicit sharing/ownership permission. The authenticated `community` Edge Function fetches the owner's saved ingredients, strips private IDs/photos/source URLs and computes a fixed snapshot using the existing Buko algorithm. Client-provided scores/payloads/author IDs are ignored. Every ingredient needs a positive gram weight and all eight finite nutrient fields for a score; incomplete recipes can be shared but get **no numeric score**. Data is contributor-supplied, not independently verified. All score bands are allowed.
+- A shared snapshot is immutable. Private edits do not change other members' recipes or invalidate existing reviews. **Save or modify a private copy → Save recipe → Share my variation** creates a separately scored publication linked to its parent. Use the saved private copy with cooking, groceries and the meal planner. Withdrawal hides the snapshot; saving a different private copy is required for a new publication. Other members' existing private copies remain.
+- One editable rating/review per member per recipe; authors cannot rate their own recipe. Latest 50 visible reviews and 20 variations appear in a detail page. Report buttons cover recipes/reviews; blocking hides contributions and reviews in both directions and recalculates the visible rating aggregate. Unblocking is available in the library. These are not verified-purchase or verified-cooking ratings.
+- Vegan, Vegetarian, Gluten-free, Dairy-free and Nut-free tags are self-declared. Keyword checks warn of possible contradictions, not certify safety or absence of allergens. Brands, substitutions and cross-contact require human checks. Never use these tags as a medical safety guarantee.
+- All community tables use RLS with direct member access revoked. Bounded member RPCs enforce visibility/ownership and server-only publication prevents forged stored scores. Writes have a transactional 100/day/member limit; publication also caps at 10/day/member. There are no paid AI calls. Operator-assigned moderators handle a private report queue, remove contributions or resolve reports with an audit reason. No one can grant themselves moderator rights. Publishing refuses to start if there is no designated moderator.
+- Existing account export automatically includes the new `user_id` tables. Deleting an author deletes their shared recipes/reviews/reports/block settings; child reviews on removed recipes are deleted and links in other members' independently saved private copies/variations become null. Private copies already saved by others are not erased. No public real names, email profiles, photo sharing, messages or follower system are introduced.
+
+#### Owner activation steps
+
+Publishing GitHub Pages alone does **not** apply Supabase SQL or deploy its functions. Until setup is complete, community errors explicitly explain the missing backend; private recipes and the curated collection still work.
+
+1. Apply the complete [`0009_community.sql`](./supabase/migrations/0009_community.sql) once in **Supabase → SQL Editor → New query → Run**, after migrations 0001–0008.
+2. Designate your moderator in a **new SQL query**. Replace the example email with your own existing Buko account email (do not put that email or any service key in Git/chat):
+
+   ```sql
+   insert into public.community_moderators(user_id)
+   select id from auth.users where lower(email)=lower('YOUR_EXISTING_ACCOUNT_EMAIL')
+   on conflict do nothing;
+   select count(*) as moderator_count from public.community_moderators;
+   ```
+
+   The count must be at least one; a zero count means no matching account. This does not expose your email to members. To revoke moderator access, an operator deletes that account's row in this table. Check **Shared recipes → Moderation reports** using the designated account.
+3. From the repository folder deploy the function:
+
+   ```bash
+   npx supabase login
+   npx supabase functions deploy community --project-ref YOUR_PROJECT_REF --no-verify-jwt --use-api
+   ```
+
+   `YOUR_PROJECT_REF` is the ID from **Supabase → Project Settings → General**, not a URL or password. `--no-verify-jwt` only disables the legacy gateway check: the handler independently validates the exact bearer token with Supabase Auth and reads private recipes through owner RLS before using its server-only key to save the snapshot. Supabase supplies the function's server environment; no new provider secret or paid service is needed.
+4. Refresh the web app. With two test member accounts, publish an original recipe from one, review/save a variation/report it from the other, and resolve that report from the moderator account. Check filtering, blocking/unblocking, withdrawal and the account export/deletion flow. Local database/handler/browser tests are not a claim that this live setup has been completed.
+
+Immediate publication requires active human moderation and a reachable owner/support channel. This foundation does not certify app-store UGC compliance, replace legal review or establish a moderation response-time promise. Review policy/store declarations before any native store launch; no new legal policy documents or store submissions are included.
 
 Some publishers, including Simply Recipes, may block server fetches with HTTP 403 even when their pages open in a browser. Buko reports the block and recommends pasting recipe text; it does not bypass site protections.
 

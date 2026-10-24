@@ -45,6 +45,7 @@ export default function Recipes() {
   return (
     <Screen>
       <TabHeader title="Recipes" />
+      <Button title="Shared recipes" icon="people-outline" variant="secondary" onPress={() => router.push('/community')} />
       <Button title="Browse recipe library" icon="library-outline" variant="secondary" onPress={() => router.push('/recipe/library')} />
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}><Button title="New recipe" icon="add" onPress={create} /></View>

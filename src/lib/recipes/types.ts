@@ -1,4 +1,4 @@
-import type { Meal, Nutrients } from '../../types';
+import type { Meal, Nutrients } from '../../types/index.ts';
 
 export type Section = 'produce' | 'dairy' | 'meat' | 'pantry' | 'frozen' | 'other';
 export type MatchStatus = 'matched' | 'unmatched' | 'manual';
@@ -31,6 +31,7 @@ export interface Recipe {
   photo_path: string | null;
   created_at: string;
   updated_at: string;
+  community_parent_id?: string | null;
 }
 
 export interface RecipeIngredient {
@@ -83,3 +84,21 @@ export interface PantryItem {
 /** Editable ingredient before it is saved (no ids). */
 export type IngredientDraft = Omit<RecipeIngredient, 'id' | 'recipe_id' | 'user_id'>;
 export type StepDraft = Omit<RecipeStep, 'id' | 'recipe_id' | 'user_id'>;
+
+/** A private editable recipe, before saving. Safe to share as a type with server validation. */
+export interface RecipeDraft {
+  id?: string;
+  communityParentId?: string | null;
+  title: string;
+  servings: number;
+  prepMinutes: number | null;
+  cookMinutes: number | null;
+  sourceUrl: string | null;
+  sourceName: string | null;
+  photoPath: string | null;
+  photoUri: string | null;
+  ingredients: IngredientDraft[];
+  steps: StepDraft[];
+  siteCalories?: number | null;
+  servingsGuessed?: boolean;
+}

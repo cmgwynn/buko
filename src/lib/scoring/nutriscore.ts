@@ -1,4 +1,4 @@
-import type { NutriGrade, Nutrients } from '../../types';
+import type { NutriGrade, Nutrients } from '../../types/index.ts';
 
 /**
  * Nutri-Score (2023 algorithm, "general foods" table) computed on-device so that recipes,

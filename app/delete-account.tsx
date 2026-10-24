@@ -54,6 +54,7 @@ export default function DeleteAccountScreen() {
         <Card>
           <Heading>What deletion removes</Heading>
           <Body>Your active Buko sign-in account, profile and birthday, targets, diary, groceries, pantry, meal plans, recipes and private photos, personal exercises, routines, workouts and sets, body measurements, imported activity, preferences, coach history/actions/snapshots/usage, and Buko’s purchase-status records are permanently removed. Cleared data cannot be restored through the app.</Body>
+          <Body>Your shared recipes, ratings, reviews, reports and block preferences are also deleted. Other members&apos; independently saved private copies remain; the link to your deleted contribution is cleared.</Body>
           <Body>Deletion may finish in stages. If a photo, provider or account step fails, the error explains it and you can retry; some photos or external records may already be removed. The auth account is deleted only after photo removal succeeds.</Body>
         </Card>
         <Card>
