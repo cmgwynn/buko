@@ -9,6 +9,11 @@ export const config = {
   supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '',
   usdaApiKey: process.env.EXPO_PUBLIC_USDA_API_KEY ?? '',
   contactEmail: process.env.EXPO_PUBLIC_CONTACT_EMAIL ?? '',
+  revenueCatIosKey: process.env.EXPO_PUBLIC_REVENUECAT_IOS_KEY ?? '',
+  revenueCatAndroidKey: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '',
+  premiumEnforcement: process.env.EXPO_PUBLIC_PREMIUM_ENFORCEMENT === 'true',
+  privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? '',
+  termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? '',
 };
 
 export const isSupabaseConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);

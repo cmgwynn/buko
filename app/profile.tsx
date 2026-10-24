@@ -69,6 +69,7 @@ export default function Profile() {
 
       <Card>
         <Text style={typography.label}>Daily support</Text>
+        <Button title="Settings, privacy & account" icon="settings-outline" variant="secondary" onPress={() => router.push('/settings')} />
         <Button title="Coach, weekly review & preferences" icon="chatbubbles-outline" variant="secondary" onPress={() => router.push('/coach')} />
         <Button title="Weight & measurements" icon="body-outline" variant="ghost" onPress={() => router.push('/body')} />
         <Button title="Training progress" icon="stats-chart-outline" variant="ghost" onPress={() => router.push('/progress')} />
@@ -89,6 +90,7 @@ export default function Profile() {
         {privacyOpen ? <>
           <Body muted>Buko has no ads, analytics or trackers. Your account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch the site you choose, without Buko account credentials.</Body>
           <Body muted>Coach is optional and off until you agree. When activated, minimized context and chat may be sent to Anthropic. Names, email and birthday are excluded from structured AI context; avoid identifiers in free text. Imported health-app workouts/active energy are excluded. Weight trend sharing is separate and off by default. Manage consent and delete conversations in Coach preferences.</Body>
+          <Body muted>Store subscriptions use RevenueCat with a pseudonymous account identifier and purchase/device metadata. Optional diagnostic signals exclude account identifiers and health content. Manage these features and export/delete account data in Settings.</Body>
           <Button title="Manage Coach privacy" variant="secondary" onPress={() => router.push('/coach')} />
         </> : null}
       </Card>

@@ -2,6 +2,7 @@ import { buildContext, CoachError, createCoachHandler, type CoachStore } from '.
 import { productContext } from './products.ts';
 import type { CoachReply } from '../../../src/lib/coach/types.ts';
 import type { DietPref } from '../../../src/types/index.ts';
+import { PremiumError, requirePremium } from '../_shared/premium.ts';
 
 const url = Deno.env.get('SUPABASE_URL');
 const anon = Deno.env.get('SUPABASE_ANON_KEY');
@@ -41,6 +42,13 @@ Deno.serve(createCoachHandler({
     const userId: string = user.id;
     return {
       userId,
+      async authorizePremium() {
+        try { await requirePremium(url!, anon!, token); }
+        catch (error) {
+          if (error instanceof PremiumError) throw new CoachError(error.message, error.status);
+          throw error;
+        }
+      },
       query: <T>(table: string, query: string) => rest<T[]>(`${table}?${query}&user_id=eq.${userId}`, token, anon!),
       reserve: () => rest<boolean>('rpc/reserve_coach_request', service!, service!, { p_user_id: userId, p_global_limit: limit }),
       publish: (reply) => rest<CoachReply>('rpc/publish_coach_reply', service!, service!, { p_user_id: userId, p_reply: reply }),

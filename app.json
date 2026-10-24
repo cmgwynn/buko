@@ -19,12 +19,14 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Buko uses the camera to scan product barcodes."
+          "cameraPermission": "Buko uses the camera to scan product barcodes.",
+          "recordAudioAndroid": false
         }
       ],
       "expo-status-bar",
       "expo-font",
       "expo-dev-client",
+      "./plugins/withStoreBilling",
       [
         "@kingstinct/react-native-healthkit",
         {
@@ -42,11 +44,15 @@
             "minSdkVersion": 26
           }
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.cmgwynn.buko"
+      "bundleIdentifier": "com.cmgwynn.buko",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -56,6 +62,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
       "package": "com.cmgwynn.buko",
       "permissions": [
         "android.permission.health.READ_STEPS",

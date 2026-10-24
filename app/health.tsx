@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Switch, Text, View } from 'react-native';
-import { Card, Chip, ChipRow, Notice, Screen } from '../src/components/ui';
+import { Button, Card, Chip, ChipRow, Notice, Screen } from '../src/components/ui';
+import { useRouter } from 'expo-router';
+import { useBilling } from '../src/providers/BillingProvider';
 import { FEATURES, getAdapter, healthAppName, syncIfDue } from '../src/lib/health';
 import type { UserSettings } from '../src/lib/fitness/types';
 import { useAuth } from '../src/providers/AuthProvider';
@@ -8,6 +10,8 @@ import { useSettings } from '../src/providers/SettingsProvider';
 import { colors, spacing, typography } from '../src/theme';
 
 export default function HealthSettings() {
+  const router = useRouter();
+  const billing = useBilling();
   const { session } = useAuth();
   const { settings, update } = useSettings();
   const [available, setAvailable] = useState<boolean | null>(null);
@@ -33,6 +37,7 @@ export default function HealthSettings() {
       setFlag({ [f.setting]: false });
       return;
     }
+    if (!billing.allowed) { router.push('/premium'); return; }
     // Explain first; the system permission prompt appears only after the user agrees.
     Alert.alert(f.title, `${f.why}\n\n${app} will now ask you to allow this. You can change it any time in ${Platform.OS === 'ios' ? 'Settings › Health' : 'Health Connect'}.`, [
       { text: 'Not now', style: 'cancel' },
@@ -80,6 +85,8 @@ export default function HealthSettings() {
       </Card>
 
       <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>{app}</Text>
+      {!billing.allowed ? <Card><Text style={typography.body}>Health integration syncing is paused without Premium. You can still turn existing permissions off.</Text>
+        <Button title="View Premium options" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
       <Notice tone="info">
         Health records are saved only to your private account and are never used for advertising. Imported health-app workouts and active energy are excluded from Coach requests. Optional Coach weight-trend sharing is controlled separately in Coach preferences.
       </Notice>
@@ -99,7 +106,7 @@ export default function HealthSettings() {
             </View>
             <Switch
               value={Boolean(settings[f.setting])}
-              disabled={!available && !settings[f.setting]}
+              disabled={(!available || !billing.allowed) && !settings[f.setting]}
               onValueChange={(v) => toggleFeature(f, v)}
               trackColor={{ true: colors.primary }}
             />

@@ -8,6 +8,8 @@ import { isSupabaseConfigured } from '../src/lib/config';
 import { AuthProvider, useAuth } from '../src/providers/AuthProvider';
 import { ProfileProvider, useProfile } from '../src/providers/ProfileProvider';
 import { SettingsProvider } from '../src/providers/SettingsProvider';
+import { BillingProvider } from '../src/providers/BillingProvider';
+import { DiagnosticBoundary, DiagnosticLifecycle } from '../src/components/DiagnosticBoundary';
 import { colors, layout, spacing } from '../src/theme';
 
 const headerOptions = {
@@ -64,6 +66,7 @@ function Gate() {
         <Stack.Screen name="log/add" options={{ ...headerOptions, title: 'Log food' }} />
         <Stack.Screen name="edit-profile" options={{ ...headerOptions, title: 'Update details' }} />
         <Stack.Screen name="profile" options={{ ...headerOptions, title: 'Profile' }} />
+        <Stack.Screen name="settings" options={{ ...headerOptions, title: 'Settings' }} />
         <Stack.Screen name="coach" options={{ ...headerOptions, title: 'Coach' }} />
         <Stack.Screen name="recipe/[id]" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
         <Stack.Screen name="recipe/edit" options={{ ...recipeHeaderOptions, title: 'Recipe' }} />
@@ -84,6 +87,11 @@ function Gate() {
         <Stack.Screen name="body" options={{ ...headerOptions, title: 'Log body stats' }} />
         <Stack.Screen name="health" options={{ ...headerOptions, title: 'Health & activity' }} />
       </Stack.Protected>
+      <Stack.Protected guard={signedIn}>
+        <Stack.Screen name="account" options={{ ...headerOptions, title: 'Your account & data' }} />
+        <Stack.Screen name="premium" options={{ ...headerOptions, title: 'Buko Premium' }} />
+      </Stack.Protected>
+      <Stack.Screen name="delete-account" options={{ ...headerOptions, title: 'Delete your account' }} />
     </Stack>
   );
 }
@@ -116,7 +124,12 @@ export default function RootLayout() {
         <AuthProvider>
           <ProfileProvider>
             <SettingsProvider>
+              <BillingProvider>
+              <DiagnosticLifecycle />
+              <DiagnosticBoundary>
               <Gate />
+              </DiagnosticBoundary>
+              </BillingProvider>
             </SettingsProvider>
           </ProfileProvider>
         </AuthProvider>

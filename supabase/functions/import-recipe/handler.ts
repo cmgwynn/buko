@@ -55,6 +55,7 @@ async function readLimited(response: Response, limit: number): Promise<string> {
 
 export function createImportHandler(options: {
   authenticate: (token: string) => Promise<boolean>;
+  authorizePremium?: (token: string) => Promise<void>;
   fetchPage?: typeof fetch;
 }) {
   const fetchPage = options.fetchPage ?? fetch;
@@ -71,6 +72,7 @@ export function createImportHandler(options: {
     const timer = setTimeout(() => controller.abort(), 15000);
     try {
       if (!(await options.authenticate(authorization.slice(7)))) return json({ error: 'Your session expired. Log in again.' }, 401);
+      await options.authorizePremium?.(authorization.slice(7));
       let body: unknown;
       try {
         body = JSON.parse(await readLimited(new Response(request.body, { headers: request.headers }), 4096));
@@ -114,6 +116,9 @@ export function createImportHandler(options: {
       throw new RequestError('The site redirected too many times. Try its final recipe URL.', 422);
     } catch (error) {
       if (error instanceof RequestError) return json({ error: error.message }, error.status);
+      if (error instanceof Error && 'status' in error && typeof error.status === 'number' && [402, 503].includes(error.status)) {
+        return json({ error: error.message }, error.status);
+      }
       console.error('Recipe import request failed:', error instanceof Error ? error.name : 'Unknown error');
       return json({ error: 'Could not fetch the recipe page. Try again, or paste the ingredients and steps instead.' }, 502);
     } finally {

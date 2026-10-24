@@ -11,6 +11,7 @@ export class CoachError extends Error {
 }
 export interface CoachStore {
   userId: string;
+  authorizePremium?(): Promise<void>;
   query<T>(table: string, query: string): Promise<T[]>;
   reserve(): Promise<boolean>;
   publish(data: Record<string, unknown>): Promise<CoachReply>;
@@ -81,6 +82,7 @@ export function createCoachHandler(deps: CoachDependencies) {
         }));
       }
       const range = previousWeek(body.today);
+      await store.authorizePremium?.();
       if (body.operation === 'summary') {
         if (!(await store.reserve())) throw new CoachError('Coach review limit reached. Please try later.', 429);
         return json({ facts: (await deps.context(store, body.today, '', 'weekly')).facts, enabled: deps.enabled });

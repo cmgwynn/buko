@@ -5,6 +5,7 @@ import type { UserSettings } from '../fitness/types';
 import { healthConnectAdapter } from './android';
 import { healthKitAdapter } from './ios';
 import type { ActivityHint, HealthAdapter, HealthFeature } from './types';
+import { checkHealthAccess } from '../billing/client';
 
 export type { HealthFeature } from './types';
 
@@ -51,6 +52,7 @@ async function loadSettings(): Promise<UserSettings | null> {
 export async function syncWorkoutToHealth(w: {
   id: string; name: string; startedAt: Date; durationMin: number; calories: number | null; hint?: ActivityHint; distanceM?: number | null;
 }): Promise<void> {
+  if (!await checkHealthAccess()) return;
   const a = getAdapter();
   if (!a || !(await a.isAvailable())) return;
   const end = new Date(w.startedAt.getTime() + w.durationMin * 60000);
@@ -70,6 +72,7 @@ export async function maybeWriteNutrition(entryId: string): Promise<void> {
     const s = await loadSettings();
     const a = getAdapter();
     if (!s?.health_write_nutrition || !a || !(await a.isAvailable())) return;
+    if (!await checkHealthAccess()) return;
     const { data } = await supabase.from('food_log_entries').select('name, calories, protein_g, carbs_g, fat_g, logged_on, created_at').eq('id', entryId).single();
     if (!data) return;
     const e = data as { name: string; calories: number; protein_g: number; carbs_g: number; fat_g: number; logged_on: string; created_at: string };
@@ -101,6 +104,7 @@ export async function syncFromHealth(userId: string, s: UserSettings): Promise<v
   const wantSteps = s.health_read_steps;
   const wantEnergy = s.health_read_active_energy;
   if (!a || !(wantSteps || wantEnergy || s.health_read_workouts) || !(await a.isAvailable())) return;
+  if (!await checkHealthAccess()) return;
 
   if (wantSteps || wantEnergy) {
     for (let back = 0; back < 3; back++) {

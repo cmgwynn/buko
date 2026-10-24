@@ -12,6 +12,7 @@ import {
   type CoachReply, type WeeklyFacts,
 } from '../src/lib/coach/types';
 import { useAuth } from '../src/providers/AuthProvider';
+import { useBilling } from '../src/providers/BillingProvider';
 import { useProfile } from '../src/providers/ProfileProvider';
 import { spacing, typography } from '../src/theme';
 
@@ -38,6 +39,7 @@ function Facts({ facts }: { facts: WeeklyFacts }) {
 export default function Coach() {
   const router = useRouter();
   const { session } = useAuth();
+  const billing = useBilling();
   const { today } = useProfile();
   const [prefs, setPrefs] = useState<CoachPreferences | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +81,7 @@ export default function Coach() {
   }
   async function request(operation: 'summary' | 'weekly' | 'chat') {
     if (busy) return;
+    if (!billing.allowed) { router.push('/premium'); return; }
     setBusy(true); setError(null); setStatusNote(null);
     try {
       const result = await coachRequest<CoachReply | CoachSummary>(operation, today, operation === 'chat' ? message : undefined);
@@ -92,6 +95,7 @@ export default function Coach() {
   }
   async function apply() {
     if (!selected || busy) return;
+    if (!billing.allowed) { router.push('/premium'); return; }
     if (selected.kind === 'recipe' && (!calendarDate(day) || !Number.isFinite(Number(servings)) || Number(servings) < 0.25 || Number(servings) > 20)) {
       setError('Choose a valid date (YYYY-MM-DD) and servings between 0.25 and 20.'); return;
     }
@@ -125,6 +129,8 @@ export default function Coach() {
       </ChipRow>
       <View style={{ height: spacing.lg }} />
       {!enabled ? <Notice tone="warning">Live AI is off. No paid Anthropic requests will be made. You can review factual weekly summaries after backend setup; AI chat and suggestions need owner activation.</Notice> : null}
+      {!billing.allowed ? <Card><Body>Coach reviews and chat require Premium. Privacy, consent withdrawal and history deletion remain available.</Body>
+        <Button title="View Premium options" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
       {(!consented || section === 'preferences') && prefs ? (
         <Card>
           <Heading>You choose what guides the coach</Heading>

@@ -7,7 +7,7 @@ It combines a food-scanning product rater (like Yuka) with a nutrition and fitne
 
 Principles
 - Every health score is explainable and tied to a named source.
-- Privacy first: no analytics, ads, or tracking SDKs. Account data lives in our Supabase project. Public food lookups use Open Food Facts/USDA and requested recipe imports fetch the publisher. Optional Coach processing requires explicit consent before minimized context/chat can go to Anthropic; weight sharing is separate and imported health-app workouts/energy are excluded.
+- Privacy first: no behavioral analytics, ads, or tracking SDKs. Account data lives in our Supabase project. Public food lookups use Open Food Facts/USDA and requested recipe imports fetch the publisher. Optional diagnostics are separately consented, off by default and restricted to fixed technical signals through a server relay. Optional Coach processing requires explicit consent before minimized context/chat can go to Anthropic; weight sharing is separate and imported health-app workouts/energy are excluded.
 - Calm, minimal, modern design driven by a single theme file (`src/theme/index.ts`).
 - Preference-driven automation: users choose goals, preferences and constraints; Buko uses those choices to reduce daily work. Customization should guide automation, not create more manual chores. Keep suggestions explainable, adjustable and easy to override.
 
@@ -25,7 +25,10 @@ Principles
 | 1 | Auth + onboarding + Mifflin-St Jeor targets; barcode scanner with explainable 0–100 score and alternatives; food diary + daily dashboard; grocery list | **Done**: tested end-to-end on a real phone with Expo Go (2026-10-19) |
 | 2 | Recipes (own + URL import), weekly meal planner, grocery generation, pantry, cooking mode, scaling | **Built**; migration `0002` must be run; drag, notifications, photos and live URL import not yet tested on a device |
 | 3 | Fitness: workouts, exercise library, routines, progress charts, HealthKit / Health Connect, activity-adjusted calorie target | **Built**; migration `0003` must be run; health integrations need a development build and are untested on a device |
-| 4 | Opt-in AI wellness coach: factual weekly reviews, own-data chat, confirmed meal-plan/grocery suggestions, preference/privacy controls | **Built, backend setup pending**: migration `0005` and Edge Function deployment required; paid AI deliberately disabled. No automatic target adjustment. |
+| 4 | Opt-in AI wellness coach: factual weekly reviews, own-data chat, confirmed meal-plan/grocery suggestions, preference/privacy controls | **Backend setup confirmed working by owner**; paid Anthropic AI deliberately disabled. No automatic target adjustment. |
+| 5 | Native app-store preparation: subscriptions/entitlement, account export/deletion, opt-in diagnostics, EAS/TestFlight/Play testing, accessibility and release declarations | **Implementation in progress**: 174 tests across 31 suites, typecheck, five Deno entry-point checks and web/native JavaScript exports pass. Synthetic browser checks cover diagnostics, legal-link handling, no web checkout, gated plan access, account confirmation/failure, logged-out delete-page behavior and JSON export Blob/anchor construction; OS file-save was not verified. These do not verify live Phase 5 backend deployment, actual App Store/Play billing or signed-device behavior. No signed binaries verified; Phase 5 backend migrations/functions are not deployed. Config introspection confirms `MainActivity` `singleTop` and a manifest merger removal rule for Android `RECORD_AUDIO`; the final signed manifest still needs verification. Store/provider setup, device acceptance, assets/declarations and release testing remain blockers. No public paid activation. |
+
+Store and beta submission notes, proposed listing copy, official references and the release go/no-go checklist are in [`docs/STORE-LAUNCH.md`](./docs/STORE-LAUNCH.md). Its status is deliberately not “launch ready”: do not infer policy compliance, account deletion readiness, purchase readiness or production eligibility from the guide.
 
 ### Phase 4 implementation and automation direction
 - Supabase authenticates every Coach request, reads owner-scoped bounded data, calculates facts and filters candidates before calling Anthropic from the Edge Function only. Model output is validated, not trusted as a calculator or database command.
@@ -38,7 +41,7 @@ Principles
 - No adaptive target changes or manual-target overrides in this release. Future automation must keep calculated recommendations separate from explicit overrides, explain changes, permit pause/override and preserve existing safety limits. Schedule/practical-constraint customization remains future work.
 
 ## Layout
-- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
+- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `account`, `delete-account`, `premium`, `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
 - `src/lib/scoring/` – isolated health-score module (`config.ts` = all weights/thresholds/sources, `factors.ts`, `index.ts`)
 - `src/lib/nutrition/targets.ts` – Mifflin-St Jeor, calorie floors, macro split
 - `src/lib/api/` – Open Food Facts, USDA, alternatives
@@ -47,7 +50,8 @@ Principles
 - `src/lib/health/` – HealthKit (`ios.ts`) and Health Connect (`android.ts`) adapters behind one interface, sync and write-back (`index.ts`)
 - `src/providers/SettingsProvider.tsx` – per-user settings (activity adjust, health toggles)
 - `src/lib/coach/`, `supabase/functions/coach/`, `app/coach.tsx` - shared facts/protocol, server-only model integration, consent/review/chat/action UI
-- `supabase/migrations/0001_init.sql` through `0005_coach.sql` - schema + RLS, birthdays and coach quota/action RPCs
+- `src/lib/diagnostics/`, `supabase/functions/diagnostics/`, `app/settings.tsx` - per-account/device opt-in for restricted diagnostic signals; default off
+- `supabase/migrations/0001_init.sql` through `0008_diagnostics.sql` - schema + RLS, birthdays, coach quota/action RPCs, billing, account export/deletion and diagnostic relay quota
 
 ## Decisions
 Log every architectural decision here (newest last).

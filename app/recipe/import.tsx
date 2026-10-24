@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { SavedPageImport } from '../../src/components/SavedPageImport';
+import { PremiumGate } from '../../src/components/PremiumGate';
 import { Body, Button, Card, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { config } from '../../src/lib/config';
 import { setDraft } from '../../src/lib/recipes/draft';
@@ -11,6 +12,9 @@ import { spacing } from '../../src/theme';
 import { useAuth } from '../../src/providers/AuthProvider';
 
 export default function ImportRecipe() {
+  return <PremiumGate feature="Recipe importing"><ImportContent /></PremiumGate>;
+}
+function ImportContent() {
   const router = useRouter();
   const { session } = useAuth();
   const [url, setUrl] = useState('');

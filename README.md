@@ -2,6 +2,10 @@
 
 Scan products, rate them, track what you eat. See [PROJECT.md](./PROJECT.md) for the vision, phase plan and decisions log.
 
+Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records current app IDs, proposed listing text, account/health declarations and unresolved release blockers; Buko is not yet marked ready for public launch.
+
+Latest Phase 5 validation report: 174 tests across 31 suites, typecheck, five Deno entry-point checks, and web/native JavaScript exports pass. Synthetic browser checks cover selected account export/deletion, diagnostics, legal-link and staged premium flows; export Blob/anchor construction was confirmed but actual OS file-save was not. This does not verify deployed Phase 5 backend changes, App Store/Google Play billing, or signed native builds/devices.
+
 Phase 1 includes: email sign-up and onboarding with calorie/macro targets, a barcode scanner with an explainable 0–100 health score and better-product suggestions, a food diary with daily dashboard, and a grocery list.
 
 ## What you need
@@ -17,7 +21,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), and [`0005_coach.sql`](./supabase/migrations/0005_coach.sql). This creates the tables and turns on owner-only row-level security. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), [`0006_subscriptions.sql`](./supabase/migrations/0006_subscriptions.sql), [`0007_account.sql`](./supabase/migrations/0007_account.sql) and [`0008_diagnostics.sql`](./supabase/migrations/0008_diagnostics.sql). This creates the tables and owner-only policies plus billing, account and limited diagnostic support. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -33,6 +37,9 @@ Edit `.env`:
 | `EXPO_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` `public` key |
 | `EXPO_PUBLIC_USDA_API_KEY` | https://fdc.nal.usda.gov/api-key-signup |
 | `EXPO_PUBLIC_CONTACT_EMAIL` | Your team's email. Sent in the User-Agent to Open Food Facts, whose API terms require identifying the app and a contact |
+| `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` | Public RevenueCat SDK keys; leave empty unless the owner enables store billing |
+| `EXPO_PUBLIC_PREMIUM_ENFORCEMENT` | Keep `false` until verified billing and server rollout are approved |
+| `EXPO_PUBLIC_PRIVACY_URL` / `EXPO_PUBLIC_TERMS_URL` | Owner-hosted document URLs; currently empty placeholders |
 
 `.env` is git-ignored. Anything prefixed `EXPO_PUBLIC_` is bundled into the app, so **never** put a Supabase `service_role` key here. The anon key is safe because row-level security protects the data. Open Food Facts needs no key.
 
@@ -89,7 +96,7 @@ Onboarding and **Profile → Update details & recalculate** ask for month, day a
 
 For profiles with a birthday, completed age and formula-based calorie/macro targets update on the device at local midnight and when the app resumes. A Feb 29 birthday advances March 1 in non-leap years. Profile and activity-adjusted diary targets share the same age calculation. Birthday target changes are derived on-device, not background database jobs: they do not rewrite food logs, saved targets, goals or preferences. If migration `0004` has not been applied, birthday saves show a setup error instead of silently dropping the date.
 
-**Profile** now opens a useful overview: targets, personal details, Coach, measurements, progress and activity settings. **Edit goals & personal details** opens a single scrollable form; new-account onboarding remains guided. Privacy/account information is expandable.
+**Profile** now opens a useful overview: targets, personal details, Coach, measurements, progress and activity settings. **Edit goals & personal details** opens a single scrollable form; new-account onboarding remains guided. **Settings → Privacy & account → Export data or delete account** provides JSON export and permanent account deletion. Export v2 embeds original private recipe photos as base64 bytes; oversized or invalid exports fail rather than returning a partial file. The public `/delete-account` web page and in-app deletion path require owner authentication and explicit confirmation. Deleting a Buko account does not cancel any store subscription or remove originals from Apple Health/Health Connect.
 
 ## Phase 4: optional wellness coach
 Open **Diary → Coach & weekly review** or **Profile → Coach, weekly review & preferences**.
@@ -102,7 +109,7 @@ Open **Diary → Coach & weekly review** or **Profile → Coach, weekly review &
 - **No autonomous goal changes:** this release never adjusts calorie/macro targets.
 
 ### Supabase Free setup - live AI stays off
-Publishing the website does **not** deploy its database migration or Edge Functions. Until these steps are done, Coach displays a setup message; other app features continue to work.
+The owner has confirmed the current Coach migration and Edge Functions are working. Publishing the website does **not** deploy a database migration or Edge Function to a separate Supabase project; use the steps below only when setting up another project. Live AI remains deliberately off, and factual summaries do not need an Anthropic API key.
 
 1. Open your existing Supabase project, choose **SQL Editor → New query**, paste the entire [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), then **Run**. Previous migrations must already be applied. This migration preserves existing meals/workouts and is safe to rerun.
 2. On your computer, open this repository in VS Code and choose **Terminal → New Terminal**. Run:
@@ -186,7 +193,7 @@ The web app deployment does **not** deploy Supabase functions. A Supabase projec
 The function accepts POST requests only, validates destinations and redirects against its fixed allowlist, limits requests to 4 KB and fetched HTML to 3 MB, and times out remote fetches. It forwards no Buko user credentials to recipe publishers. TypeScript checks cover the shared function handler; the Deno-specific entry point can be checked with `deno check supabase/functions/import-recipe/index.ts`.
 
 ## Privacy
-No analytics, advertising or tracking SDKs. Account data lives in your Supabase project. Food lookups use Open Food Facts/USDA; recipe URL requests go through your function to the requested supported publisher without account credentials. Browser camera frames and pasted/saved-page drafts stay on the device until parsed recipe data is saved. Health integration is optional, not used for advertising, and imported workouts/active energy are excluded from Coach. Separately opted-in weight summaries and minimized food/goal/chat context can go to Anthropic only after consent and owner activation; see the Coach section for controls and retention limitations.
+No behavioral analytics, advertising or tracking SDKs. This does not mean Buko never communicates with third-party services: food lookups use Open Food Facts/USDA; recipe URL requests go through your function to the requested supported publisher without Buko account credentials; and, if purchases are enabled, RevenueCat uses the stable Supabase account UUID as a pseudonymous subscriber identifier (not anonymous data) while Apple/Google process store transactions. Settings has a separate, optional crash-signal control that is off by default. If enabled and configured, it sends only a fixed JavaScript error category, platform and fatal flag through Supabase to the crash service; raw error text/stacks, screenshots, breadcrumbs, health data, chat and user IDs are not forwarded. Native crash dumps and session replay are not enabled. Supabase still receives authenticated requests and can associate account/session information and network metadata with them; the crash service sees the relay connection rather than the device connection. Account data lives in your Supabase project. Browser camera frames and pasted/saved-page drafts stay on the device until parsed recipe data is saved. Health integration is optional, not used for advertising, and imported workouts/active energy are excluded from Coach. Separately opted-in weight summaries and minimized food/goal/chat context can go to Anthropic only after consent and owner activation; see the Coach section for controls and retention limitations.
 
 ## Data attribution
 Product data is from [Open Food Facts](https://world.openfoodfacts.org) (Open Database License) and is credited in the app. Whole-food data is from [USDA FoodData Central](https://fdc.nal.usda.gov).
