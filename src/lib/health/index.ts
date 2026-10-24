@@ -50,16 +50,27 @@ async function loadSettings(): Promise<UserSettings | null> {
   return (data as UserSettings | null) ?? null;
 }
 
-/** Write a finished Buko workout to the health app and remember its id there. Errors are swallowed by callers. */
+/** Legacy direct-write API. Stable native identifiers make receipt-sync retries duplicate-resistant. */
 export async function syncWorkoutToHealth(w: {
   id: string; name: string; startedAt: Date; durationMin: number; calories: number | null; hint?: ActivityHint; distanceM?: number | null;
 }): Promise<void> {
+  const settings = await loadSettings();
+  if (!settings?.health_write_workouts) return;
   if (!await checkHealthAccess()) return;
   const a = getAdapter();
   if (!a || !(await a.isAvailable())) return;
+  const existing = await supabase.from('workouts').select('exported_external_id').eq('id', w.id).single();
+  if (existing.error) throw new Error(`Could not check the workout’s Health export: ${existing.error.message}`);
+  if (existing.data.exported_external_id) return;
   const end = new Date(w.startedAt.getTime() + w.durationMin * 60000);
-  const id = await a.writeWorkout({ name: w.name, start: w.startedAt, end, calories: w.calories, distanceM: w.distanceM ?? null, hint: w.hint ?? 'strength' });
-  if (id) await supabase.from('workouts').update({ exported_external_id: id }).eq('id', w.id);
+  const id = await a.writeWorkout({
+    clientId: w.id,
+    name: w.name, start: w.startedAt, end, calories: w.calories,
+    distanceM: w.distanceM ?? null, hint: w.hint ?? 'strength',
+  });
+  if (!id) throw new Error('The health app did not confirm a saved workout.');
+  const saved = await supabase.from('workouts').update({ exported_external_id: id }).eq('id', w.id).select('id').single();
+  if (saved.error) throw new Error(`The workout reached Health, but its confirmation could not sync. Retry safely using the same workout ID: ${saved.error.message}`);
 }
 
 export async function removeWorkoutFromHealth(exportedId: string | null): Promise<void> {

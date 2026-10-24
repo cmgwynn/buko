@@ -1,15 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { config } from '../config';
-import { getSession } from '../fitness/session';
+import { getSession, workoutSessionStore } from '../fitness/session';
+import { getFitnessOfflineSnapshot, pendingWorkoutCount, purgeFitnessOfflineData } from '../fitness/offline';
 import { getDraft } from '../recipes/draft';
 import { purgeAccountWork } from '../recovery';
 import { supabase } from '../supabase';
 import { cleanupDeletedAccount } from './cleanup';
 import { removeAccountExportCache } from './download';
+import { requireNoActiveWorkout, requireSyncedWorkouts } from './offlineWork';
 
 export class AccountClientError extends Error {
   constructor(message: string, public code = 'ACCOUNT_ERROR') { super(message); }
 }
+const activeWorkout = () => ({ ownerId: workoutSessionStore.getAccount(), active: workoutSessionStore.get().active });
 export async function reauthenticate(password: string): Promise<void> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user.email) throw new AccountClientError('Sign in again with your account provider to continue.', 'REAUTH_REQUIRED');
@@ -20,6 +23,7 @@ async function request(action: 'export' | 'delete', expectedUserId: string, conf
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new AccountClientError('Sign in first.', 'UNAUTHORIZED');
   if (session.user.id !== expectedUserId) throw new AccountClientError('The signed-in account changed. Reopen the account page and try again.');
+  if (action === 'delete') requireNoActiveWorkout(expectedUserId, activeWorkout());
   let response: Response;
   try {
     response = await fetch(`${config.supabaseUrl}/functions/v1/account`, {
@@ -48,23 +52,30 @@ export async function exportAccount() {
   const current = (await supabase.auth.getSession()).data.session;
   if (current?.user.id !== session.user.id) throw new AccountClientError('The signed-in account changed during export. No file was saved.');
   const diagnosticPreference = await AsyncStorage.getItem(`buko:diagnostics:${session.user.id}`);
+  const fitnessOffline = await getFitnessOfflineSnapshot(session.user.id);
   return {
     ...result,
     device: {
-      note: 'Unsaved recipe draft and workout from this device only; not stored on the server.',
+      note: 'This device’s unsaved recipe, active workout, diagnostics preference and offline fitness cache/outbox. Queued completed workouts may not yet be stored on the server.',
       recipe_draft: getDraft(), workout_in_progress: getSession(),
       diagnostics_preference: diagnosticPreference,
+      fitness_offline: fitnessOffline,
     },
   };
 }
 export async function deleteAccount(confirmation: string): Promise<{ cleanupError: string | null }> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new AccountClientError('Sign in first.', 'UNAUTHORIZED');
+  await requireSyncedWorkouts(session.user.id, pendingWorkoutCount, activeWorkout);
   const result = await request('delete', session.user.id, confirmation);
   if (result.deleted !== true) throw new AccountClientError('The server did not confirm deletion. Please retry.');
   let recoveryError: string | null = null;
+  try { await purgeFitnessOfflineData(session.user.id, { discardPending: false }); }
+  catch {
+    recoveryError = 'Your server account was deleted, but offline workout data on this device was preserved because queued work could not be safely cleared. Do not clear app storage until you have recovered any needed local copy; queued workouts can no longer sync to the deleted account.';
+  }
   try { await purgeAccountWork(session.user.id); }
-  catch { recoveryError = 'Your account was deleted, but clearing device recovery failed. Clear this app’s saved data on this device.'; }
+  catch { recoveryError = [recoveryError, 'Your account was deleted, but clearing device recovery failed. Preserve any needed local workout copy before clearing this app’s saved data.'].filter(Boolean).join(' '); }
   try {
     await cleanupDeletedAccount(session.user.id, {
       currentUserId: async () => (await supabase.auth.getSession()).data.session?.user.id ?? null,
@@ -81,6 +92,6 @@ export async function deleteAccount(confirmation: string): Promise<{ cleanupErro
     });
     return { cleanupError: recoveryError };
   } catch (error) {
-    return { cleanupError: error instanceof Error ? error.message : 'Account deleted. Clear this app’s saved data on this device.' };
+    return { cleanupError: [recoveryError, error instanceof Error ? error.message : 'Account deleted. Device cleanup failed.'].filter(Boolean).join(' ') };
   }
 }

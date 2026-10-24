@@ -3,10 +3,14 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { AppState } from 'react-native';
 import { supabase } from '../lib/supabase';
 import { recoverAccountWork } from '../lib/recovery';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { config } from '../lib/config';
+import { parseOfflineSession } from '../lib/fitness/offlineAuth';
 
 interface AuthContextValue {
   session: Session | null;
   loading: boolean;
+  sessionError?: string | null;
 }
 
 const AuthContext = createContext<AuthContextValue>({ session: null, loading: true });
@@ -14,6 +18,7 @@ const AuthContext = createContext<AuthContextValue>({ session: null, loading: tr
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState<string | null>(null);
 
   useEffect(() => {
     let live = true;
@@ -33,12 +38,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (live && version === change) setLoading(false);
     }
     const initialChange = change;
-    supabase.auth.getSession().then(({ data }) => {
-      if (live && change === initialChange) void apply(data.session);
-    });
+    supabase.auth.getSession().then(async ({ data, error }) => {
+      if (!live || change !== initialChange) return;
+      let next = data.session;
+      if (!next && error?.name === 'AuthRetryableFetchError') {
+        try {
+          const storageKey = `sb-${new URL(config.supabaseUrl).hostname.split('.')[0]}-auth-token`;
+          next = parseOfflineSession(await AsyncStorage.getItem(storageKey));
+          if (live && change === initialChange) setSessionError(next
+            ? 'Offline workout access uses your saved sign-in. Reconnect to refresh sign-in before syncing.'
+            : 'No saved sign-in is available. Reconnect and sign in to access your local workout data.');
+        } catch { if (live && change === initialChange) setSessionError('Saved sign-in could not be read. Reconnect and sign in again; local workout data has not been deleted.'); }
+      } else if (error) setSessionError(`Sign-in could not refresh: ${error.message}`);
+      if (live && change === initialChange) await apply(next);
+    }).catch((e: Error) => { if (live) { setSessionError(e.message); setLoading(false); } });
     // Do not await Supabase queries inside its auth callback (the auth lock is held there).
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      if (live) void apply(next);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      if (event === 'INITIAL_SESSION' && !next) return;
+      if (live) {
+        if (next || event === 'SIGNED_OUT') setSessionError(null);
+        void apply(next).catch((e: Error) => {
+          if (live) { setSessionError(`Account recovery failed: ${e.message}`); setLoading(false); }
+        });
+      }
     });
 
     // Only refresh tokens while the app is in the foreground.
@@ -53,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const value = useMemo(() => ({ session, loading }), [session, loading]);
+  const value = useMemo(() => ({ session, loading, sessionError }), [session, loading, sessionError]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

@@ -3,7 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Linking, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Body, Card, Heading, Loading, Screen } from '../src/components/ui';
+import { Body, Button, Card, Heading, Loading, Notice, Screen } from '../src/components/ui';
 import { isSupabaseConfigured } from '../src/lib/config';
 import { AuthProvider, useAuth } from '../src/providers/AuthProvider';
 import { ProfileProvider, useProfile } from '../src/providers/ProfileProvider';
@@ -13,6 +13,8 @@ import { SelectedDateProvider } from '../src/providers/SelectedDateProvider';
 import { DiagnosticBoundary, DiagnosticLifecycle } from '../src/components/DiagnosticBoundary';
 import { BackButton } from '../src/components/BackButton';
 import { ConfirmProvider } from '../src/components/ConfirmProvider';
+import { WorkoutWebOffline } from '../src/components/workout/WorkoutWebOffline';
+import { WorkoutModeProvider } from '../src/providers/WorkoutModeProvider';
 import { colors, layout, spacing } from '../src/theme';
 
 const headerOptions = {
@@ -42,14 +44,17 @@ const communityHeaderOptions = {
 };
 
 function Gate() {
-  const { session, loading } = useAuth();
-  const { profile, loading: profileLoading } = useProfile();
+  const { session, loading, sessionError } = useAuth();
+  const { profile, loading: profileLoading, connectionError, refresh } = useProfile();
   if (loading || profileLoading) return <Loading />;
+  if (session && !profile && connectionError) return <Screen><Notice tone="danger">{connectionError}</Notice><Button title="Retry profile" onPress={() => { void refresh(); }} /></Screen>;
 
   const signedIn = !!session;
   const onboarded = signedIn && !!profile;
 
   return (
+    <>
+    {sessionError ? <Notice tone={session ? 'info' : 'danger'}>{sessionError}</Notice> : null}
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
@@ -82,7 +87,9 @@ function Gate() {
         <Stack.Screen name="cook/finish" options={{ ...recipeHeaderOptions, title: 'Log meal', gestureEnabled: false }} />
         <Stack.Screen name="grocery/generate" options={{ ...headerOptions, title: 'Grocery list from plan' }} />
         <Stack.Screen name="pantry" options={{ ...headerOptions, title: 'Pantry' }} />
-        <Stack.Screen name="workout/active" options={{ ...workoutHeaderOptions, title: 'Workout' }} />
+        <Stack.Screen name="workout/start" options={{ ...workoutHeaderOptions, title: 'Start workout' }} />
+        <Stack.Screen name="workout/active" options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen name="workout/finish" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="workout/exercises" options={{ ...workoutHeaderOptions, title: 'Exercises' }} />
         <Stack.Screen name="workout/[id]" options={{ ...workoutHeaderOptions, title: 'Workout' }} />
         <Stack.Screen name="workout/library" options={{ ...workoutHeaderOptions, title: 'Workout library' }} />
@@ -98,6 +105,7 @@ function Gate() {
       </Stack.Protected>
       <Stack.Screen name="delete-account" options={{ ...headerOptions, title: 'Delete your account' }} />
     </Stack>
+    </>
   );
 }
 
@@ -134,7 +142,10 @@ export default function RootLayout() {
               <DiagnosticLifecycle />
               <DiagnosticBoundary>
               <ConfirmProvider>
+              <WorkoutModeProvider>
+              <WorkoutWebOffline />
               <Gate />
+              </WorkoutModeProvider>
               </ConfirmProvider>
               </DiagnosticBoundary>
               </BillingProvider>

@@ -1,4 +1,4 @@
-import { APP_ID, type ActivityHint, type DayActivity, type HealthAdapter, type HealthFeature, type ImportedWorkout } from './types';
+import { APP_ID, healthWorkoutClientRecordId, type ActivityHint, type DayActivity, type HealthAdapter, type HealthFeature, type ImportedWorkout } from './types';
 
 // The native module is loaded on demand so the app still starts in Expo Go, where it does not exist.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -22,6 +22,7 @@ const iso = (d: Date) => d.toISOString();
 
 export const healthConnectAdapter: HealthAdapter = {
   platform: 'health_connect',
+  supportsWorkoutIdempotency: true,
 
   async isAvailable() {
     try {
@@ -92,7 +93,15 @@ export const healthConnectAdapter: HealthAdapter = {
 
   async writeWorkout(w) {
     const ids: string[] = await hc().insertRecords([
-      { recordType: 'ExerciseSession', startTime: iso(w.start), endTime: iso(w.end), exerciseType: TYPE[w.hint], title: w.name },
+      {
+        recordType: 'ExerciseSession',
+        startTime: iso(w.start),
+        endTime: iso(w.end),
+        exerciseType: TYPE[w.hint],
+        title: w.name,
+        // Health Connect upserts by clientRecordId, so a retried insert updates the same session instead of duplicating it.
+        ...(w.clientId ? { metadata: { clientRecordId: healthWorkoutClientRecordId(w.clientId), clientRecordVersion: 1 } } : {}),
+      },
     ]);
     return ids[0] ?? null;
   },

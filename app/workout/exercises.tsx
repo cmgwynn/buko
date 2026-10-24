@@ -4,15 +4,17 @@ import { useCallback, useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Button, Card, Chip, ChipRow, Notice, Screen, TextField } from '../../src/components/ui';
 import { createExercise, loadExercises } from '../../src/lib/fitness/data';
-import { addExercise } from '../../src/lib/fitness/session';
+import { addExercise, getSession, swapSessionExercise } from '../../src/lib/fitness/session';
 import { MUSCLE_GROUPS, MUSCLE_LABEL, type Exercise, type MuscleGroup } from '../../src/lib/fitness/types';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { colors, spacing, typography } from '../../src/theme';
 
 export default function Exercises() {
   const router = useRouter();
-  const { mode } = useLocalSearchParams<{ mode?: string }>();
-  const picking = mode === 'pick';
+  const { mode, item: itemKey } = useLocalSearchParams<{ mode?: string; item?: string }>();
+  const swapping = mode === 'swap';
+  const picking = mode === 'pick' || swapping;
+  const original = swapping ? getSession().items.find((item) => item.key === itemKey) : null;
   const { session } = useAuth();
   const [all, setAll] = useState<Exercise[]>([]);
   const [q, setQ] = useState('');
@@ -31,14 +33,22 @@ export default function Exercises() {
   const shown = useMemo(() => {
     const term = q.trim().toLowerCase();
     return all
-      .filter((e) => (!term || e.name.toLowerCase().includes(term)) && (!muscle || e.muscle_groups.includes(muscle)))
+      .filter((e) => (!term || e.name.toLowerCase().includes(term)) && (!muscle || e.muscle_groups.includes(muscle))
+        && (!swapping || (!!original && e.id !== original.exercise.id && e.category === original.exercise.category
+          && e.muscle_groups.includes(original.exercise.muscle_groups[0]))))
+      .sort((a, b) => Number(b.equipment === original?.exercise.equipment) - Number(a.equipment === original?.exercise.equipment))
       .slice(0, 80);
-  }, [all, q, muscle]);
+  }, [all, q, muscle, swapping, original]);
 
   function choose(e: Exercise) {
     if (picking) {
-      addExercise(e);
-      router.back();
+      try {
+        if (swapping) {
+          if (!itemKey) throw new Error('The exercise to replace is unavailable.');
+          swapSessionExercise(itemKey, e);
+        } else addExercise(e);
+        router.back();
+      } catch (e) { setError(e instanceof Error ? e.message : 'Could not select this exercise.'); }
     } else {
       router.push({ pathname: '/exercise/[id]', params: { id: e.id } });
     }
@@ -65,6 +75,7 @@ export default function Exercises() {
 
   return (
     <Screen>
+      {swapping ? <Notice tone="info">Choose an exercise for the same primary muscles. Completed sets keep their original exercise; only remaining sets are swapped.</Notice> : null}
       <TextField placeholder="Search exercises" value={q} onChangeText={setQ} autoCorrect={false} />
       <ChipRow>
         <Chip label="All" selected={!muscle} onPress={() => setMuscle(null)} />

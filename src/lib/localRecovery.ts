@@ -23,6 +23,7 @@ export function createRecoveryStore<T>(options: {
   empty(): T;
   isEmpty(value: T): boolean;
   validate(value: unknown): value is T;
+  keepPreviousAccount?: boolean;
   now?: () => number;
 }) {
   const now = options.now ?? Date.now;
@@ -58,7 +59,7 @@ export function createRecoveryStore<T>(options: {
     setState({ ready: false, status: 'loading', savedAt: null, error: null });
     hydration = enqueue(async () => {
       let cleanupFailed = false;
-      if (previous) {
+      if (previous && !options.keepPreviousAccount) {
         try { await options.storage.removeItem(recoveryKey(options.kind, previous)); }
         catch { cleanupFailed = true; }
       }

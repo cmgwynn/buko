@@ -17,7 +17,7 @@ Principles
 - Supabase: Auth + Postgres, row-level security on every table
 - Open Food Facts: barcode/product data (descriptive User-Agent sent; attribution shown in app)
 - USDA FoodData Central: whole-food nutrition data (Foundation + SR Legacy)
-- Dev target: Expo Go on iOS/Android
+- Dev target: Expo Go for base UI; development builds for native health, billing and workout features
 
 ## Phase plan
 | Phase | Scope | Status |
@@ -27,7 +27,8 @@ Principles
 | 3 | Fitness: workouts, exercise library, routines, progress charts, HealthKit / Health Connect, activity-adjusted calorie target | **Complete, owner-reported live**; health integrations need a development build and separate device acceptance |
 | 4 | Opt-in AI wellness coach: factual weekly reviews, own-data chat, confirmed meal-plan/grocery suggestions, preference/privacy controls | **Complete, backend confirmed working by owner**; paid Anthropic AI deliberately disabled. No automatic target adjustment. |
 | 5 | Native app-store preparation: subscriptions/entitlement, account export/deletion, opt-in diagnostics, EAS/TestFlight/Play testing, accessibility and release declarations | **Complete and live with subscriptions, owner-reported**. Owner verified export and account deletion. This supersedes earlier pending-backend status, not the independent signed-binary, real store billing, health permissions or accessibility acceptance checklist. |
-| 6 | Shared selected date, week/calendar navigation, diary quick actions/favorites/history, Jest and component tests | **Built and locally verified**: 332 tests, TypeScript and web/iOS/Android JavaScript exports pass. Owner confirmed migration `0012` succeeded on 2026-10-24; frontend release is proceeding. Live/device acceptance remains separate. |
+| 6 | Shared selected date, week/calendar navigation, diary quick actions/favorites/history, Jest and component tests | **Complete and live**: 332 tests, TypeScript and web/iOS/Android JavaScript exports pass. Owner confirmed migration `0012`; Pages deployment succeeded on 2026-10-24. Device acceptance remains separate. |
+| 7 | Focused offline workout mode, timers, supersets, demonstrations, Live Activities and durable workout sync | **Built; release pending** on `phase7-workout-mode`. Owner must apply migration `0013` before publication. Automated/device acceptance details are recorded below; iOS Live Activities need a new native build. |
 
 Store and beta submission notes, proposed listing copy, official references and the independent release go/no-go checklist are in [`docs/STORE-LAUNCH.md`](./docs/STORE-LAUNCH.md). Owner-reported live status is not an independent claim of policy compliance or signed-device/store acceptance.
 
@@ -45,6 +46,17 @@ Store and beta submission notes, proposed listing copy, official references and 
 - Migration `0012_diary_navigation.sql` adds the favorites/receipts and bounded authenticated RPCs. Owner confirmed successful application on 2026-10-24; do not rerun it. No new Edge Function is required. Favorites and action receipts cascade on account deletion and remain covered by owner-data export discovery.
 - Existing Node tests are retained alongside Jest/React Native Testing Library. See [TESTING.md](./TESTING.md). `npm run verify` runs both runners plus TypeScript; PR checks and the Pages build gate run it too. Run it before reporting any future phase complete. Browser/native gesture arbitration, screen-reader acceptance and live migration acceptance are separate from automated tests.
 - Local verification: 289 Node tests (including actual PostgreSQL migration/RLS/idempotency/cascade tests) and 43 Jest tests in eight suites pass; TypeScript, production web export and iOS/Android JavaScript exports pass. Date tests include DST, leap years, midnight/resume, account reset/stale requests and calendar pagination beyond 1,000 records. Diary tests cover favorite portions, duplicate-aware day previews, history pagination/errors, confirmations/retries and health replay/failure warnings. Integrated browser connections timed out, so no new visual/mobile-browser acceptance is claimed; no real backend data was modified.
+
+### Phase 7 dedicated workout mode
+- Workout start, active and finish routes live outside the tab navigator. Train launches saved routines, planned routine snapshots or an empty session; an existing workout is resumed rather than overwritten. Start always records actual time. The focused screen shows one exercise, large set inputs/Done buttons, elapsed time, completed-set progress and the next exercise.
+- Sets are suggestions until explicitly completed. Previous-session values prefill matching set positions, routine targets fill gaps and edits are not overwritten by later history loads. Only completed sets count in the final workout, volume or PR comparisons. Warm-ups are excluded from working volume/PRs; a first working session is a baseline. RPE 1-10 is optional.
+- Exercise rest preferences, notes, timer deadlines, pauses, current position and superset membership persist locally. Swap suggestions require matching primary muscles; completed sets retain their original exercise. Supersets alternate exercises before the round's rest.
+- Active recovery has no automatic 24-hour deletion. Finished workouts first enter an account-scoped durable outbox, then sync through an atomic, idempotent owner RPC. Local persistence failure is an explicit error, not a finished-workout success. Account switching isolates records; sign-out/deletion block unsynced data or an active workout until resolved.
+- A previously cached signed-in profile, exercise catalog, routines and history make offline workouts possible after initial online setup. An expired saved sign-in is used for local recovery only on retryable network failure; all server requests still require valid Supabase authorization. Offline PR comparisons are provisional against cached history.
+- The production website precaches only its static shell/assets under its own service-worker scope. API responses, credentials and account data are not put in service-worker caches. Local workout records remain in account-scoped device storage. An initial successful online load/cache is required; clearing browser/app storage removes local-only data. The offline shell is not a claim that all other Buko features work offline.
+- Native timers use persisted deadlines, local notifications and foreground haptic/audio feedback where permitted. Keep-awake is limited to the focused, unpaused workout. Live Activities are iOS-native only, with a new widget-extension build; Expo Go, Android and web do not claim this capability. No push server or health data transmission is needed for the activity.
+- Health exports use durable server jobs after Buko sync, current consent checks and stable native identifiers/receipts. Android supplies Health Connect client-record IDs; iOS uses the raw HealthKit sync metadata keys and an existing-sample lookup. Retries are duplicate-resistant, not a signed-device-verified exactly-once guarantee; denied HealthKit read access limits UUID confirmation.
+- Verification: `npm run verify` passes 340 Node tests plus 69 Jest tests (409 total), including logging, persistence/recovery, PR rules, migration/RLS/idempotency and native lifecycle mocks. Production web/offline-shell and iOS/Android JavaScript exports pass. Expo config introspection confirms SDK 57, Live Activity support and the App Group. Integrated browser connection timed out; visual phone/browser acceptance and actual notifications, lock screen, health writes and signed native builds remain unverified. See [native setup and acceptance](./docs/WORKOUT-NATIVE.md).
 
 ### Usability and connected daily flows
 - Diary prioritizes Add food and a compact expandable summary. Meal menus offer Search/Scan/Recipes/Recent and confirmed duplicate-aware copying from yesterday. Entries support quantity/meal editing and removal Undo. Food search has explicit submission/source filters and stale-result protection; unknown scans have search/manual recovery. Missing food macros block logging rather than becoming zero.
@@ -88,7 +100,7 @@ Store and beta submission notes, proposed listing copy, official references and 
 - `src/providers/SettingsProvider.tsx` – per-user settings (activity adjust, health toggles)
 - `src/lib/coach/`, `supabase/functions/coach/`, `app/coach.tsx` - shared facts/protocol, server-only model integration, consent/review/chat/action UI
 - `src/lib/diagnostics/`, `supabase/functions/diagnostics/`, `app/settings.tsx` - per-account/device opt-in for restricted diagnostic signals; default off
-- `supabase/migrations/0001_init.sql` through `0008_diagnostics.sql` - schema + RLS, birthdays, coach quota/action RPCs, billing, account export/deletion and diagnostic relay quota
+- `supabase/migrations/0001_init.sql` through `0013_workout_mode.sql` - schema + RLS, nutrition/recipes, coach, billing/account controls, diary transfers and atomic offline-workout sync
 
 ## Decisions
 Log every architectural decision here (newest last).
@@ -138,3 +150,12 @@ Log every architectural decision here (newest last).
 - `grocery_items`: new `quantity_value`, `unit`, `section`, `generated_week`, `from_recipes`; source allows `'plan'`
 - `food_log_entries`: source allows `'recipe'`
 - Private storage bucket `recipe-photos` with per-user-folder policies
+
+## Licensing & asset provenance (workout native, Phase 7)
+- **Exercise demonstrations.** These are original Buko schematics, generated in code. The poses in `src/lib/workoutNative/demoPoses.ts` are coordinates written for Buko. `src/components/workout/ExerciseDemo.tsx` draws them as simple stick figures with react-native-svg. No images, videos or animations were copied, traced or scraped from any website, app or book.
+- **Exercise cues.** The cue text in `src/lib/workoutNative/exerciseDemos.ts` was written for Buko as general movement reminders. Exercise names come from our own seed (`0003_fitness.sql`).
+- **Original-media terms.** The original drawings, cues and chime are bundled for use within Buko, without a third-party media subscription, royalty or attribution requirement. This statement does not grant a separate open-source license or change any dependency/SF Symbols terms.
+- **Rest cue sound.** `assets/sounds/buko_rest_cue.wav` is an original two-tone sine chime. It is synthesized by `scripts/generate-workout-cue.mjs` and contains no samples or third-party audio.
+- **User photos.** Optional photos for custom exercises are supplied by the user and stay on the device or in the user's own storage.
+- **Live Activity icons.** The Live Activity uses Apple SF Symbols through SwiftUI `Image(systemName:)`. They are used only inside the iOS system UI, as Apple's SF Symbols license allows; the symbols are not redistributed as assets.
+- **Dependencies.** expo-widgets, @expo/ui, expo-haptics, expo-audio, expo-network and expo-notifications are all MIT-licensed (Expo, SDK 57). react-native-svg is MIT-licensed.

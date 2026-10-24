@@ -45,7 +45,34 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-widgets",
+        {
+          "bundleIdentifier": "com.cmgwynn.buko.ExpoWidgetsTarget",
+          "groupIdentifier": "group.com.cmgwynn.buko",
+          "enablePushNotifications": false,
+          "frequentUpdates": false,
+          "widgets": []
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundRecording": false,
+          "enableBackgroundPlayback": false
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "sounds": [
+            "./assets/sounds/buko_rest_cue.wav"
+          ]
+        }
+      ]
     ],
     "ios": {
       "supportsTablet": false,
@@ -62,7 +89,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "blockedPermissions": ["android.permission.RECORD_AUDIO"],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO"
+      ],
       "package": "com.cmgwynn.buko",
       "permissions": [
         "android.permission.health.READ_STEPS",

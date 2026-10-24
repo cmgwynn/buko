@@ -28,12 +28,19 @@ export interface WorkoutSet {
   is_warmup: boolean;
   duration_s: number | null;
   distance_m: number | null;
+  /** False for a planned set; omitted legacy history sets are treated as completed. */
+  completed?: boolean;
+  /** Completion timestamp for new logs. Existing saved sets may have no timestamp. */
+  completed_at?: string | null;
+  rpe?: number | null;
+  prefillEditedFields?: ('reps' | 'weight_kg' | 'duration_s' | 'distance_m')[];
 }
 
 export interface Workout {
   id: string;
   name: string;
   started_at: string;
+  completed_at?: string | null;
   duration_min: number | null;
   calories_burned: number | null;
   calories_estimated: boolean;

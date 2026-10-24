@@ -20,3 +20,21 @@ verification gate before exporting the app.
 
 Jest's configuration sets `America/Los_Angeles` before starting workers so DST
 tests exercise 23- and 25-hour days consistently, even on UTC CI machines.
+
+Workout coverage includes set completion/Undo and optional RPE controls, durable
+autosave/resume, offline identity/profile recovery, queue retries and owner checks,
+and personal-record rules. The static-shell test verifies that API requests,
+credential-bearing resource URLs and other origins are not intercepted.
+Native haptics, audio, notification delivery, Live Activities and health exports
+need signed-device acceptance in addition to mocked/pure tests.
+
+For a focused workout pass:
+
+```sh
+npx tsx --test src/lib/fitness/__tests__/engine.test.ts src/lib/fitness/__tests__/offlineStore.test.ts src/lib/fitness/__tests__/workoutDatabase.test.ts
+npm run test:components -- --runInBand src/components/workout src/lib/workoutNative/useWorkoutNative.jest.test.tsx
+```
+
+`npm run build:web` also generates the production static offline shell.
+Native setup and manual acceptance steps are in
+[WORKOUT-NATIVE.md](./docs/WORKOUT-NATIVE.md).

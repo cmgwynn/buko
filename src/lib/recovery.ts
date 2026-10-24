@@ -4,6 +4,7 @@ import { supabase } from './supabase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { accountStorageWrites, accountWorkKeys } from './account/storageWrites';
 import { signOutWithCleanup } from './account/signOut';
+import { pendingWorkoutCount, purgeFitnessOfflineData } from './fitness/offline';
 
 /** Auth waits for both stores before mounting protected editors. */
 export async function recoverAccountWork(userId: string | null) {
@@ -43,9 +44,12 @@ export async function retryRecipeDraftRecovery() {
 }
 
 export async function purgeAccountWork(userId: string) {
+  if (await pendingWorkoutCount(userId) > 0) throw new Error('There are workouts or fitness preferences waiting to sync. Reconnect, open Train and sync them before signing out. Account export can also back up your device-only workout data.');
+  if (workoutSessionStore.getAccount() === userId && workoutSessionStore.get().active) throw new Error('Finish or explicitly discard your active workout before signing out. It is saved only on this device.');
   await accountStorageWrites.revoke(userId);
   const results = await Promise.allSettled([
     recipeDraftStore.purge(userId), workoutSessionStore.purge(userId),
+    purgeFitnessOfflineData(userId, { discardPending: false }),
     AsyncStorage.multiRemove(accountWorkKeys(userId)),
   ]);
   if (results.some((result) => result.status === 'rejected')) {

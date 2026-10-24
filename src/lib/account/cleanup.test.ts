@@ -20,7 +20,8 @@ describe('deleted-account device cleanup', () => {
     await cleanupDeletedAccount('alice', f.deps);
     assert.deepEqual(f.events, [
       'buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice',
-      'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'reset-draft-and-workout', 'signout',
+      'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice',
+      'buko:workout-profile:alice', 'buko:workout-settings:alice', 'reset-draft-and-workout', 'signout',
       'sb-project-auth-token', 'sb-project-auth-token-code-verifier', 'sb-project-auth-token-user',
     ]);
   });
@@ -28,13 +29,19 @@ describe('deleted-account device cleanup', () => {
     const f = fixture();
     f.switchUser('bob');
     await cleanupDeletedAccount('alice', f.deps);
-    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice']);
+    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'buko:workout-profile:alice', 'buko:workout-settings:alice']);
   });
   it('does not erase a new session created while signout completes', async () => {
     const f = fixture();
     f.deps.signOut = async () => { f.switchUser('bob'); };
     await cleanupDeletedAccount('alice', f.deps);
-    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'reset-draft-and-workout']);
+    assert.deepEqual(f.events, ['buko:diagnostics:alice', 'buko:recovery:recipe:alice', 'buko:recovery:workout:alice', 'buko:recipe-favorites:alice', 'buko:recently-cooked:alice', 'buko:grocery-offline:alice', 'buko:onboarding:alice', 'buko:workout-profile:alice', 'buko:workout-settings:alice', 'reset-draft-and-workout']);
+  });
+  it('does not remove offline workout outboxes through generic cleanup', async () => {
+    const f = fixture();
+    await cleanupDeletedAccount('alice', f.deps);
+    assert.ok(!f.events.includes('buko:fitness:offline:alice'));
+    assert.ok(!f.events.includes('buko:fitness:offline:bob'));
   });
   it('still removes the dead session when signout fails and makes the partial cleanup explicit', async () => {
     const f = fixture();

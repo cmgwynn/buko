@@ -7,10 +7,10 @@ import { DateNavigator } from '../../src/components/date/DateNavigator';
 import { DaySwipe } from '../../src/components/date/DaySwipe';
 import { Button, Card, Empty, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
 import { addLocalDays, localDateStartIso, mondayOfWeek, parseLocalDate } from '../../src/lib/dates';
-import { loadRoutines, routineToItems, type RoutineRow, type TrainingRow, type WorkoutListRow } from '../../src/lib/fitness/data';
+import { loadRoutines, type RoutineRow, type TrainingRow, type WorkoutListRow } from '../../src/lib/fitness/data';
 import { setVolume } from '../../src/lib/fitness/calc';
 import { toDisplayWeight, weightUnit } from '../../src/lib/fitness/format';
-import { startSession, useWorkoutRecovery, useWorkoutSession } from '../../src/lib/fitness/session';
+import { useWorkoutRecovery, useWorkoutSession } from '../../src/lib/fitness/session';
 import { loadActivityForDay, syncIfDue } from '../../src/lib/health';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
@@ -18,12 +18,15 @@ import { useProfile } from '../../src/providers/ProfileProvider';
 import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { useSettings } from '../../src/providers/SettingsProvider';
 import { colors, spacing, typography } from '../../src/theme';
+import { PlannedWorkouts } from '../../src/components/workout/PlannedWorkouts';
+import { useWorkoutMode } from '../../src/providers/WorkoutModeProvider';
 
 export default function Train() {
   const router = useRouter();
   const { session } = useAuth();
   const { profile } = useProfile();
   const { settings } = useSettings();
+  const workoutMode = useWorkoutMode();
   const { selectedDate, today } = useSelectedDate();
   const active = useWorkoutSession();
   const recovery = useWorkoutRecovery();
@@ -66,6 +69,7 @@ export default function Train() {
           .eq('user_id', session.user.id).gte('workouts.started_at', weekStartIso).lt('workouts.started_at', weekEndIso).limit(1000),
       ]);
       if (request !== requestVersion.current) return;
+      setRoutines(routinesResult);
       if (recentResult.error || weekResult.error || trainingResult.error) {
         throw new Error(recentResult.error?.message ?? weekResult.error?.message ?? trainingResult.error?.message);
       }
@@ -73,7 +77,6 @@ export default function Train() {
       const weekWorkouts = weekResult.data as { id: string; duration_min: number | null }[];
       const t = trainingResult.data as unknown as TrainingRow[];
       setRecent(r);
-      setRoutines(routinesResult);
       setWeek({
         workouts: weekWorkouts.length,
         minutes: Math.round(weekWorkouts.reduce((s, w) => s + (w.duration_min ?? 0), 0)),
@@ -105,8 +108,8 @@ export default function Train() {
 
   function start(routine?: RoutineRow) {
     if (!recovery.ready) { setError('Wait for your saved workout to finish loading.'); return; }
-    if (!active.active) startSession(routine ? routine.name : 'Workout', routine?.id ?? null, routine ? routineToItems(routine) : []);
-    router.push('/workout/active');
+    if (active.active) router.push('/workout/active');
+    else router.push({ pathname: '/workout/start', params: routine ? { routine: routine.id } : {} });
   }
 
   return (
@@ -122,6 +125,13 @@ export default function Train() {
       />
       <DateNavigator />
       {error ? <Notice tone="danger">{error}</Notice> : null}
+      {workoutMode.online === false ? <Notice tone="info">Offline: cached routines and workouts are available. Completed sessions sync when you reconnect.</Notice> : null}
+      {workoutMode.error ? <Notice tone="danger">{workoutMode.error}</Notice> : null}
+      {workoutMode.error && !workoutMode.pending ? <Button title="Retry fitness sync" variant="secondary" loading={workoutMode.syncing} disabled={workoutMode.online === false} onPress={() => { void workoutMode.retry(); }} /> : null}
+      {workoutMode.pending ? <Card>
+        <Text style={typography.subheading}>{workoutMode.pending} fitness change{workoutMode.pending === 1 ? '' : 's'} waiting to sync</Text>
+        <Button title="Sync saved workouts" loading={workoutMode.syncing} disabled={workoutMode.online === false} onPress={() => { void workoutMode.retry(); }} />
+      </Card> : null}
       {recovery.error ? <Notice tone="danger">{recovery.error} Open your workout to retry the device save.</Notice> : null}
       {selectedDate !== today ? (
         <Notice tone="info">Browsing {new Date(`${selectedDate}T00:00:00`).toLocaleDateString()}. Starting a workout always records the actual current time, not the selected date.</Notice>
@@ -157,6 +167,7 @@ export default function Train() {
         ))
       )}
 
+      <PlannedWorkouts routines={routines} />
       <Card>
         <Text style={typography.label}>
           Week of {parseLocalDate(mondayOfWeek(selectedDate)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}

@@ -187,6 +187,15 @@ See [TESTING.md](./TESTING.md) for focused commands and test conventions. Run th
 - Food favorites sync across devices, separately from device-local recipe favorites. Find them beside Recent in food search. Diary history search searches only your own saved food names/brands, literally (including `%` and `_`), newest date first, with pagination, View day and Log again.
 - **Before deploying Phase 6:** run [0012_diary_navigation.sql](./supabase/migrations/0012_diary_navigation.sql) once in Supabase SQL Editor after migrations through `0011`. It adds owner-only food favorites, transfer receipts, atomic move/copy operations and bounded history search. Favorites/receipts cascade with account deletion; favorites are included by account export's user-table discovery. SQL tabs may be closed after success. No Edge Function redeployment is needed for this migration. A failed migration must be resolved before deploying; GitHub Pages never applies SQL.
 
+## Phase 7: focused workout mode
+- Train → **Start workout** opens a saved routine or an empty workout. Planned workouts store a routine snapshot. The active workout has no tab bar: complete sets with Done, review the suggested last-session values, and use Exercises to jump or add movements.
+- Rest starts after completed sets (or superset rounds). Adjust by 15 seconds, skip rest, or choose an exercise's rest default. Enable rest alerts explicitly; permissions, silent mode and OS background restrictions still apply.
+- Swap exercises for matching primary muscles, pair the current and next exercise as a superset, add notes and optional set RPE, and review duration/working-set volume/PRs before finishing.
+- Start online at least once to cache your own routines, exercises, profile and history. After that, workouts can start, autosave, resume and finish offline. A finished session is saved on device before syncing. Keep the local copy until sync is confirmed; clearing site/app storage removes unsynced data.
+- The production website caches its static workout shell after a successful online visit; private API responses are not cached by its service worker. Native Live Activities and health exports require a development/production app build, not a browser.
+- Migration `0013_workout_mode.sql` must be applied after `0012` before publishing Phase 7. The migration is not applied by GitHub Pages. Native widget/notification/audio setup requires a new app binary; JavaScript updates alone cannot add the extension.
+- Follow [native workout setup](./docs/WORKOUT-NATIVE.md) for iOS Live Activities, alert permissions, development builds and signed-device checks. Expo Go cannot host Buko's widget extension.
+
 ## Tuning the health score
 All weights, thresholds, flagged additives and source citations live in [`src/lib/scoring/config.ts`](./src/lib/scoring/config.ts). Each factor's logic is in `factors.ts`. Change a number, run `npm test`, and the app picks it up. Scores are never stored, so there is nothing to migrate.
 

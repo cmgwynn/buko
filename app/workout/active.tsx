@@ -1,317 +1,173 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useKeepAwake } from 'expo-keep-awake';
-import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import { Button, Card, Notice, Screen, TextField } from '../../src/components/ui';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { BackHandler, Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button, Card, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { RecoveryNotice } from '../../src/components/RecoveryNotice';
 import { useConfirm } from '../../src/components/ConfirmProvider';
-import { estimateCalories, estimateStrengthMinutes, newRecordsFor, type DatedSet } from '../../src/lib/fitness/calc';
-import { exerciseHistory, saveRoutine, saveWorkout } from '../../src/lib/fitness/data';
-import { invalidateDateHistory } from '../../src/components/date/dateHistory';
+import { WorkoutSetRow } from '../../src/components/workout/WorkoutSetRow';
+import { ExerciseDemo } from '../../src/components/workout/ExerciseDemo';
 import {
-  distanceUnit, formatDuration, fromDisplayDistance, fromDisplayWeight, parseNum, toDisplayDistance, toDisplayWeight, weightUnit,
-} from '../../src/lib/fitness/format';
-import { blankSet, endSession, getSession, prepareWorkoutSave, updateSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore } from '../../src/lib/fitness/session';
+  adjustSessionRest, blankSet, completeSessionSet, endSession, pauseSession, prefillSessionHistory,
+  resumeSession, undoSessionSet, updateSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore,
+} from '../../src/lib/fitness/session';
+import { formatDuration } from '../../src/lib/fitness/format';
 import type { WorkoutSet } from '../../src/lib/fitness/types';
-import { activityHintFor, syncWorkoutToHealth } from '../../src/lib/health';
-import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
-import { useSettings } from '../../src/providers/SettingsProvider';
+import { useWorkoutMode } from '../../src/providers/WorkoutModeProvider';
+import { setExerciseRest } from '../../src/lib/fitness/data';
 import { colors, radius, spacing, typography } from '../../src/theme';
 
-const RECORD_LABEL = { heaviest: 'Heaviest', oneRepMax: 'Est. 1RM', setVolume: 'Set volume' } as const;
-
-function NumInput({ value, onChange, placeholder, width = 64 }: { value: number | null; onChange: (n: number | null) => void; placeholder?: string; width?: number }) {
-  const [text, setText] = useState(value == null ? '' : String(value));
-  return (
-    <TextInput
-      value={text}
-      onChangeText={(t) => {
-        setText(t);
-        onChange(t.trim() === '' ? null : parseNum(t));
-      }}
-      placeholder={placeholder}
-      placeholderTextColor={colors.textMuted}
-      keyboardType="decimal-pad"
-      style={{
-        width, height: 40, borderRadius: radius.sm, backgroundColor: colors.surfaceMuted, textAlign: 'center', fontSize: 16, color: colors.text,
-      }}
-    />
-  );
-}
+function Awake() { useKeepAwake('buko-focused-workout'); return null; }
 
 export default function ActiveWorkout() {
-  useKeepAwake();
   const router = useRouter();
+  const [focused, setFocused] = useState(false);
   const confirm = useConfirm();
-  const { session: auth } = useAuth();
-  const { profile } = useProfile();
-  const { settings } = useSettings();
+  const { profile, connectionError } = useProfile();
+  const mode = useWorkoutMode();
   const w = useWorkoutSession();
   const recovery = useWorkoutRecovery();
-  const units = profile?.units ?? 'metric';
   const [now, setNow] = useState(Date.now());
-  const [histories, setHistories] = useState<Record<string, { dated: DatedSet[]; last: WorkoutSet[] }>>({});
-  const loading = useRef(new Set<string>());
-  const [finishing, setFinishing] = useState(false);
-  const [saveAs, setSaveAs] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [menu, setMenu] = useState(false);
+  const [showDemo, setShowDemo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
+  const units = profile?.units ?? 'metric';
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  // Load each exercise's past sets once, for the placeholders and the new-record badges.
-  useEffect(() => {
-    for (const item of w.items) {
-      const id = item.exercise.id;
-      if (histories[id] || loading.current.has(id)) continue;
-      loading.current.add(id);
-      exerciseHistory(id)
-        .then((h) => setHistories((cur) => ({ ...cur, [id]: { dated: h.dated, last: h.sessions[0]?.sets ?? [] } })))
-        .catch(() => setHistories((cur) => ({ ...cur, [id]: { dated: [], last: [] } })));
-    }
-  }, [w.items, histories]);
-
+    if (!focused) return;
+    const clock = setInterval(() => setNow(Date.now()), 1000);
+    setNow(Date.now());
+    return () => clearInterval(clock);
+  }, [focused]);
+  useFocusEffect(useCallback(() => {
+    setFocused(true);
+    void prefillSessionHistory().catch((e: Error) => setError(e.message));
+    const back = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace('/(tabs)/train'); return true;
+    });
+    return () => { setFocused(false); back.remove(); };
+  }, [router]));
   if (!recovery.ready) return <Screen><RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} /></Screen>;
-
-  if (!w.active) {
-    return (
-      <Screen>
-        <Text style={typography.body}>No workout in progress.</Text>
-        <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
-        <View style={{ height: spacing.md }} />
-        <Button title="Back to Train" onPress={() => router.replace('/(tabs)/train')} />
-      </Screen>
-    );
+  if (!w.active) return <Screen><Heading>No workout in progress</Heading><Button title="Start workout" onPress={() => router.replace('/workout/start')} /></Screen>;
+  const index = Math.min(w.focusIndex ?? 0, Math.max(0, w.items.length - 1));
+  const item = w.items[index];
+  const totalSets = w.items.reduce((sum, exercise) => sum + exercise.sets.length, 0);
+  const completedSets = w.items.reduce((sum, exercise) => sum + exercise.sets.filter((set) => !!set.completed_at).length, 0);
+  const elapsed = Math.max(0, Math.floor(((w.pausedAt ?? now) - w.startedAt - (w.totalPausedMs ?? 0)) / 1000));
+  const rest = w.restEndsAt ? Math.max(0, Math.ceil((w.restEndsAt - now) / 1000)) : 0;
+  const nextItem = w.items.slice(index + 1).find((exercise) => exercise.sets.some((set) => !set.completed_at))
+    ?? w.items.slice(0, index).find((exercise) => exercise.sets.some((set) => !set.completed_at));
+  function safe(action: () => void) {
+    try { action(); setError(null); } catch (e) { setError(e instanceof Error ? e.message : 'Could not update your workout.'); }
   }
-
-  const elapsedS = Math.max(0, Math.round((now - w.startedAt) / 1000));
-
-  function patchSet(key: string, idx: number, patch: Partial<WorkoutSet>) {
-    updateSession((s) => ({
-      ...s,
-      items: s.items.map((i) => (i.key === key ? { ...i, sets: i.sets.map((x, n) => (n === idx ? { ...x, ...patch } : x)) } : i)),
-    }));
+  function focus(value: number) { updateSession((session) => ({ ...session, focusIndex: value })); setShowDemo(false); }
+  function patchSet(position: number, patch: Partial<WorkoutSet>) {
+    if (!item || item.sets[position]?.completed_at) return;
+    updateSession((session) => ({ ...session, items: session.items.map((exercise) => exercise.key === item.key
+      ? { ...exercise, sets: exercise.sets.map((set, n) => n === position ? { ...set, ...patch } : set) } : exercise) }));
   }
-  function addSet(key: string) {
-    updateSession((s) => ({
-      ...s,
-      items: s.items.map((i) => {
-        if (i.key !== key) return i;
-        const prev = i.sets[i.sets.length - 1];
-        return { ...i, sets: [...i.sets, blankSet(i.sets.length, prev ? { reps: prev.reps, weight_kg: prev.weight_kg, duration_s: prev.duration_s, distance_m: prev.distance_m } : undefined)] };
-      }),
-    }));
-  }
-  function removeSet(key: string, idx: number) {
-    updateSession((s) => ({ ...s, items: s.items.map((i) => (i.key === key ? { ...i, sets: i.sets.filter((_, n) => n !== idx) } : i)) }));
-  }
-  function removeItem(key: string) {
-    updateSession((s) => ({ ...s, items: s.items.filter((i) => i.key !== key) }));
-  }
-
-  function summary() {
-    const bodyKg = profile?.weight_kg ?? 70;
-    let cardioMin = 0;
-    let cardioKcal = 0;
-    let strengthSets = 0;
-    let strengthMetSum = 0;
-    let strengthN = 0;
-    for (const i of w.items) {
-      if (i.exercise.category === 'cardio') {
-        const min = i.sets.reduce((s, x) => s + (x.duration_s ?? 0), 0) / 60;
-        cardioMin += min;
-        cardioKcal += estimateCalories(i.exercise.met, bodyKg, min);
-      } else {
-        const n = i.sets.filter((x) => !x.is_warmup && (x.reps ?? 0) > 0).length;
-        if (n > 0) {
-          strengthSets += n;
-          strengthMetSum += i.exercise.met * n;
-          strengthN += n;
-        }
-      }
-    }
-    // Time not spent on timed cardio is treated as strength time, but never less than the per-set estimate.
-    const elapsedMin = elapsedS / 60;
-    const strengthMin = strengthSets > 0 ? Math.max(elapsedMin - cardioMin, estimateStrengthMinutes(strengthSets)) : 0;
-    const strengthKcal = strengthSets > 0 ? estimateCalories(strengthMetSum / strengthN, bodyKg, strengthMin) : 0;
-    const duration = Math.max(1, Math.round(Math.max(elapsedMin, cardioMin + strengthMin)));
-    return { duration, calories: cardioKcal + strengthKcal, strengthSets, cardioMin: Math.round(cardioMin) };
-  }
-
-  async function finish() {
-    if (busy) return;
-    if (!auth) return setError('Please log in again before saving your workout.');
-    if (saveAs.trim().length > 100) return setError('Use a routine name of 100 characters or fewer.');
-    const done = w.items.filter((i) => i.sets.length > 0);
-    if (done.length === 0) return setError('Add at least one exercise with a set.');
-    setBusy(true);
-    setError(null);
-    try {
-      const sum = summary();
-      await prepareWorkoutSave();
-      const id = await saveWorkout(auth.user.id, w, { durationMin: sum.duration, calories: sum.calories || null, caloriesEstimated: true });
-      invalidateDateHistory();
-      if (workoutSessionStore.getAccount() !== auth.user.id || getSession() !== w) return;
-      await endSession();
-      const completed = getSession();
-      let routineError: string | undefined;
-      if (saveAs.trim()) {
-        try {
-          await saveRoutine(auth.user.id, saveAs, w);
-        } catch (err) {
-          routineError = err instanceof Error ? err.message : 'Please try creating the routine again.';
-        }
-      }
-      const startedAt = new Date(w.startedAt);
-      const name = w.name;
-      const hint = activityHintFor(w.items.map((i) => ({ name: i.exercise.name, category: i.exercise.category })));
-      const distanceM = w.items.reduce((s, i) => s + (i.exercise.category === 'cardio' ? i.sets.reduce((a, x) => a + (x.distance_m ?? 0), 0) : 0), 0);
-      if (settings?.health_write_workouts) {
-        // Best effort: a failure here never loses the saved workout.
-        syncWorkoutToHealth({ id, name, startedAt, durationMin: sum.duration, calories: sum.calories || null, hint, distanceM: distanceM || null }).catch(() => {});
-      }
-      if (workoutSessionStore.getAccount() !== auth.user.id || getSession() !== completed) return;
-      router.replace({ pathname: '/workout/[id]', params: { id, ...(routineError ? { routineError } : {}) } });
-    } catch (e) {
-      setError((e as Error).message);
-      if (workoutSessionStore.getAccount() === auth.user.id && getSession() === w) await workoutSessionStore.retry().catch(() => {});
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function discard() {
-    if (!await confirm({ title: 'Discard workout?', message: 'This removes the unfinished workout from this device. Your saved routine is kept.', confirmLabel: 'Discard workout', destructive: true })) return;
-    try {
-      await endSession();
-      router.dismissTo('/(tabs)/train');
-    } catch {
-      setError('The workout could not be discarded on this device. Retry before leaving.');
-    }
+    if (!await confirm({ title: 'Discard this workout?', message: 'This removes the active session on this device. Previously finished workouts are not affected.', destructive: true, confirmLabel: 'Discard workout' })) return;
+    try { await endSession(); router.replace('/(tabs)/train'); }
+    catch (e) { setError(e instanceof Error ? e.message : 'Could not discard the workout.'); }
   }
-
-  if (finishing) {
-    const sum = summary();
-    return (
-      <Screen>
-        <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
-        <Text style={typography.heading}>Nice work</Text>
-        <Card style={{ marginTop: spacing.md }}>
-          <Text style={typography.body}>Time: {sum.duration} min</Text>
-          <Text style={typography.body}>Estimated burn: {Math.round(sum.calories)} kcal</Text>
-          <Text style={[typography.small, { marginTop: spacing.xs }]}>
-            An estimate from the exercises’ MET values (a standard energy-cost rating), your weight and time. It can be off by a lot, so treat it as a rough guide.
-          </Text>
-        </Card>
-        <TextField label="Save as a routine (optional)" placeholder="e.g. Push day" value={saveAs} onChangeText={setSaveAs} editable={!busy} />
-        {error ? <Notice tone="danger">{error}</Notice> : null}
-        <Button title="Save workout" onPress={finish} loading={busy} />
-        <View style={{ height: spacing.sm }} />
-        <Button title="Keep training" variant="ghost" onPress={() => setFinishing(false)} disabled={busy} />
-      </Screen>
-    );
-  }
-
-  return (
-    <Screen>
-      <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <View style={{ flex: 1, marginRight: spacing.md }}>
-          <TextInput
-            value={w.name}
-            onChangeText={(name) => updateSession((s) => ({ ...s, name }))}
-            style={[typography.heading, { paddingVertical: spacing.xs }]}
-            placeholder="Workout name"
-          />
-          <Text style={typography.small}>{formatDuration(elapsedS)} · screen stays awake</Text>
-        </View>
-        <Pressable onPress={discard} hitSlop={10} accessibilityLabel="Discard workout">
-          <Ionicons name="trash-outline" size={22} color={colors.danger} />
+  return <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    {focused && !w.pausedAt ? <Awake /> : null}
+    <View style={{ paddingHorizontal: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+        <Pressable onPress={() => router.replace('/(tabs)/train')} accessibilityRole="button" accessibilityLabel="Minimize workout" style={{ minWidth: 56, minHeight: 56, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="chevron-down" size={28} color={colors.primary} />
         </Pressable>
+        <View style={{ flex: 1 }}><Text style={typography.subheading} numberOfLines={1}>{w.name}</Text><Text style={[typography.body, { fontVariant: ['tabular-nums'] }]}>{formatDuration(elapsed)}{w.pausedAt ? ' · paused' : ''}</Text></View>
+        <Button title="Finish" disabled={!completedSets || !!recovery.error} onPress={() => router.push('/workout/finish')} />
       </View>
-
-      <View style={{ height: spacing.md }} />
-      {w.items.map((item) => {
-        const hist = histories[item.exercise.id];
-        const cardio = item.exercise.category === 'cardio';
-        return (
-          <Card key={item.key}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={[typography.subheading, { flex: 1 }]}>{item.exercise.name}</Text>
-              <Pressable onPress={() => removeItem(item.key)} hitSlop={10}>
-                <Ionicons name="close" size={20} color={colors.textMuted} />
-              </Pressable>
-            </View>
-            <View style={{ flexDirection: 'row', marginTop: spacing.sm, gap: spacing.sm }}>
-              <Text style={[typography.label, { width: 22 }]}>#</Text>
-              {cardio ? (
-                <>
-                  <Text style={[typography.label, { width: 64, textAlign: 'center' }]}>min</Text>
-                  <Text style={[typography.label, { width: 64, textAlign: 'center' }]}>{distanceUnit(units)}</Text>
-                </>
-              ) : (
-                <>
-                  <Text style={[typography.label, { width: 64, textAlign: 'center' }]}>{weightUnit(units)}</Text>
-                  <Text style={[typography.label, { width: 64, textAlign: 'center' }]}>reps</Text>
-                  <Text style={[typography.label, { width: 40, textAlign: 'center' }]}>warm</Text>
-                </>
-              )}
-            </View>
-            {item.sets.map((set, idx) => {
-              const prev = hist?.last[idx];
-              const records = !cardio && hist ? newRecordsFor(hist.dated, set) : [];
-              return (
-                <View key={idx} style={{ marginTop: spacing.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                    <Text style={[typography.small, { width: 22 }]}>{idx + 1}</Text>
-                    {cardio ? (
-                      <>
-                        <NumInput value={set.duration_s != null ? Math.round((set.duration_s / 60) * 10) / 10 : null} onChange={(n) => patchSet(item.key, idx, { duration_s: n == null ? null : Math.round(n * 60) })} placeholder={prev?.duration_s ? String(Math.round(prev.duration_s / 60)) : '—'} />
-                        <NumInput value={set.distance_m != null ? toDisplayDistance(set.distance_m, units) : null} onChange={(n) => patchSet(item.key, idx, { distance_m: n == null ? null : fromDisplayDistance(n, units) })} placeholder={prev?.distance_m ? String(toDisplayDistance(prev.distance_m, units)) : '—'} />
-                      </>
-                    ) : (
-                      <>
-                        <NumInput value={set.weight_kg != null ? toDisplayWeight(set.weight_kg, units) : null} onChange={(n) => patchSet(item.key, idx, { weight_kg: n == null ? null : fromDisplayWeight(n, units) })} placeholder={prev?.weight_kg != null ? String(toDisplayWeight(prev.weight_kg, units)) : '—'} />
-                        <NumInput value={set.reps} onChange={(n) => patchSet(item.key, idx, { reps: n == null ? null : Math.round(n) })} placeholder={prev?.reps != null ? String(prev.reps) : '—'} />
-                        <Pressable onPress={() => patchSet(item.key, idx, { is_warmup: !set.is_warmup })} style={{ width: 40, alignItems: 'center' }} accessibilityLabel="Toggle warm-up set">
-                          <Ionicons name={set.is_warmup ? 'checkbox' : 'square-outline'} size={24} color={set.is_warmup ? colors.primary : colors.textMuted} />
-                        </Pressable>
-                      </>
-                    )}
-                    <Pressable onPress={() => removeSet(item.key, idx)} hitSlop={8}>
-                      <Ionicons name="remove-circle-outline" size={20} color={colors.textMuted} />
-                    </Pressable>
-                  </View>
-                  {!cardio ? (
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xs, marginLeft: 30 }}>
-                      <Text style={typography.small}>Minutes (optional)</Text>
-                      <NumInput value={set.duration_s == null ? null : set.duration_s / 60} onChange={(n) => patchSet(item.key, idx, { duration_s: n == null ? null : Math.round(n * 60) })} placeholder="min" />
-                    </View>
-                  ) : null}
-                  {records.length ? (
-                    <Text style={{ color: colors.primary, fontSize: 12, fontWeight: '700', marginLeft: 30, marginTop: 2 }}>
-                      🏆 New record: {records.map((r) => RECORD_LABEL[r]).join(', ')}
-                    </Text>
-                  ) : null}
-                </View>
-              );
-            })}
-            <View style={{ marginTop: spacing.md }}>
-              <Button title={cardio ? 'Add interval' : 'Add set'} icon="add" variant="secondary" onPress={() => addSet(item.key)} />
-            </View>
-          </Card>
-        );
-      })}
-
-      <Button title="Add exercise" icon="barbell-outline" variant="secondary" onPress={() => router.push({ pathname: '/workout/exercises', params: { mode: 'pick' } })} />
+      <View accessibilityRole="progressbar" accessibilityLabel="Workout sets completed" accessibilityValue={{ min: 0, max: totalSets || 1, now: completedSets }}
+        style={{ height: 10, backgroundColor: colors.surfaceMuted, borderRadius: radius.pill, overflow: 'hidden' }}>
+        <View style={{ height: 10, width: `${totalSets ? completedSets / totalSets * 100 : 0}%`, backgroundColor: colors.primary }} />
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={typography.small}>{completedSets} / {totalSets} sets · {recovery.status === 'saving' ? 'Saving on device…' : recovery.error ? 'Device save needs attention' : 'Saved on device'}</Text>
+        <Button title="Exercises" variant="ghost" onPress={() => setMenu(true)} />
+      </View>
+    </View>
+    <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl * 2, width: '100%', maxWidth: 620, alignSelf: 'center' }}>
+      {connectionError ? <Notice tone="info">{connectionError}</Notice> : null}
+      {mode.online === false ? <Notice tone="info">Offline workout: sets and notes save on this device. Finish normally; sync will retry when connected.</Notice> : null}
+      {mode.native.liveActivity.status === 'error' ? <Notice tone="danger">{mode.native.liveActivity.reason ?? 'Live Activity could not update.'}</Notice> : null}
+      {mode.native.alerts.status !== 'granted' ? <Button title="Enable rest alerts" variant="secondary" onPress={() => { void mode.native.enableAlerts().then((enabled) => { if (!enabled) setError('Rest alerts are unavailable or not permitted. The on-screen timer still works.'); }).catch((e: Error) => setError(e.message)); }} /> : null}
+      <RecoveryNotice state={recovery} kind="Workout" retry={workoutSessionStore.retry} />
       {error ? <Notice tone="danger">{error}</Notice> : null}
-      <View style={{ height: spacing.lg }} />
-      <Button title="Finish workout" onPress={() => (w.items.some((i) => i.sets.length) ? setFinishing(true) : setError('Add at least one exercise with a set.'))} />
-    </Screen>
-  );
+      {w.pausedAt ? <Card><Heading>Workout paused</Heading><Button title="Resume workout" onPress={() => safe(resumeSession)} /></Card> : null}
+      {w.restEndsAt ? <Card>
+        <Text style={typography.subheading}>{rest ? 'Rest' : 'Rest complete'}</Text>
+        <Text accessibilityLiveRegion="none" style={{ fontSize: 48, fontWeight: '800', color: colors.text, fontVariant: ['tabular-nums'] }}>{formatDuration(rest)}</Text>
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flex: 1 }}><Button title="−15 seconds" variant="secondary" onPress={() => safe(() => adjustSessionRest(-15))} /></View>
+          <View style={{ flex: 1 }}><Button title="+15 seconds" variant="secondary" onPress={() => safe(() => adjustSessionRest(15))} /></View>
+        </View>
+        <Button title="Skip rest" variant="ghost" onPress={() => updateSession((session) => ({ ...session, restEndsAt: null }))} />
+      </Card> : null}
+      {item ? <>
+        <Text style={typography.small}>Exercise {index + 1} of {w.items.length}{item.supersetId ? ' · superset' : ''}</Text>
+        <Text accessibilityRole="header" style={{ fontSize: 32, fontWeight: '800', color: colors.text, marginVertical: spacing.md }}>{item.exercise.name}</Text>
+        <Button title={showDemo ? 'Hide demonstration' : 'Demonstration & form cues'} variant="secondary" onPress={() => setShowDemo(!showDemo)} />
+        {showDemo ? <ExerciseDemo exercise={item.exercise} /> : null}
+        <Text style={[typography.small, { marginVertical: spacing.md }]}>Suggested weights and reps come from your last saved session when available. Review them before tapping Done. Use 0 for bodyweight.</Text>
+        {item.sets.map((set, position) => <WorkoutSetRow key={set.id ?? `${item.key}:${position}`} set={set} index={position} units={units}
+          cardio={item.exercise.category === 'cardio'} completed={!!set.completed_at} onPatch={(patch) => safe(() => patchSet(position, patch))}
+          onDone={() => safe(() => completeSessionSet(item.key, position))} onUndo={() => safe(() => undoSessionSet(item.key, position))}
+          onRemove={() => updateSession((session) => ({ ...session, items: session.items.map((exercise) => exercise.key === item.key
+            ? { ...exercise, sets: exercise.sets.filter((_, n) => n !== position).map((value, n) => ({ ...value, position: n })) } : exercise) }))} />)}
+        {!w.pausedAt ? <Button title="Add set" variant="secondary" onPress={() => updateSession((session) => ({ ...session, items: session.items.map((exercise) => {
+          if (exercise.key !== item.key) return exercise;
+          const previous = exercise.sets.at(-1);
+          return { ...exercise, sets: [...exercise.sets, blankSet(exercise.sets.length, previous ? { reps: previous.reps, weight_kg: previous.weight_kg, duration_s: previous.duration_s, distance_m: previous.distance_m } : undefined)] };
+        }) }))} /> : null}
+        <TextField label="Exercise notes" placeholder="Setup, form or adjustments" multiline maxLength={2000} value={item.notes ?? ''}
+          onChangeText={(notes) => updateSession((session) => ({ ...session, items: session.items.map((exercise) => exercise.key === item.key ? { ...exercise, notes } : exercise) }))} />
+        <Text style={typography.label}>Rest after sets</Text>
+        <ChipRow>{[0, 30, 60, 90, 120, 180].map((seconds) => <Chip key={seconds} label={seconds ? `${seconds}s` : 'Off'} selected={(item.restSeconds ?? 90) === seconds}
+          onPress={() => {
+            updateSession((session) => ({ ...session, items: session.items.map((exercise) => exercise.key === item.key ? { ...exercise, restSeconds: seconds } : exercise) }));
+            void setExerciseRest(item.exercise.id, seconds).catch((e: Error) => setError(e.message));
+          }} />)}</ChipRow>
+        <View style={{ height: spacing.md }} />
+        <Button title="Swap exercise" variant="ghost" onPress={() => router.push({ pathname: '/workout/exercises', params: { mode: 'swap', item: item.key } })} />
+        <Button title={item.supersetId ? 'Remove from superset' : 'Superset with next exercise'} variant="ghost" disabled={!item.supersetId && !w.items[index + 1]}
+          onPress={() => updateSession((session) => {
+            const group = item.supersetId ? null : item.key;
+            return { ...session, items: session.items.map((exercise, n) =>
+              item.supersetId && exercise.supersetId === item.supersetId ? { ...exercise, supersetId: null }
+                : n === index || (!item.supersetId && n === index + 1) ? { ...exercise, supersetId: group } : exercise) };
+          })} />
+        <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+          <View style={{ flex: 1 }}><Button title="Previous exercise" variant="secondary" disabled={index === 0} onPress={() => focus(index - 1)} /></View>
+          <View style={{ flex: 1 }}><Button title="Next exercise" variant="secondary" disabled={index >= w.items.length - 1} onPress={() => focus(index + 1)} /></View>
+        </View>
+        <Text style={[typography.subheading, { marginVertical: spacing.lg }]}>Next up: {nextItem?.exercise.name ?? 'Finish and review'}</Text>
+      </> : <Card><Heading>Your workout starts here</Heading><Text style={typography.body}>Choose exercises from your offline library.</Text><Button title="Add exercise" onPress={() => router.push({ pathname: '/workout/exercises', params: { mode: 'pick' } })} /></Card>}
+      <Button title={w.pausedAt ? 'Resume workout' : 'Pause workout'} variant="secondary" onPress={() => safe(w.pausedAt ? resumeSession : pauseSession)} />
+      <Button title="Discard workout" variant="ghost" onPress={() => { void discard(); }} />
+    </ScrollView>
+    <Modal visible={menu} animationType="slide" onRequestClose={() => setMenu(false)}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+        <ScrollView contentContainerStyle={{ padding: spacing.lg }}>
+          <Heading>Workout exercises</Heading>
+          {w.items.map((exercise, n) => <Card key={exercise.key}>
+            <Text style={typography.subheading}>{exercise.exercise.name}</Text>
+            <Text style={typography.small}>{exercise.sets.filter((set) => set.completed_at).length} / {exercise.sets.length} complete{exercise.supersetId ? ' · superset' : ''}</Text>
+            <Button title={`Go to ${exercise.exercise.name}`} variant="secondary" onPress={() => { focus(n); setMenu(false); }} />
+            <Button title={`Move ${exercise.exercise.name} up`} variant="ghost" disabled={n === 0} onPress={() => updateSession((session) => {
+              const items = [...session.items]; [items[n - 1], items[n]] = [items[n], items[n - 1]];
+              return { ...session, items, focusIndex: items.findIndex((value) => value.key === item?.key) };
+            })} />
+          </Card>)}
+          <Button title="Add exercise" onPress={() => { setMenu(false); router.push({ pathname: '/workout/exercises', params: { mode: 'pick' } }); }} />
+          <Button title="Back to workout" variant="ghost" onPress={() => setMenu(false)} />
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>
+  </SafeAreaView>;
 }

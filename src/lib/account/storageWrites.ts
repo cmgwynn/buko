@@ -31,4 +31,6 @@ export const accountStorageWrites = createAccountStorageWrites();
 
 export const accountWorkKeys = (userId: string) => [
   `buko:grocery-offline:${userId}`, `buko:onboarding:${userId}`,
+  `buko:workout-profile:${userId}`,
+  `buko:workout-settings:${userId}`,
 ];

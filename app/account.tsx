@@ -27,7 +27,7 @@ export default function AccountScreen() {
         <Body>Export your data before deleting your account. Exports contain sensitive nutrition, birthday, health, coach and purchase information. Store them securely.</Body>
         {!session ? <Link href="/(auth)/sign-in">Sign in to manage your data</Link> : (
           <Card>
-            <Body>The JSON export includes all saved account data, recipe ingredients and steps, workouts and sets, health imports, settings, coach history, usage and purchase status, plus this device’s unsaved recipe and workout.</Body>
+            <Body>The JSON export includes all saved account data, recipe ingredients and steps, workouts and sets, health imports, settings, coach history, usage and purchase status, plus this device’s unsaved recipe, active workout, cached fitness data and complete queued workout payloads.</Body>
             <Body>Saved private recipe photos are embedded in the JSON as durable base64 image bytes with their content type and path—not expiring links. The complete JSON is limited to 20 MiB, with a 5 MiB limit per photo, 1,000 photos and 25,000 rows plus photo objects. Larger exports fail explicitly with no partial archive; contact the app operator for a complete assisted export.</Body>
             <Body>For security, sign-in must be within the last 10 minutes. Confirm your password below if needed. A refreshed session alone does not count.</Body>
             <TextField label="Current password (if needed)" secureTextEntry value={password} onChangeText={setPassword} autoCapitalize="none" autoComplete="current-password" />

@@ -5,6 +5,7 @@ import { Body, Button, Card, Heading, TextField, Screen } from '../src/component
 import { deleteAccount, reauthenticate } from '../src/lib/account/client';
 import { useAuth } from '../src/providers/AuthProvider';
 import { SubscriptionManagement } from '../src/components/SubscriptionManagement';
+import { pendingWorkoutCount, syncPendingWorkouts } from '../src/lib/fitness/offline';
 
 /** Public web entry for store account-deletion links; personal details are never shown. */
 export default function DeleteAccountScreen() {
@@ -16,6 +17,27 @@ export default function DeleteAccountScreen() {
   const [message, setMessage] = useState('');
   const [deleted, setDeleted] = useState(false);
   const [cleanupError, setCleanupError] = useState<string | null>(null);
+  const [pendingWorkouts, setPendingWorkouts] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    setPendingWorkouts(null);
+    if (session) pendingWorkoutCount(session.user.id)
+      .then((count) => { if (active) setPendingWorkouts(count); })
+      .catch(() => { if (active) setMessage('Offline workout status could not be read. Retry syncing before deleting your account.'); });
+    return () => { active = false; };
+  }, [session?.user.id]);
+  async function syncWorkouts() {
+    if (!session) return;
+    setBusy(true); setMessage('');
+    try {
+      const result = await syncPendingWorkouts(session.user.id);
+      setPendingWorkouts(result.pending);
+      setMessage(result.error
+        ? `Workout sync did not finish. ${result.pending} queued changes remain safely on this device. ${result.error}`
+        : `${result.pending} queued changes remaining. Synced workouts and preferences will be included in export and removed if you permanently delete your account.`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'Workout sync failed. Queued workouts were preserved.'); }
+    finally { setBusy(false); }
+  }
   useEffect(() => {
     if (deleted && !session && !cleanupError) {
       router.replace({ pathname: '/(auth)/sign-in', params: { accountDeleted: 'true' } });
@@ -69,6 +91,8 @@ export default function DeleteAccountScreen() {
           <Link href="/(auth)/sign-in">Sign in to continue deletion</Link>
         </Card>}
         {session && !deleted && <Card>
+          <Body>Finish or explicitly discard your active workout before deletion. Queued offline workouts and fitness preference changes must be synced before deletion. Export a local copy first if needed. Account deletion never silently discards active or queued workouts. {pendingWorkouts === null ? 'Checking this device’s offline queue.' : `${pendingWorkouts} changes queued on this device.`}</Body>
+          <Button title="Sync queued workouts first" variant="secondary" loading={busy} onPress={syncWorkouts} />
           <Body>Confirm your identity with your current password if your last sign-in was more than 10 minutes ago. If you use a sign-in provider, sign out and sign back in with that provider first.</Body>
           <TextField label="Current password (if needed)" secureTextEntry value={password} onChangeText={setPassword} autoCapitalize="none" autoComplete="current-password" />
           <TextField label="Type DELETE to confirm permanent deletion" value={confirmation} onChangeText={setConfirmation} autoCapitalize="characters" autoCorrect={false} />

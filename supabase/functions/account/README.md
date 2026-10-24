@@ -61,7 +61,21 @@ there is no link-only fallback or silently omitted image. All owned
 nested paths, not just current recipe photo references.
 
 The client adds this device's in-memory recipe draft, workout and scoped
-diagnostics preference. Unsaved local image URIs are references on this device,
+diagnostics preference, plus the user-scoped fitness offline snapshot (cached
+catalog/routines/plans/history/finished workouts, exercise rest preferences and
+complete queued workout/preference RPC payloads). Deletion
+checks both completed-workout and rest-preference outboxes before requesting server deletion and
+blocks if queued work remains or its status cannot be read. The deletion
+client also blocks an active workout owned by this account before and after
+the offline check and immediately before the deletion HTTP request; finish or
+explicitly discard it first. Another account's active session is not touched.
+The deletion
+screen offers an explicit sync action; export a copy first if needed. After
+confirmed server deletion the offline cache is purged only with
+`discardPending: false`. Work queued during deletion is preserved and reported
+as a device-cleanup warning, never silently discarded; it can no longer sync
+to the deleted account. The key is not added to generic recovery/sign-out
+purge lists. Unsaved local image URIs are references on this device,
 not uploaded photo assets. Web uses a JSON download. Native uses an owner-scoped
 cache file and a share sheet; cancelling sharing is not claimed as saving. The
 cache file is removed when sharing closes, and any surviving owned cache

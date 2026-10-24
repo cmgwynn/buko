@@ -32,7 +32,12 @@ export interface WorkoutToWrite {
   calories: number | null;
   distanceM: number | null;
   hint: ActivityHint;
+  /** Stable workout UUID. When set, retried writes update/return the same health record instead of adding another. */
+  clientId?: string;
 }
+
+/** Health record identifier derived from a Buko workout clientId (HealthKit sync identifier / Health Connect clientRecordId). */
+export const healthWorkoutClientRecordId = (clientId: string) => `buko-workout:${clientId}`;
 
 export interface NutritionToWrite {
   name: string;
@@ -45,6 +50,11 @@ export interface NutritionToWrite {
 
 export interface HealthAdapter {
   platform: 'healthkit' | 'health_connect';
+  /**
+   * True when writeWorkout with the same clientId cannot create a second record, even if the app crashed after
+   * the native write but before the returned id was stored.
+   */
+  supportsWorkoutIdempotency?: boolean;
   /** True when the native module is present and the device supports it. */
   isAvailable(): Promise<boolean>;
   /** Shows the operating system's permission prompt for just this feature. Returns false when not granted. */

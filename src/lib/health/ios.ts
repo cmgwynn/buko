@@ -1,4 +1,4 @@
-import { APP_ID, type ActivityHint, type DayActivity, type HealthAdapter, type HealthFeature, type ImportedWorkout } from './types';
+import { APP_ID, healthWorkoutClientRecordId, type ActivityHint, type DayActivity, type HealthAdapter, type HealthFeature, type ImportedWorkout } from './types';
 
 // The native module is loaded on demand so the app still starts in Expo Go, where it does not exist.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -28,6 +28,7 @@ function activityType(hint: ActivityHint): number {
 
 export const healthKitAdapter: HealthAdapter = {
   platform: 'healthkit',
+  supportsWorkoutIdempotency: true,
 
   async isAvailable() {
     try {
@@ -91,10 +92,24 @@ export const healthKitAdapter: HealthAdapter = {
   },
 
   async writeWorkout(w) {
-    const saved = await hk().saveWorkoutSample(activityType(w.hint), [], w.start, w.end, {
-      energyBurned: w.calories ?? undefined,
-      distance: w.distanceM ?? undefined,
-    });
+    const syncId = w.clientId ? healthWorkoutClientRecordId(w.clientId) : null;
+    if (syncId) {
+      // HealthKit keeps one object per (source, sync identifier); return the earlier save if it already exists.
+      const existing = await hk().queryWorkoutSamples({
+        limit: 1,
+        filter: { metadata: { withMetadataKey: 'HKSyncIdentifier', operatorType: 4 /* ComparisonPredicateOperator.equalTo */, value: syncId } },
+      });
+      const found = existing?.[0]?.uuid ?? null;
+      if (found) return found;
+    }
+    const saved = await hk().saveWorkoutSample(
+      activityType(w.hint),
+      [],
+      w.start,
+      w.end,
+      { energyBurned: w.calories ?? undefined, distance: w.distanceM ?? undefined },
+      syncId ? { HKSyncIdentifier: syncId, HKSyncVersion: 1 } : undefined,
+    );
     const id = saved?.uuid ?? null;
     if (typeof saved?.dispose === 'function') saved.dispose();
     return id;
