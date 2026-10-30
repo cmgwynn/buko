@@ -323,9 +323,9 @@ export default function Diary() {
             <Text style={[typography.subheading, { color: colors.onHeroMuted, marginLeft: spacing.sm }]}>kcal {remaining < 0 ? 'over' : 'left'}</Text>
           </View>
           <View accessibilityLabel={`Goal ${Math.round(targets.calories - (adjusted?.bonusKcal ?? 0))}, food ${Math.round(totals.calories)}${adjusted ? `, exercise ${Math.round(adjusted.bonusKcal)}` : ''}`}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm }}>
+            style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginTop: spacing.sm }}>
             {([['Goal', targets.calories - (adjusted?.bonusKcal ?? 0), null], ['Food', totals.calories, '−'], ...(adjusted ? [['Exercise', adjusted.bonusKcal, '+'] as const] : [])] as const).map(([label, value, sign]) => (
-              <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+              <View key={label} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
                 {sign ? <Text style={[typography.subheading, { color: colors.onHeroMuted }]}>{sign}</Text> : null}
                 <View>
                   <Text style={[typography.subheading, { color: colors.onHero, fontVariant: ['tabular-nums'] }]}>{Math.round(value).toLocaleString()}</Text>

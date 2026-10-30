@@ -87,7 +87,7 @@ const SESSIONS: Record<Exclude<TrainingSplit, 'run'>, { name: string; patterns: 
   ],
   ppl: [
     { name: 'Push day', patterns: ['hpush', 'vpush', 'incline', 'lateral', 'triceps'] },
-    { name: 'Pull day', patterns: ['vpull', 'hpull', 'rear', 'biceps'] },
+    { name: 'Pull day', patterns: ['hpull', 'vpull', 'rear', 'biceps'] },
     { name: 'Leg day', patterns: ['squat', 'hinge', 'lunge', 'legExt', 'legCurl', 'calves'] },
   ],
 };
