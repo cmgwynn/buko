@@ -52,92 +52,136 @@ Optional diagnostics use `DIAGNOSTICS_ENABLED=false` by default, `SENTRY_DSN` as
 
 ## Proposed store listing copy
 
-Draft copy is deliberately limited to currently implemented, user-facing features. Review every statement on the release candidate and remove any feature that is unavailable in a particular platform build. Character counts include spaces and punctuation.
+Positioning (owner direction): **everyday tracking is free with no ads; personalization is Buko Plus** (annual by default with a 7-day free trial, plus a monthly option). Competitor names belong in marketing comparisons, never in store metadata, which Apple and Google both reject. The listing only describes shipped features. Before submitting, check every line against the release candidate and remove anything not in that platform build. Character counts include spaces.
+
+### Release gates for this copy
+
+- **Pricing and trial paragraph:** include it only after the store products, intro offer, local prices, restore and `EXPO_PUBLIC_PREMIUM_ENFORCED=true` have been tested on that build. Until then, delete the paragraph and the "BUKO PLUS" heading wording that implies a charge. The feature bullets can stay as "Plans built around your week".
+- **Instacart:** add `• Send your grocery list to Instacart to order from local stores (US/Canada, where available)` only when `EXPO_PUBLIC_GROCERY_ORDERING=true` and the Instacart key is live. Instacart's name may be used only as their partner terms allow.
+- **Coach / AI:** do not mention it until it is intentionally activated (see App facts above).
+- Replace `[TERMS URL]` / `[PRIVACY URL]` with the published legal pages after the placeholders in `public/legal/` are filled in.
 
 ### Apple App Store
 
-**Name — 20/30 characters**
+**Name — 26/30**
 
-> Buko: Food & Fitness
+> Buko: Meal & Workout Plans
 
-**Subtitle — 24/30 characters**
+**Subtitle — 30/30**
 
-> Scan, plan, cook & track
+> Free scanner. Plans that adapt
 
-**Keywords — 60/100 characters**
+**Promotional text — 155/170** (can be changed without a new build)
 
-> barcode,nutrition,meal,recipes,grocery,diary,workout,fitness
+> Free barcode scanning and food tracking, with no ads. Buko Plus builds your weekly meals and workouts around your goals, then adjusts them after each week.
 
-**Description — draft**
+**Keywords — 96/100** (no spaces after commas. Words already in the name and subtitle are indexed, so don't repeat them. No competitor or trademarked names.)
 
-> Buko brings food choices, meal planning and training into one place.
+> macro,calorie counter,barcode scanner,grocery list,nutrition,training,recipes,fitness,food diary
+
+**Description — 1954/4000**
+
+> Scan food for free, plan smarter with Plus. Buko keeps the everyday basics free and without ads, and saves the paid tier for planning that is actually personal.
 >
-> Scan a packaged-food barcode to see an explainable product score, nutrition details and alternatives when product information is available. Add foods to your diary and review calories and macros alongside your personal targets.
+> FREE, WITH NO ADS
+> • Scan packaged-food barcodes for an explainable product score, nutrition details and better alternatives where product data is available
+> • Log meals and recipe portions in a food diary and compare calories and macros with your personal targets
+> • Save recipes, import a recipe link or paste recipe text, and cook with step-by-step instructions and timers
+> • Build workout routines, record sessions, and follow weight and training progress
+> • Do a weekly check-in to see what you planned against what you actually did
 >
-> Plan meals with your own recipes or start with Buko’s recipe library. Import a supported recipe link or paste recipe text, adjust ingredients and servings, and build a grocery list from your plan. Keep pantry items, cook with step-by-step instructions and timers, then log recipe portions in your diary.
+> BUKO PLUS: PLANS BUILT AROUND YOUR WEEK
+> • Weekly meal plans generated from your calorie and macro targets, with foods you never want left out
+> • Training plans built around the days you can train, ramping up gradually, with exercises you want to avoid excluded
+> • Training-day fueling: more carbs on hard days and less on rest days, while your weekly totals stay the same
+> • Weekly check-ins that adapt the coming week: ease off after a tough week, step up when it felt easy
+> • Turn your meal plan into one grocery list, with pantry items already subtracted
 >
-> Build and customize workout routines, record sessions, follow progress and review weight trends. On supported iPhone devices, optionally connect Apple Health to read activity or save eligible Buko workouts and diary nutrition after granting the relevant permissions. Connections are optional and can be changed in Buko and device settings.
+> Try Buko Plus free for 7 days, then billed yearly unless you cancel at least 24 hours before the trial ends. A monthly option is also available. Manage or cancel any time in your App Store account settings.
 >
-> Buko is a general food, nutrition and fitness tracking tool. Scores and formula-based targets are estimates for general wellness, not diagnoses or medical advice. Product information and nutrition matches can be incomplete; check ingredients, serving sizes and source data for yourself.
+> OPTIONAL CONNECTIONS
+> On supported iPhones, you can connect Apple Health to read activity or save eligible workouts and nutrition. Connections are optional and can be changed in Buko and in Settings.
 >
-> Sign-in and cloud-synced features require an internet connection and a Buko account. Product records and recipe-site imports vary by availability. Camera scanning requires permission; manual barcode entry is available when scanning is unavailable.
+> Buko is a general wellness tool. Scores, targets and plans are estimates, not medical advice. Product data and nutrition matches can be incomplete; check labels, especially for allergies. Sign-in and sync need an internet connection and a Buko account.
+>
+> Terms: [TERMS URL]
+> Privacy: [PRIVACY URL]
+
+**App Store Connect fields:** Primary category Health & Fitness; secondary Food & Drink. Subscription group "Buko Plus" with Yearly ($49.99, 7-day free trial intro offer) ranked above Monthly ($9.99). Subscription display names: "Buko Plus Yearly" / "Buko Plus Monthly". Description: "Personal meal & workout plans that adapt weekly."
 
 ### Google Play
 
-**Title — 20/30 characters**
+**Title — 26/30**
 
-> Buko: Food & Fitness
+> Buko: Meal & Workout Plans
 
-**Short description — 78/80 characters**
+**Short description — 74/80**
 
-> Scan products, plan recipes and groceries, and track food, goals and workouts.
+> Free scanner & food diary. Meal and workout plans that adapt to your week.
 
-**Full description — draft**
+**Full description — 1970/4000**
 
-> Buko brings food choices, meal planning and training into one place.
+> Scan food for free, plan smarter with Plus. Buko keeps the everyday basics free and without ads, and saves the paid tier for planning that is actually personal.
 >
-> **Scan and learn**
-> Scan a packaged-food barcode to see an explainable product score, nutrition details and alternatives when product information is available. Add foods to your diary and review calories and macros alongside your personal targets.
+> FREE, WITH NO ADS
+> • Scan packaged-food barcodes for an explainable product score, nutrition details and better alternatives where product data is available
+> • Log meals and recipe portions in a food diary and compare calories and macros with your personal targets
+> • Save recipes, import a recipe link or paste recipe text, and cook with step-by-step instructions and timers
+> • Build workout routines, record sessions, and follow weight and training progress
+> • Do a weekly check-in to see what you planned against what you actually did
 >
-> **Plan meals and shop**
-> Make meals from your own recipes or Buko’s recipe library. Import a supported recipe link or paste recipe text, adjust ingredients and servings, and build a grocery list from your plan. Keep pantry items, cook with step-by-step instructions and timers, then log recipe portions in your diary.
+> BUKO PLUS: PLANS BUILT AROUND YOUR WEEK
+> • Weekly meal plans generated from your calorie and macro targets, with foods you never want left out
+> • Training plans built around the days you can train, ramping up gradually, with exercises you want to avoid excluded
+> • Training-day fueling: more carbs on hard days and less on rest days, while your weekly totals stay the same
+> • Weekly check-ins that adapt the coming week: ease off after a tough week, step up when it felt easy
+> • Turn your meal plan into one grocery list, with pantry items already subtracted
 >
-> **Move and review progress**
-> Build and customize workout routines, record sessions, follow progress and review weight trends. On supported Android devices, optionally connect Health Connect to read activity or save eligible Buko workouts and diary nutrition after granting the relevant permissions. Connections are optional and can be changed in Buko and device settings.
+> Try Buko Plus free for 7 days, then billed yearly unless you cancel at least 24 hours before the trial ends. A monthly option is also available. Manage or cancel any time in Google Play subscriptions.
 >
-> Buko is a general food, nutrition and fitness tracking tool. Scores and formula-based targets are estimates for general wellness, not diagnoses or medical advice. Product information and nutrition matches can be incomplete; check ingredients, serving sizes and source data for yourself.
+> OPTIONAL CONNECTIONS
+> On supported Android devices, you can connect Health Connect to read activity or save eligible workouts and nutrition. Connections are optional and can be changed in Buko and in your device settings.
 >
-> Sign-in and cloud-synced features require an internet connection and a Buko account. Product records and recipe-site imports vary by availability. Camera scanning requires permission; manual barcode entry is available when scanning is unavailable.
+> Buko is a general wellness tool. Scores, targets and plans are estimates, not medical advice. Product data and nutrition matches can be incomplete; check labels, especially for allergies. Sign-in and sync need an internet connection and a Buko account.
+>
+> Terms: [TERMS URL]
+> Privacy: [PRIVACY URL]
 
-Do not claim particular foods are available, recipes are medically suitable, nutrition values are exact, or results are guaranteed. Do not imply health-system or medical-professional endorsement. Add Coach copy only after live Coach activation and build-specific testing; its availability is not assumed here. Add pricing/trial copy only after store products, eligibility behavior, local prices and purchase restoration are verified.
+**Play Console fields:** Category Health & Fitness. Tags: Nutrition, Diet, Workout, Meal planning. Subscription `buko_plus` with base plans `yearly` ($49.99, with a 7-day free-trial offer for new customers) and `monthly` ($9.99).
+
+Do not claim particular foods are available, that recipes are medically suitable, that nutrition values are exact, or that results such as weight loss are guaranteed. Do not imply endorsement by a health system or medical professional.
 
 ## Store screenshots and creative
 
-Capture screenshots from the actual signed release candidate, using safe demo data with no real names, email addresses, health values or account identifiers. Prefer unaltered app captures; any added captions must accurately describe the shown feature and must not conceal or invent app UI.
+Capture screenshots from the actual signed release candidate using a synthetic demo account, with no real names, email addresses, health values or account identifiers. Captions sit above an unaltered capture, must accurately describe the screen shown, and must not hide or invent app UI.
 
 ### Apple App Store
 
-- Current App Store Connect guidance requires at least one iPhone screenshot for an iPhone with Dynamic Island (medium display); it permits up to 10 screenshots per display size. Accepted current portrait sizes for this display class include **1179 × 2556** and **1206 × 2622** pixels. Use a native simulator/device capture at a resolution accepted by App Store Connect and confirm the upload target in the live form.
-- Buko is configured not to support iPad, so do not submit iPad screenshots or imply iPad support unless that configuration changes and is tested.
-- Use JPEG or PNG without an alpha channel. Check current App Store Connect screenshot specifications at upload time; Apple can change supported device classes and accepted sizes.
+- Current App Store Connect guidance requires at least one iPhone screenshot for an iPhone with Dynamic Island (medium display), and allows up to 10 per display size. Accepted portrait sizes for this class include **1179 × 2556** and **1206 × 2622**. Confirm the target in the live upload form.
+- Buko does not support iPad. Do not submit iPad screenshots.
+- JPEG or PNG without alpha. Recheck the current specifications at upload time.
 
 ### Google Play
 
-- Provide at least **2** screenshots overall (up to 8 per supported device type). For better Play discovery, its current guidance recommends at least **4** app screenshots at 1080 px or larger: portrait **1080 × 1920 or larger at 9:16**, or landscape **1920 × 1080 or larger at 16:9**. All screenshots must be JPEG or 24-bit PNG without alpha, at least 320 px and no more than 3840 px on a dimension; the longest dimension must be no more than twice the shortest. A common 1080 × 2400 phone capture exceeds the 2:1 limit and must not be submitted as-is. Recheck the console’s device-specific upload panel.
-- Play also requires a feature graphic (**1024 × 500**, JPEG or 24-bit PNG without alpha) and a 512 × 512 PNG store icon under the current preview-asset rules. Verify the final assets and limits in Play Console; the launcher icon is not automatically a compliant store icon.
+- At least **2** screenshots (up to 8 per device type). Play recommends **4+** at 1080 px or larger: portrait **1080 × 1920 (9:16)**. JPEG or 24-bit PNG without alpha, 320–3840 px, and the long side can be no more than 2× the short side. A typical 1080 × 2400 capture breaks that rule, so crop or pad it.
+- Feature graphic **1024 × 500** and a 512 × 512 store icon, both without alpha. Suggested feature graphic: the Buko mark on the brand gradient with the line "Plans that adapt to your week".
 
-### Screenshot shotlist
+### Screenshot set, in upload order
 
-Use real release-candidate screens for all of these; omit any screen that is not available and tested:
+The first three screenshots carry the story. Most visitors never scroll further.
 
-1. **Scan:** permission explanation / scanner and a real decoded product result with a readable score explanation, not a fabricated brand/product.
-2. **Diary:** food entries and daily totals compared with a target, using a synthetic demo account.
-3. **Recipes:** saved recipe or recipe library, with ingredients, portions and nutrition-match caveat visible where relevant.
-4. **Plan and grocery:** planned meals and the resulting grocery list, showing realistic quantities and pantry behavior.
-5. **Train:** a routine/session and progress screen based on synthetic workout history.
-6. **Connections:** optional Health settings screen with controls off or a neutral permissions explanation; do not show personal records or suggest a connection is mandatory.
+| # | Caption (≤ 6 words) | Screen to capture | Demo data to set up first |
+|---|---|---|---|
+| 1 | **Your week, planned for you** | Plan tab: generated weekly meal plan preview, with day labels like "Run day · +170 kcal" | Targets set, 3 workouts planned, generator run with "Fuel my training days" on |
+| 2 | **Training that fits your days** | Training plan generator preview with chosen days and the ramp | Pick Mon/Wed/Sat, goal "Build fitness", exclude one exercise |
+| 3 | **Adapts after every week** | Weekly check-in with stats and "Ease off a little" / "Step it up" advice | A previous week with 2 of 3 workouts done, "About right" or "Too easy" picked |
+| 4 | **Scan any food. Free.** | Product result with score and explanation | A real, common product with full data. Don't fabricate a brand |
+| 5 | **Track calories & macros free** | Diary with entries and the macro ring | Three logged meals near target |
+| 6 | **Meal plan to grocery list** | Groceries tab right after "Build my grocery list" (shows the "Added N items" banner and, if enabled, the Instacart button) | Plan saved, a couple of pantry items already stocked |
+| 7 | **No ads. Ever.** | Settings/About or the Plus screen ("Always free: … No ads, ever.") | Only once pricing is live (see the gates above); otherwise use the Recipes screen captioned "Cook from your own recipes" |
+| 8 | **Works with Apple Health / Health Connect** | Connections screen with the permission explanation | Connections off. Never show personal records |
 
-Do not show the Coach as live, a premium paywall, a price, a free-trial offer, or a locked premium health/meal screen until that exact functionality is enabled, policy-reviewed and tested in the submitted build.
+Only show the Plus screen, prices or the trial offer once that exact purchase flow is enabled and tested in the submitted build (see "Premium and purchase release gates").
 
 ## EAS build and beta submission (novice path)
 

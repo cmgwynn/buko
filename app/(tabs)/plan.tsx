@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, HeroCta, Loading, Notice, TextField } from '../../src/components/ui';
+import { config } from '../../src/lib/config';
 import { PlanRecipePicker, type PlanChoice } from '../../src/components/PlanRecipePicker';
 import { DateNavigator } from '../../src/components/date/DateNavigator';
 import { DaySwipe } from '../../src/components/date/DaySwipe';
@@ -58,6 +59,7 @@ export default function Plan() {
   const [pending, setPending] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [shopWeek, setShopWeek] = useState<string | null>(null);
   const [removed, setRemoved] = useState<EntryRow | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
   const [swappedOut, setSwappedOut] = useState<Record<string, string[]>>({});
@@ -300,7 +302,7 @@ export default function Plan() {
           .eq('meal', original.meal).eq('servings', original.servings).is('logged_at', null).select('id');
         if (removed.error || !removed.data?.length) throw new Error('New meals were added, but at least one original meal could not be replaced or changed during saving. Review your plan: some originals remain. Do not retry the old preview.');
       }
-      setMessage('Your week is planned. Adjust servings or swap meals any time.'); setGeneratorOpen(false);
+      setMessage('Your week is planned. Adjust servings or swap meals any time.'); setShopWeek(start); setGeneratorOpen(false);
     } catch (err) { saveError = err instanceof Error ? err.message : 'Could not save weekly plan.'; }
     finally {
       setPreview(null); setReplaceSlots([]);
@@ -477,6 +479,13 @@ export default function Plan() {
           {error ? <Notice tone="danger">{error}</Notice> : null}
           {error ? <Button title="Retry loading plan" variant="ghost" onPress={() => { void load(); }} /> : null}
           {pending ? <Notice tone="info">Saving…</Notice> : message ? <Notice tone="info">{message}</Notice> : null}
+          {shopWeek === start && !pending ? (
+            <Card>
+              <Text style={typography.heading}>Shop for this week</Text>
+              <Text style={[typography.small, { marginBottom: spacing.sm }]}>Turn these meals into one grocery list{config.groceryOrdering ? ', then order on Instacart' : ''}. Pantry items are skipped.</Text>
+              <Button title="Build my grocery list" icon="cart-outline" onPress={() => { setShopWeek(null); router.push({ pathname: '/grocery/generate', params: { week: start, from: 'plan' } }); }} />
+            </Card>
+          ) : null}
           {removed ? <Button title="Undo remove meal" variant="ghost" disabled={pending} onPress={() => { void undoRemove(); }} /> : null}
           {!loaded ? <Loading /> : null}
           {loaded ? <HeroCta eyebrow={`Week of ${formatDay(start)}`} title="Plan my week"

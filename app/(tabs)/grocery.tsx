@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { useConfirm } from '../../src/components/ConfirmProvider';
@@ -22,6 +22,8 @@ export default function Grocery() {
   const { session } = useAuth();
   const userId = session?.user.id;
   const confirm = useConfirm();
+  const { added } = useLocalSearchParams<{ added?: string }>();
+  const addedCount = Number(added) || 0;
   const [items, setItems] = useState<GroceryItem[]>([]);
   const [name, setName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +88,8 @@ export default function Grocery() {
   }, [userId, persist]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
+  // The plan handoff banner is one-time; drop it once the user leaves the tab.
+  useFocusEffect(useCallback(() => () => { if (addedCount) router.setParams({ added: undefined }); }, [addedCount, router]));
   useEffect(() => {
     if (Platform.OS !== 'web') return;
     const online = () => { void load(); };
@@ -208,8 +212,13 @@ export default function Grocery() {
         }
       />
       <Text style={typography.small}>{todo.length} item{todo.length === 1 ? '' : 's'} to pick up</Text>
+      {addedCount > 0 ? <Notice tone="info">Added {addedCount} item{addedCount === 1 ? '' : 's'} from your meal plan.{config.groceryOrdering ? ' Order them below or shop in store.' : ' Check them off as you shop.'}</Notice> : null}
+      {config.groceryOrdering && todo.length && addedCount > 0 ? <>
+        <Button title={`Order ${todo.length} item${todo.length === 1 ? '' : 's'} on Instacart`} icon="cart-outline" loading={ordering} onPress={() => { void orderOnInstacart(); }} />
+        <Text style={[typography.small, { marginTop: spacing.xs, marginBottom: spacing.sm }]}>Opens Instacart to pick a store and check out. Only item names are shared. Buko may earn a commission.</Text>
+      </> : null}
       <Button title="Make list from meal plan" icon="calendar-outline" variant="secondary" onPress={() => router.push('/grocery/generate')} />
-      {config.groceryOrdering && todo.length ? <>
+      {config.groceryOrdering && todo.length && !addedCount ? <>
         <View style={{ height: spacing.sm }} />
         <Button title={`Order ${todo.length} item${todo.length === 1 ? '' : 's'} on Instacart`} icon="cart-outline" loading={ordering} onPress={() => { void orderOnInstacart(); }} />
         <Text style={[typography.small, { marginTop: spacing.xs }]}>Opens Instacart to pick a store and check out. Only item names are shared. Buko may earn a commission.</Text>

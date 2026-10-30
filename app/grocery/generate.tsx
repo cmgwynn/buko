@@ -7,6 +7,7 @@ import { addDays, MEALS, toDateString } from '../../src/lib/diary';
 import { buildGroceryList, type GeneratedItem } from '../../src/lib/recipes/grocery';
 import { SECTIONS, type PantryItem, type Recipe, type RecipeIngredient } from '../../src/lib/recipes/types';
 import { weekStart } from '../../src/lib/recipes/week';
+import { config } from '../../src/lib/config';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
@@ -92,7 +93,7 @@ export default function GenerateGrocery() {
       setBusy(false); return;
     }
     setBusy(false);
-    router.replace('/(tabs)/grocery');
+    router.replace({ pathname: '/(tabs)/grocery', params: { added: String(items.length) } });
   }
 
   const label = `${new Date(week + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${new Date(addDays(week, 6) + 'T00:00:00').toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
@@ -141,6 +142,7 @@ export default function GenerateGrocery() {
           })}
           <Notice tone="info">Adding replaces this week&apos;s earlier unchecked generated items. Items you added by hand or already checked off are kept.</Notice>
           <Button title={`Add ${items.length} item${items.length === 1 ? '' : 's'} to grocery list`} onPress={save} loading={busy} disabled={items.length === 0} />
+          {config.groceryOrdering && items.length ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Next: order them on Instacart in one tap.</Text> : null}
           <Button title="Manage pantry" variant="ghost" onPress={() => router.push('/pantry')} />
         </>
       ) : null}
