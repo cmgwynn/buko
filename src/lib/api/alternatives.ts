@@ -20,7 +20,13 @@ export function alternativeSearchTags(categoryTags: string[], limit = 3): string
   const specificFirst = [...categoryTags].reverse();
   const taxonomy = specificFirst.filter((tag) => tag.startsWith('en:') && tag === canonicalCategoryTag(tag));
   const other = specificFirst.filter((tag) => !taxonomy.includes(tag)).map(canonicalCategoryTag);
-  return [...new Set([...taxonomy, ...other])].slice(0, limit);
+  const ordered = [...new Set([...taxonomy, ...other])];
+  // Products are often filed under unrelated branches too (Nutella is also "cocoa powders"), so fall
+  // back along the same branch first: confectionary-based-spreads -> sweet-spreads -> spreads.
+  const head = (tag: string) => tag.slice(tag.indexOf(':') + 1).split('-').pop();
+  const branch = head(ordered[0] ?? '');
+  const sameBranch = ordered.filter((tag, i) => i === 0 || head(tag) === branch);
+  return [...sameBranch, ...ordered.filter((tag) => !sameBranch.includes(tag))].slice(0, limit);
 }
 
 /**
