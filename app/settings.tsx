@@ -9,9 +9,6 @@ import { loadDiagnosticConsent, saveDiagnosticConsent } from '../src/lib/diagnos
 import { loadUsageOptOut, saveUsageOptOut } from '../src/lib/trial/client';
 import { useAuth } from '../src/providers/AuthProvider';
 import { spacing } from '../src/theme';
-const adsCopy = config.adsEnabled
-  ? 'The free version may show non-personalized ads that never use your health data. Buko Plus removes them.'
-  : 'No ads.';
 export default function Settings() {
   const router = useRouter();
   const { section } = useLocalSearchParams<{ section?: string }>();
@@ -77,7 +74,7 @@ export default function Settings() {
       </View>
     </Card>
     <Card><Disclosure title="Privacy & data processing">
-      <Body muted>{adsCopy} No behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials. Order on Instacart sends only your unchecked grocery item names, and Buko may earn a commission.</Body>
+      <Body muted>No ads. No behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials. Order on Instacart sends only your unchecked grocery item names, and Buko may earn a commission.</Body>
       <Body muted>Coach is optional. With consent, minimized context and chat may go to Anthropic; names, email and birthday are excluded from structured context. Avoid identifiers in free text. Imported health-app workouts and energy are excluded; weight sharing is a separate choice.</Body>
       <Body muted>Store subscriptions use RevenueCat with a pseudonymous identifier and purchase/device metadata. Exported files contain sensitive personal and health data. Deletion does not remove original Apple Health or Health Connect records.</Body>
     </Disclosure></Card>
@@ -91,7 +88,7 @@ export default function Settings() {
     <Card><Heading>Legal & data sources</Heading>
       <Button title="Privacy policy" variant="ghost" onPress={() => { void open(config.privacyUrl); }} />
       <Button title="Terms of service" variant="ghost" onPress={() => { void open(config.termsUrl); }} />
-      <Body muted>{adsCopy} No behavioral analytics. Optional RevenueCat purchases, Coach and diagnostics involve additional processors as disclosed in their screens. Public food lookups use Open Food Facts and USDA.</Body>
+      <Body muted>No ads. No behavioral analytics. Optional RevenueCat purchases, Coach and diagnostics involve additional processors as disclosed in their screens. Public food lookups use Open Food Facts and USDA.</Body>
       <Attribution usda />
       <Button title="Open Food Facts database license (ODbL)" variant="ghost" onPress={() => { void open('https://opendatacommons.org/licenses/odbl/1-0/'); }} />
     </Card>

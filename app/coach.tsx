@@ -81,7 +81,7 @@ export default function Coach() {
   }
   async function request(operation: 'summary' | 'weekly' | 'chat') {
     if (busy) return;
-    if (!billing.allowed) { router.push('/premium'); return; }
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'coach' } }); return; }
     setBusy(true); setError(null); setStatusNote(null);
     try {
       const result = await coachRequest<CoachReply | CoachSummary>(operation, today, operation === 'chat' ? message : undefined);
@@ -95,7 +95,7 @@ export default function Coach() {
   }
   async function apply() {
     if (!selected || busy) return;
-    if (!billing.allowed) { router.push('/premium'); return; }
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'coach' } }); return; }
     if (selected.kind === 'recipe' && (!calendarDate(day) || !Number.isFinite(Number(servings)) || Number(servings) < 0.25 || Number(servings) > 20)) {
       setError('Choose a valid date (YYYY-MM-DD) and servings between 0.25 and 20.'); return;
     }

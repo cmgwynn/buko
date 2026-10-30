@@ -14,6 +14,8 @@ const mockSavePreferences = jest.fn<(owner: string, value: PlanningPreferences) 
 const mockLoadPlans = jest.fn<() => Promise<PlannedWorkoutRow[]>>();
 let mockAccount = 'owner';
 let mockActive = false;
+let mockAllowed = true;
+const mockPush = jest.fn();
 let mockPreferences: PlanningPreferences;
 const mockCatalog = ['Running', 'Glute Bridge', 'Push-Up', 'Crunch'].map((name, index) => ({
   id: `00000000-0000-4000-8000-00000000000${index}`, name, category: index === 0 ? 'cardio' : 'strength',
@@ -30,6 +32,8 @@ const mockExisting = (id: string, completed = false): PlannedWorkoutRow => ({
 
 jest.mock('../../../providers/AuthProvider', () => ({ useAuth: () => ({ session: { user: { id: mockAccount } } }) }));
 jest.mock('../../../providers/ProfileProvider', () => ({ useProfile: () => ({ profile: { units: 'metric' } }) }));
+jest.mock('../../../providers/BillingProvider', () => ({ useBilling: () => ({ allowed: mockAllowed }) }));
+jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
 jest.mock('../../../components/ConfirmProvider', () => ({ useConfirm: () => mockConfirm }));
 jest.mock('../../../components/ui', () => {
   const React = require('react');
@@ -66,6 +70,7 @@ jest.mock('../../planning/preferences', () => ({
 
 beforeEach(() => {
   mockAccount = 'owner'; mockActive = false;
+  mockAllowed = true; mockPush.mockReset();
   mockPreferences = { excludedFoods: ['milk'], excludedExercises: [] };
   mockLoadPreferences.mockReset().mockImplementation(async () => mockPreferences);
   mockSavePreferences.mockReset().mockImplementation(async (_, value) => { mockPreferences = value; return value; });
@@ -189,5 +194,15 @@ test('autoOpen loads the setup form on arrival without generating or saving', as
   await render(<WeeklyTrainingPlan autoOpen />);
   expect(await screen.findByLabelText('Training start date (YYYY-MM-DD)')).toBeTruthy();
   expect(screen.queryByText('Review all four weeks')).toBeNull();
+  expect(mockSaveSlot).not.toHaveBeenCalled();
+});
+
+test('without Buko Plus the preview stays free but saving opens the paywall', async () => {
+  mockAllowed = false;
+  await preview();
+  expect(screen.getByText(/Previews are free/)).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Save with Buko Plus' }));
+  expect(mockPush).toHaveBeenCalledWith({ pathname: '/premium', params: { from: 'training-plan' } });
+  expect(mockConfirm).not.toHaveBeenCalled();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });

@@ -37,7 +37,7 @@ export default function HealthSettings() {
       setFlag({ [f.setting]: false });
       return;
     }
-    if (!billing.allowed) { router.push('/premium'); return; }
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'health' } }); return; }
     // Explain first; the system permission prompt appears only after the user agrees.
     Alert.alert(f.title, `${f.why}\n\n${app} will now ask you to allow this. You can change it any time in ${Platform.OS === 'ios' ? 'Settings › Health' : 'Health Connect'}.`, [
       { text: 'Not now', style: 'cancel' },

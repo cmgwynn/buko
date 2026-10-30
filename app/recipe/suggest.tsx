@@ -38,7 +38,7 @@ export default function SuggestRecipe() {
   }, []);
   async function suggest() {
     if (lock.current) return;
-    if (!billing.allowed) { router.push('/premium'); return; }
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'suggest' } }); return; }
     const numeric = [minutes, calories, protein].map((value) => value.trim() ? Number(value) : undefined);
     if (numeric.some((value) => value !== undefined && (!Number.isFinite(value) || value <= 0))) { setError('Targets and time must be positive numbers, or left blank.'); return; }
     const constraints: SuggestionRequest['constraints'] = {

@@ -243,12 +243,12 @@ Migrations [`0015_nutrition_insights.sql`](./supabase/migrations/0015_nutrition_
 
 ## Beta trial readiness (free core, Buko Plus, feedback)
 
-- **Free core:** meal planning, the plan generators, "Add to plan" on recipes, and recipe import are no longer behind the premium gate. Buko Plus (the existing `premium` entitlement, still off) covers Coach, AI tested-meal suggestions and health-app sync, and will remove ads.
+- **Free core, paid personalization:** logging, scanning, manual meal planning, "Add to plan" on recipes, recipe import and grocery lists are free. Anyone can preview the meal and training plan generators. Saving a generated plan, AI tested-meal suggestions, Coach and health-app sync need Buko Plus (the `premium` entitlement). Targets are $49.99/yr with a 7-day free trial or $9.99/mo. The paywall defaults to Yearly. All of this stays unlocked until premium enforcement is turned on.
 - **Welcome:** after setup, Diary shows a one-time **Welcome to Buko** card with three starting points: Plan my week, Build my training plan, and Scan my first food.
 - **Feedback:** Profile → **Send feedback** saves the category, message, screen, platform and app version to `feedback`. If the table is missing, it falls back to `EXPO_PUBLIC_CONTACT_EMAIL`.
 - **Anonymous usage counts:** once per account per day, the app calls `record_daily_use`, which increments `usage_daily` by date, platform and sign-up week. No user ID is stored. Users can turn this off in Settings.
 - **Grocery ordering:** when `EXPO_PUBLIC_GROCERY_ORDERING=true`, Groceries shows **Order on Instacart**. The `grocery-order` function (with secrets `INSTACART_API_KEY`, `INSTACART_BASE_URL` and `GROCERY_ORDERING_ENABLED`) turns unchecked items into an Instacart shopping-list link. Only names, quantity notes and UPCs are sent. Setup is in STORE-LAUNCH.
-- **Ads:** `AdSlot` stays off unless `EXPO_PUBLIC_ADS_ENABLED=true`. See STORE-LAUNCH for placement rules.
+- **No ads:** Buko has no ad SDKs or ad slots.
 - **Legal drafts:** `public/legal/privacy.html` and `terms.html` are served at `/buko/legal/...`.
 - Apply [`0017_trial_readiness.sql`](./supabase/migrations/0017_trial_readiness.sql) in the SQL editor (not `db push`), and redeploy `import-recipe`. The beta checklist is in [docs/STORE-LAUNCH.md](./docs/STORE-LAUNCH.md#beta-trial-plan-closed-testing).
 

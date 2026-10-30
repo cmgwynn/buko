@@ -28,6 +28,7 @@ import { repeatPlanRows } from '../../src/lib/recipes/repeat';
 import type { RecipeDraft } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
+import { useBilling } from '../../src/providers/BillingProvider';
 import { useProfile } from '../../src/providers/ProfileProvider';
 import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { colors, layout, radius, spacing, typography } from '../../src/theme';
@@ -43,6 +44,7 @@ export default function Plan() {
   const router = useRouter();
   const confirm = useConfirm();
   const { session } = useAuth();
+  const billing = useBilling();
   const { targets, profile, today } = useProfile();
   const { selectedDate: selected, setSelectedDate: setSelected } = useSelectedDate();
   const [recipes, setRecipes] = useState<RecipeRow[]>([]);
@@ -224,6 +226,7 @@ export default function Plan() {
 
   async function applyPreview() {
     if (!session || !preview || mutation.current || preview.owner !== session.user.id || preview.context !== generatorContext) return;
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'meal-plan' } }); return; }
     const proposal = preview;
     if (!await confirm({
       title: 'Add this weekly meal plan?',
@@ -539,7 +542,8 @@ export default function Plan() {
                   </Disclosure>
                 </View>;
               })}
-              <Button title="Add to my plan" icon="checkmark" disabled={pending || savingPreferences || !preview.result.additions} onPress={() => { void applyPreview(); }} />
+              {!billing.allowed ? <Text style={typography.small}>Previews are free. Saving generated plans is part of Buko Plus, with a free trial.</Text> : null}
+              <Button title={billing.allowed ? 'Add to my plan' : 'Save with Buko Plus'} icon={billing.allowed ? 'checkmark' : 'lock-closed-outline'} disabled={pending || savingPreferences || !preview.result.additions} onPress={() => { void applyPreview(); }} />
               <Button title="Discard preview" variant="ghost" disabled={pending} onPress={() => setPreview(null)} />
             </> : null}
           </Card> : null}

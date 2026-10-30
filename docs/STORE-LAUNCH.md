@@ -240,32 +240,26 @@ No subscription is currently approved for a public launch. Current staged defaul
 - Keep purchase packages/paywalls disabled while the rollout is staged or either real legal/document URL is missing. Test sandbox purchases only against a separate test Supabase/RevenueCat setup; never turn on sandbox acceptance in production.
 - Confirm the database-side restrictive premium policies and Edge Function premium checks are active only in the explicitly approved enforcement rollout. In the current staged default, access enforcement is not publicly activated.
 
-### Grocery ordering (Instacart affiliate)
+### Buko Plus pricing (owner direction, no ads)
 
-Groceries can show **Order N items on Instacart**. The `grocery-order` Edge Function sends only item names, quantity notes and valid 12/14-digit UPCs to Instacart's *Create shopping list page* API, and returns a link to a shopping list that expires after 7 days. The user then picks a store and checks out on Instacart. Commission (currently advertised at up to 5% of the cart) is tracked through Impact. Instacart adds the tracking parameters automatically, so never append them by hand.
+Model: **free core, paid personalization, no ads**. Free: food diary, barcode scanning, food scores, manual meal planning, recipes and import, workout logging and grocery lists. **Buko Plus** unlocks saving generated weekly meal plans and 4-week training plans (anyone can preview them), AI tested-meal suggestions, Coach and health-app sync. It uses the single RevenueCat entitlement `premium`.
 
-1. Apply for the Instacart Developer Platform at https://www.instacart.com/company/business/developers and get a **development** API key.
-2. Set the function secrets in Supabase (Edge Functions → Secrets): `INSTACART_API_KEY`, `INSTACART_BASE_URL=https://connect.dev.instacart.tools` and `GROCERY_ORDERING_ENABLED=true`. Then run `npx supabase functions deploy grocery-order`.
-3. In GitHub → Settings → Secrets and variables → Actions → Variables, add `EXPO_PUBLIC_GROCERY_ORDERING=true` and re-run the deploy.
-4. Test end to end, then request a **production** key from Instacart. Switch `INSTACART_BASE_URL` to `https://connect.instacart.com` and join the affiliate program through the Impact invite Instacart emails to active partners.
-5. US and Canada only. The button text discloses that Buko may earn a commission. Keep that disclosure, as the FTC requires.
+Positioning: MyFitnessPal charges $79.99/yr for Premium and $99.99/yr for Premium+, its meal-planning tier. Lose It! is $79.99/yr and Yuka about $20–30/yr. Buko Plus includes meal and training plans for about 40% less than MyFitnessPal Premium.
 
+| Store product | Price target | Intro offer | RevenueCat package |
+| --- | --- | --- | --- |
+| `buko_plus_annual` | $49.99 / year | **7-day free trial** (new subscribers) | `$rc_annual` |
+| `buko_plus_monthly` | $9.99 / month | none | `$rc_monthly` |
 
-Model: **free with light ads, plus an optional low-cost Buko Plus**. Planning, recipe import, logging, scanning, workouts and grocery lists stay free. Plus adds no ads, Coach, AI tested-meal suggestions and health-app sync. It still uses the single RevenueCat entitlement `premium`.
-
-| Store product (proposed) | Price target | RevenueCat package |
-| --- | --- | --- |
-| `buko_plus_monthly` | $1.99 / month | `$rc_monthly` |
-| `buko_plus_annual` | $14.99 / year (about 37% off monthly) | `$rc_annual` |
-
-- Prices are set in each store. The app shows only the store's `priceString` and never hardcodes these amounts.
-- Enroll in the Apple Small Business Program and confirm Google Play's 15% subscription rate before launch.
-- Ads: `EXPO_PUBLIC_ADS_ENABLED` defaults to `false`.
-  - `AdSlot` renders only in the approved placements (`recipes-browse`, `progress`) and is hidden for Plus members and during a live workout.
-  - Ads must never appear in Diary logging, search, scan, cooking or workouts.
-  - Until a native SDK is approved, the slot shows a house promo for Plus.
-- Adding AdMob means `react-native-google-mobile-ads`, an EAS rebuild, AdMob app IDs in `app.json`, non-personalized requests only, a UMP consent form for the EEA and UK, an `app-ads.txt` file, and updated App Privacy and Data safety answers.
-- Health data must never be shared with ad networks.
+- Prices and trials are set in each store. The app reads `priceString` and the intro offer from RevenueCat and never hardcodes amounts.
+- The paywall selects Yearly by default, shows the per-month equivalent and the % saved, and labels the button **Start 7-day free trial** when the store returns a $0 intro offer.
+- App Store Connect: on the annual subscription, set Subscription Prices to $49.99, then add an Introductory Offer of type **Free**, 1 week, for new subscribers.
+- Play Console: on the annual base plan, add an offer with a **Free trial** phase of 7 days and eligibility "New customer acquisition".
+- In RevenueCat, add both packages to the `default` (current) offering.
+- Enroll in the Apple Small Business Program. It cuts Apple's commission to 15%, and Google Play charges 15% on subscriptions.
+- Turning on paid access: set `EXPO_PUBLIC_PREMIUM_ENFORCEMENT=true` and `enforce_premium=true` once store products are live. Until then, every user has Plus features (beta).
+- The generated-plan save gate is in the client. Manual planning stays free and uses the same tables, so the database does not separately block generated saves.
+- No ads: the ad scaffold was removed. Instacart grocery ordering stays as an affiliate feature the user chooses, not advertising.
 
 ## Privacy, account, health and policy information to complete
 

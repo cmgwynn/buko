@@ -1,4 +1,3 @@
-import { AdSlot } from '../../src/components/AdSlot';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
@@ -173,7 +172,6 @@ export default function Recipes() {
           </View>
         );
       })}</CardGrid>
-      <AdSlot placement="recipes-browse" />
     </Screen>
   );
 }

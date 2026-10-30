@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../providers/AuthProvider';
+import { useBilling } from '../../providers/BillingProvider';
 import { useProfile } from '../../providers/ProfileProvider';
 import { loadPlanningPreferences, savePlanningPreferences } from '../../lib/planning/preferences';
 import { loadExercises, loadPlannedWorkouts, type PlannedWorkoutRow } from '../../lib/fitness/data';
@@ -33,6 +35,8 @@ function nextMonday(today: string) {
 
 export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { disabled?: boolean; autoOpen?: boolean }) {
   const { session } = useAuth();
+  const billing = useBilling();
+  const router = useRouter();
   const userId = session?.user.id;
   const { profile } = useProfile();
   const units = profile?.units ?? 'metric';
@@ -137,6 +141,7 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
   }
   async function save() {
     if (!preview || lock.current || dirty || saveBlocked) return;
+    if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'training-plan' } }); return; }
     lock.current = true; setBusy(true); setError(null); setStatus(null);
     const request = version.current;
     const savedDates: string[] = [];
@@ -272,7 +277,8 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
             </Disclosure>
           </>}
         </View>)}
-        <Button title={`Save ${selectedCount} workouts to my plan`} loading={busy} disabled={disabled || dirty || saveBlocked || !preview.days.some((day) => day.save)} onPress={() => { void save(); }} />
+        {!billing.allowed ? <Text style={typography.small}>Previews are free. Saving generated plans is part of Buko Plus, with a free trial.</Text> : null}
+        <Button title={billing.allowed ? `Save ${selectedCount} workouts to my plan` : 'Save with Buko Plus'} loading={busy} disabled={disabled || dirty || saveBlocked || !preview.days.some((day) => day.save)} onPress={() => { void save(); }} />
       </> : null}
       <Button title="Close training generator" variant="ghost" disabled={off} onPress={() => { version.current++; setOpen(false); setPreview(null); }} />
     </>}
