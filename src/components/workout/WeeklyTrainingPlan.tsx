@@ -32,7 +32,7 @@ function friendlyDate(date: string) {
 
 function shortDay(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+  return Number.isNaN(parsed.getTime()) ? date : `${parsed.toLocaleDateString(undefined, { weekday: 'short' })} ${parsed.getDate()}`;
 }
 
 function IconAction({ icon, label, text, disabled, onPress }: {
@@ -300,24 +300,24 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
                   {rest.length ? <>
                     <Text style={[typography.label, { marginTop: spacing.sm }]}>Move to</Text>
                     <ChipRow>
-                      <Chip label={shortDay(day.date)} selected disabled={off} onPress={() => undefined} />
-                      {rest.map(({ day: free, index: freeIndex }) => <Chip key={freeIndex} label={shortDay(free.date)} disabled={off || free.date < today}
-                        onPress={() => moveDay(index, freeIndex)} />)}
+                      {[{ day, index }, ...rest].sort((a, b) => a.day.date.localeCompare(b.day.date)).map(({ day: option, index: optionIndex }) => optionIndex === index
+                        ? <Chip key={optionIndex} label={shortDay(option.date)} selected disabled={off} onPress={() => undefined} />
+                        : <Chip key={optionIndex} label={shortDay(option.date)} disabled={off || option.date < today} onPress={() => moveDay(index, optionIndex)} />)}
                     </ChipRow>
                   </> : null}
                   <TextField label="Name" accessibilityLabel={`Workout ${n} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
                   <TextField label="Notes" accessibilityLabel={`Workout ${n} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
-                  <TextField label="Search swaps" accessibilityLabel={`Find replacement exercises for workout ${n}`} placeholder="e.g. squat" value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
+                  <TextField label="Swap an exercise" accessibilityLabel={`Find replacement exercises for workout ${n}`} placeholder="Search, e.g. squat" value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
                   {day.snapshot.map((item, itemIndex) => <View key={itemIndex} style={{ marginBottom: spacing.md }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={[typography.subheading, { flex: 1 }]}>{item.exercise.name}</Text>
                       <IconAction icon="trash-outline" label={`Remove ${item.exercise.name} from workout ${n}`} disabled={off || day.snapshot.length <= 1}
                         onPress={() => patchDay(index, { snapshot: day.snapshot.filter((_, k) => k !== itemIndex) })} />
                     </View>
-                    <ChipRow>{catalog.filter((exercise) => !savedExcluded.includes(exercise.id) && exercise.category === item.exercise.category
+                    {exerciseSearch.trim() ? <ChipRow>{catalog.filter((exercise) => !savedExcluded.includes(exercise.id) && exercise.id !== item.exercise.id && exercise.category === item.exercise.category
                       && (day.kind !== 'run' || exercise.name.toLowerCase() === 'running')
-                      && (exercise.id === item.exercise.id || exercise.name.toLowerCase().includes(exerciseSearch.toLowerCase()))).slice(0, 6).map((exercise) => <Chip key={exercise.id} label={exercise.name}
-                      selected={item.exercise.id === exercise.id} disabled={off} onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, k) => k === itemIndex ? { ...value, exercise } : value) })} />)}</ChipRow>
+                      && exercise.name.toLowerCase().includes(exerciseSearch.trim().toLowerCase())).slice(0, 4).map((exercise) => <Chip key={exercise.id} label={`⇄ ${exercise.name}`}
+                      disabled={off} onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, k) => k === itemIndex ? { ...value, exercise } : value) })} />)}</ChipRow> : null}
                     {item.sets.map((set, setIndex) => item.exercise.category === 'cardio'
                       ? <TextField key={setIndex} label="Minutes" accessibilityLabel={`Workout ${n} ${item.exercise.name} minutes`} value={numeric(set.duration_s == null ? null : set.duration_s / 60)} keyboardType="decimal-pad" editable={!off}
                         onChangeText={(value) => patchSet(index, itemIndex, setIndex, { duration_s: (parseNum(value) ?? NaN) * 60 })} />

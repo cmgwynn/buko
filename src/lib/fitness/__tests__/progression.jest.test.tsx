@@ -140,7 +140,8 @@ test('occupied dates are preserved unless one specific uncompleted slot is selec
 test('moving a workout swaps it with a rest day in the same week', async () => {
   await preview();
   const restDay = trainingAddDays(mockStartDate, 3);
-  const label = new Date(`${restDay}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+  const parsed = new Date(`${restDay}T00:00:00`);
+  const label = `${parsed.toLocaleDateString(undefined, { weekday: 'short' })} ${parsed.getDate()}`;
   await fireEvent.press(screen.getAllByRole('button', { name: label })[0]);
   mockConfirm.mockResolvedValue(true);
   await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
