@@ -7,6 +7,14 @@ import { useSelectedDate } from '../../providers/SelectedDateProvider';
 import { DaySwipeContext } from './DaySwipeContext';
 import { swipeDayDelta, SWIPE_LONG_PRESS_MS } from './swipe';
 
+type FocusState = { currentlyFocusedInput?: () => unknown; currentlyFocusedField?: () => unknown };
+/** react-native-web only implements the older `currentlyFocusedField`; calling the native API there throws. */
+function textInputFocused(): boolean {
+  const state = TextInput.State as unknown as FocusState;
+  const read = state.currentlyFocusedInput ?? state.currentlyFocusedField;
+  return read ? read.call(state) != null : false;
+}
+
 export function DaySwipe({ children }: PropsWithChildren) {
   const { selectedDate, setSelectedDate } = useSelectedDate();
   const reducedMotion = useReducedMotion();
@@ -24,12 +32,12 @@ export function DaySwipe({ children }: PropsWithChildren) {
     .onTouchesDown((_event, manager) => {
       touchStarted.current = Date.now();
       activated.current = false;
-      blocked.current = TextInput.State.currentlyFocusedInput() != null;
+      blocked.current = textInputFocused();
       if (blocked.current) manager.fail();
     })
     .onStart(() => { activated.current = true; })
     .onTouchesMove((_event, manager) => {
-      if ((!activated.current && Date.now() - touchStarted.current >= SWIPE_LONG_PRESS_MS) || TextInput.State.currentlyFocusedInput() != null) {
+      if ((!activated.current && Date.now() - touchStarted.current >= SWIPE_LONG_PRESS_MS) || textInputFocused()) {
         blocked.current = true;
         manager.fail();
       }
