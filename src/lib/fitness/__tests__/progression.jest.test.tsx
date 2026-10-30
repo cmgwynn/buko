@@ -48,6 +48,7 @@ jest.mock('../../../components/ui', () => {
     Card: ({ children }: { children: unknown }) => React.createElement(View, null, children),
     Heading: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     Eyebrow: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
+    Step: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     Disclosure: ({ title, children }: { title: string; children: unknown }) => React.createElement(View, null, React.createElement(Text, null, title), children),
     Notice: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     ChipRow: ({ children }: { children: unknown }) => React.createElement(View, null, children),
@@ -87,7 +88,7 @@ beforeEach(() => {
 
 async function open() {
   await render(<WeeklyTrainingPlan />);
-  await fireEvent.press(screen.getByRole('button', { name: 'Build a weekly training plan' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Build a training plan' }));
   await screen.findByLabelText('Or pick a start date');
   await fireEvent.changeText(screen.getByLabelText('Or pick a start date'), mockStartDate);
 }
@@ -152,7 +153,7 @@ test('saving exclusions preserves food preferences and excluded running produces
 test('missing preference storage fails closed without generating or saving', async () => {
   mockLoadPreferences.mockRejectedValue(new Error('planning_preferences unavailable'));
   await render(<WeeklyTrainingPlan />);
-  await fireEvent.press(screen.getByRole('button', { name: 'Build a weekly training plan' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Build a training plan' }));
   expect(await screen.findByText('planning_preferences unavailable')).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Preview my 4-week plan' })).toBeNull();
   expect(mockSaveSlot).not.toHaveBeenCalled();
@@ -192,7 +193,7 @@ test('account changes clear the previous account preview and saved exclusions', 
   mockAccount = 'other';
   await screen.rerender(<WeeklyTrainingPlan />);
   await waitFor(() => expect(screen.queryByText('Review all four weeks')).toBeNull());
-  expect(screen.getByRole('button', { name: 'Build a weekly training plan' })).toBeTruthy();
+  expect(screen.getByRole('button', { name: 'Build a training plan' })).toBeTruthy();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });
 
@@ -211,4 +212,15 @@ test('without Buko Plus the preview stays free but saving opens the paywall', as
   expect(mockPush).toHaveBeenCalledWith({ pathname: '/premium', params: { from: 'training-plan' } });
   expect(mockConfirm).not.toHaveBeenCalled();
   expect(mockSaveSlot).not.toHaveBeenCalled();
+});
+
+test('choosing a strength split previews named split sessions instead of runs', async () => {
+  await open();
+  await fireEvent.press(screen.getByRole('button', { name: 'Full body' }));
+  expect(screen.queryByLabelText('Easy run/walk minutes today (5–60)')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Full gym' })).toBeTruthy();
+  await fireEvent.press(screen.getByRole('button', { name: 'Preview my 4-week plan' }));
+  await screen.findByText('Review all four weeks');
+  expect(screen.getAllByText(/^Full body [AB]$/).length).toBeGreaterThan(0);
+  expect(screen.queryByText('Easy run / walk')).toBeNull();
 });

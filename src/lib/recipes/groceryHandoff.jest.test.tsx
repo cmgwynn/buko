@@ -36,7 +36,7 @@ jest.mock('../../components/ui', () => {
 
 test('adding a planned week returns to Groceries with the added count for one-tap ordering', async () => {
   await render(<GenerateGrocery />);
-  expect(await screen.findByText('Next: order them on Instacart in one tap.')).toBeTruthy();
+  expect(await screen.findByText('Order groceries on Instacart.')).toBeTruthy();
   await fireEvent.press(screen.getByRole('button', { name: 'Add 2 items to grocery list' }));
   expect(mockRpc).toHaveBeenCalledWith('replace_generated_groceries', expect.objectContaining({ p_week: '2026-11-02', p_expected_user_id: 'u' }));
   expect(mockReplace).toHaveBeenCalledWith({ pathname: '/(tabs)/grocery', params: { added: '2' } });

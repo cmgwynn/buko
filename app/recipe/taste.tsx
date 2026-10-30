@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Text } from 'react-native';
-import { Button, Card, Chip, ChipRow, Heading, Loading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Heading, Loading, Notice, Screen, TextField } from '../../src/components/ui';
 import { DEFAULT_TASTE, formatTasteLearning, loadTasteProfile, RECIPE_AI_CONSENT_VERSION, saveTasteProfile, type TastePreferences } from '../../src/lib/recipes/qualityClient';
 import { typography } from '../../src/theme';
 import { useConfirm } from '../../src/components/ConfirmProvider';
@@ -46,7 +46,7 @@ export default function TastePreferencesScreen() {
   }
   return <Screen edges={[]} variant="form">
     <Heading>Your taste preferences</Heading>
-    <Text style={typography.body}>These guide recipe suggestions. Ingredient dislikes are not allergy information; keep dietary restrictions in your profile up to date.</Text>
+    <Text style={typography.body}>Dislikes guide suggestions, not allergy checks. Keep dietary restrictions updated.</Text>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {!ready && !error ? <Loading /> : null}
     {ready ? <>
@@ -57,15 +57,16 @@ export default function TastePreferencesScreen() {
       <TextField label="Maximum cooking minutes (optional)" value={minutes} onChangeText={(v) => { setMinutes(v); setSaved(false); }} editable={!busy} keyboardType="number-pad" />
       <Card>
         <Heading>Optional AI adaptation</Heading>
-        <Text style={typography.body}>If the owner enables paid AI, Anthropic receives the selected base recipe, your requested changes and relevant taste/diet preferences. It does not receive your identity, diary or health history. AI reviews are not kitchen tests or allergy certification.</Text>
+        <Text style={typography.body}>Optional AI adaptations share recipe details and preferences. Not allergy-certified.</Text>
+        <Disclosure title="How AI uses recipe data"><Text style={typography.body}>If the owner enables paid AI, Anthropic receives the selected base recipe, your requested changes and relevant taste/diet preferences. It does not receive your identity, diary or health history. AI reviews are not kitchen tests or allergy certification.</Text></Disclosure>
         <Chip label={preferences.aiConsentVersion === RECIPE_AI_CONSENT_VERSION ? 'AI recipe sharing allowed' : 'AI recipe sharing off'}
           selected={preferences.aiConsentVersion === RECIPE_AI_CONSENT_VERSION} disabled={busy} onPress={() => {
             setPreferences((p) => ({ ...p, aiConsentVersion: p.aiConsentVersion === RECIPE_AI_CONSENT_VERSION ? null : RECIPE_AI_CONSENT_VERSION })); setSaved(false);
           }} />
-        <Text style={typography.small}>Save to apply this choice. You can withdraw consent here at any time; unchanged approved recipes need no model call.</Text>
+        <Text style={typography.small}>Save to apply. Withdraw consent here anytime.</Text>
       </Card>
       {Object.keys(learned).length ? <Card><Heading>From your cooking feedback</Heading>
-        <Text style={typography.small}>Feedback-based trends are separate from your explicit choices above. Explicit preferences take priority.</Text>
+        <Text style={typography.small}>Your choices take priority over feedback trends.</Text>
         {Object.entries(learned).map(([name, value]) => {
           const text = formatTasteLearning(name, value);
           return text ? <Text key={name} style={typography.body}>{text}</Text> : null;

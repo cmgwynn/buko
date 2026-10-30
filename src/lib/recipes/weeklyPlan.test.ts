@@ -152,3 +152,36 @@ test('per-day targets steer each day independently', () => {
   assert.equal(fueled.slots[0].candidate?.id, 'fuel');
   assert.equal(generateWeeklyMealPlan({ ...input, dailyTargets: { '2026-10-26': { calories: 9000, carbs_g: 1500 } } }).slots[0].candidate?.id, 'lean');
 });
+
+test('batch cook reuses a recipe for up to three planned days, then cooks something new', () => {
+  const dates = Array.from({ length: 6 }, (_, index) => `2026-10-${26 + index}`);
+  const result = generateWeeklyMealPlan({ ...base, dates, style: 'batch' });
+  const ids = result.slots.map((slot) => slot.candidate!.id);
+  assert.equal(new Set(ids.slice(0, 3)).size, 1);
+  assert.equal(new Set(ids.slice(3, 6)).size, 1);
+  assert.notEqual(ids[0], ids[3]);
+  assert.match(result.slots[1].reason, /Batch cook/);
+});
+
+test('high protein style prefers protein-dense recipes', () => {
+  const lean = bowl('z-lean'); lean.ingredients[0].nutrition!.per100g.protein = 55; lean.ingredients[0].nutrition!.per100g.carbs = 20;
+  const input = { ...base, dates: ['2026-10-26'], candidates: [bowl('a'), lean] };
+  assert.equal(generateWeeklyMealPlan({ ...input, style: 'high_protein' }).slots[0].candidate?.id, 'z-lean');
+});
+
+test('batch leftovers expire by calendar day, not by planned slot count', () => {
+  const result = generateWeeklyMealPlan({ ...base, dates: ['2026-10-26', '2026-10-29', '2026-11-01'], style: 'batch' });
+  assert.ok(result.slots.every((slot) => !/Batch cook/.test(slot.reason)));
+  const near = generateWeeklyMealPlan({ ...base, dates: ['2026-10-26', '2026-10-28'], style: 'batch' });
+  assert.equal(near.slots[0].candidate?.id, near.slots[1].candidate?.id);
+});
+
+test('pinned slots keep their recipes so a swap changes only one meal', () => {
+  const dates = Array.from({ length: 6 }, (_, index) => `2026-10-${26 + index}`);
+  const first = generateWeeklyMealPlan({ ...base, dates, style: 'batch' });
+  const key = mealSlotKey('2026-10-26', 'dinner');
+  const pinned = Object.fromEntries(first.slots.slice(1).map((slot) => [mealSlotKey(slot.date, slot.meal), slot.candidate!.id]));
+  const swapped = generateWeeklyMealPlan({ ...base, dates, style: 'batch', swappedOut: { [key]: [first.slots[0].candidate!.id] }, pinned });
+  assert.notEqual(swapped.slots[0].candidate?.id, first.slots[0].candidate?.id);
+  assert.deepEqual(swapped.slots.slice(1).map((slot) => slot.candidate?.id), first.slots.slice(1).map((slot) => slot.candidate?.id));
+});

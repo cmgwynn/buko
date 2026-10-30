@@ -95,7 +95,8 @@ export default function EditRoutine() {
   return (
     <Screen variant="form">
       <Heading>{id ? 'Edit your routine' : 'Make a routine your own'}</Heading>
-      <Body muted>Changes apply to future sessions only. Your logged workouts and any workout already in progress stay unchanged. Targets are per set; leave optional targets blank.</Body>
+      <Body muted>Only future sessions change; logged and in-progress workouts stay unchanged.</Body>
+      <Body muted>Targets are per set. Optional targets can stay blank.</Body>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {needsReload || (id && !original) ? <Button title="Reload routine" variant="secondary" onPress={() => setReloadKey((key) => key + 1)} /> : null}
       <View style={{ height: spacing.lg }} />

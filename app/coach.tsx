@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Linking, Switch, Text, View } from 'react-native';
-import { Body, Button, Card, Chip, ChipRow, Heading, Loading, Notice, Screen, TextField } from '../src/components/ui';
+import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Loading, Notice, Screen, TextField } from '../src/components/ui';
 import {
   applyCoachAction, clearCoachHistory, coachRequest, loadCoachHistory, loadCoachPreferences,
   saveCoachPreferences, type CoachSummary,
@@ -121,7 +121,7 @@ export default function Coach() {
     <Screen>
       <Heading>Your wellness coach</Heading>
       <Button title="Find a tested meal" variant="secondary" onPress={() => router.push('/recipe/suggest')} />
-      <Notice tone="info">{COACH_NOTICE} Suggestions never change your targets or add items without your confirmation.</Notice>
+      <Notice tone="info">{COACH_NOTICE}</Notice><Body muted>Nothing changes without your confirmation.</Body>
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {statusNote ? <Notice tone="info">{statusNote}</Notice> : null}
       <ChipRow>
@@ -130,25 +130,28 @@ export default function Coach() {
         <Chip label="Preferences & privacy" selected={section === 'preferences'} onPress={() => setSection('preferences')} />
       </ChipRow>
       <View style={{ height: spacing.lg }} />
-      {!enabled ? <Notice tone="warning">Live AI is off. No paid Anthropic requests will be made. You can review factual weekly summaries after backend setup; AI chat and suggestions need owner activation.</Notice> : null}
-      {!billing.allowed ? <Card><Body>Coach reviews and chat are part of Buko Plus. Privacy, consent withdrawal and history deletion remain available.</Body>
+      {!enabled ? <><Notice tone="warning">Live AI is off; no paid AI requests run.</Notice><Body muted>Weekly summaries need backend setup; chat and suggestions need owner activation.</Body></> : null}
+      {!billing.allowed ? <Card><Body>Coach needs Plus. Consent and history controls stay free.</Body>
         <Button title="See Buko Plus" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
       {(!consented || section === 'preferences') && prefs ? (
         <Card>
           <Heading>You choose what guides the coach</Heading>
-          <Body muted>Coach is optional. If live AI is enabled later, minimized food-log summaries, goals, dietary preferences, selected recipe/product information and recent chat will be processed by Anthropic. Names, email, account identifiers and birthday are not included in the structured model context. Avoid personal identifiers in chat or recipe titles; automatic redaction cannot catch everything.</Body>
-          <Body muted>Imported Apple Health / Health Connect workouts and active-energy records are excluded. Weight measurements are shared only if you enable the separate weight option. Anthropic processing follows its API data terms; it is not guaranteed zero-retention.</Body>
+          <Body muted>Coach is optional. See what data it uses and how.</Body>
+          <Disclosure title="How Coach uses your data">
+            <Body muted>If live AI is enabled, minimized food-log summaries, goals, dietary preferences, selected recipe/product information and recent chat are processed by Anthropic. Names, email, account identifiers and birthday are excluded from structured model context. Avoid identifiers in chat or recipe titles; automatic redaction can miss them.</Body>
+            <Body muted>Apple Health / Health Connect workouts and active-energy records are excluded. Weight measurements are shared only if you enable the separate weight option. Anthropic follows its API data terms; zero retention is not guaranteed.</Body>
+            <Body muted>Turning Coach off stops future processing. Clear history to delete saved conversations, check-ins and unused action cards. Applied plan/grocery entries remain; usage counters are retained for cost control.</Body>
+          </Disclosure>
           <Button title="Read Anthropic privacy information" variant="ghost" onPress={() => { void Linking.openURL('https://privacy.claude.com/').catch(() => setError('Could not open the privacy link. Visit privacy.claude.com in your browser.')); }} />
           <Body>What should Coach prioritize?</Body>
           <ChipRow>{FOCUS.map((item) => <Chip key={item.key} label={item.label} selected={prefs.focus === item.key}
             onPress={() => { if (!busy) void changePreferences({ ...prefs, focus: item.key }); }} />)}</ChipRow>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginVertical: spacing.lg }}>
-            <View style={{ flex: 1 }}><Body>Include weight trend</Body><Body muted>Off by default. Enable only if weight-focused feedback is helpful for you.</Body></View>
+            <View style={{ flex: 1 }}><Body>Include weight trend</Body><Body muted>Off by default. Share weight only if you want weight-focused feedback.</Body></View>
             <Switch accessibilityLabel="Include weight trend" value={prefs.include_weight} disabled={busy} onValueChange={(value) => { void changePreferences({ ...prefs, include_weight: value }); }} />
           </View>
           <Button title={consented ? 'Turn Coach off / withdraw consent' : 'I agree — enable optional Coach features'} variant={consented ? 'secondary' : 'primary'} loading={busy}
             onPress={() => changePreferences({ ...prefs, consent_version: consented ? null : COACH_CONSENT_VERSION })} />
-          <Body muted>Turning Coach off stops future processing. Clear history below to delete saved conversations, check-ins and unused action cards. Applied plan/grocery entries remain yours. Usage counters are retained for cost control.</Body>
           <Button title="Clear Coach history" variant="danger" disabled={busy} onPress={() => setConfirmClear(true)} />
           {confirmClear ? <>
             <Body>Delete all saved Coach conversations and check-ins? This cannot be undone.</Body>
@@ -159,17 +162,19 @@ export default function Coach() {
       ) : null}
       {consented && section !== 'preferences' ? (
         <>
-          {support ? <Notice tone="info">Numeric nutrition feedback and food actions are paused in this conversation. Support and professional resources take priority. You can clear conversation history in Preferences.</Notice> : null}
+          {support ? <><Notice tone="info">Food feedback and actions are paused. Support resources come first.</Notice><Body muted>Clear conversation history in Preferences.</Body></> : null}
           {section === 'weekly' ? (
             <>
-              <Body muted>The check-in covers the previous completed Monday–Sunday week. One AI check-in is cached per week; facts show coverage, not assumptions.</Body>
+              <Body muted>Reviews the previous completed Monday–Sunday week. One AI check-in per week.</Body>
+              <Body muted>Facts reflect available logs, not assumptions.</Body>
               <Button title="Review my logged week (no AI)" variant="secondary" loading={busy} onPress={() => request('summary')} />
               <Button title="Get weekly Coach suggestions" loading={busy} disabled={!enabled} onPress={() => request('weekly')} />
               {summary && !support ? <Facts facts={summary} /> : null}
             </>
           ) : (
             <Card>
-              <Body muted>Ask about logged patterns or saved recipes, such as “Find high-protein dinners under 600 calories.” Coach cannot explain a medical cause or invent missing nutrition. Only saved, matched recipes can become plan actions.</Body>
+              <Body muted>Ask about your logs or saved recipes. Not medical advice.</Body>
+              <Disclosure title="Coach limitations"><Body muted>Coach cannot explain medical causes or invent missing nutrition. Only saved, matched recipes can become plan actions.</Body></Disclosure>
               <TextField label="Ask Coach" value={message} onChangeText={setMessage} multiline maxLength={2000} editable={!busy} placeholder="What small habit could help me this week?" />
               <Button title="Send to Coach" loading={busy} disabled={!message.trim() || !enabled} onPress={() => request('chat')} />
             </Card>
@@ -199,7 +204,7 @@ export default function Coach() {
             <DateField label="Plan date" value={day} minDate={today} onChange={setDay} />
             <ChipRow>{['breakfast', 'lunch', 'dinner', 'snack'].map((value) => <Chip key={value} label={value} selected={meal === value} onPress={() => setMeal(value)} />)}</ChipRow>
             <TextField label="Servings to plan" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
-          </> : <Body muted>Adds one grocery item. It does not remove your original item or guarantee availability/allergen suitability.</Body>}
+          </> : <><Body muted>Adds one item; it doesn't remove the original.</Body><Body muted>Availability and allergen suitability aren't guaranteed.</Body></>}
           <Button title={selected.kind === 'recipe' ? 'Confirm add to meal plan' : 'Confirm add to groceries'} loading={busy} onPress={apply} />
           <Button title="Cancel suggestion" variant="ghost" disabled={busy} onPress={() => setSelected(null)} />
         </Card>

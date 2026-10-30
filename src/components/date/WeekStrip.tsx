@@ -23,9 +23,10 @@ export function WeekStrip() {
 
   return (
     <GestureDetector gesture={swipe}>
-      <View accessibilityLabel={`Week of ${monday}`} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md }}>
+      <View accessibilityLabel={`Week of ${monday}`} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.xs, marginBottom: spacing.md }}>
         {dates.map((date) => {
           const selected = date === selectedDate;
+          const isToday = date === today;
           const day = parseLocalDate(date);
           return (
             <Pressable
@@ -33,27 +34,30 @@ export function WeekStrip() {
               accessibilityRole="button"
               accessibilityState={{ selected }}
               accessibilityLabel={day.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+              accessibilityHint={isToday ? 'Today' : undefined}
               onPress={() => setSelectedDate(date)}
               style={{
                 alignItems: 'center',
                 justifyContent: 'center',
                 paddingVertical: spacing.sm,
                 flex: 1,
-                maxWidth: 64,
-                minHeight: 56,
+                maxWidth: 56,
+                minHeight: 60,
                 borderRadius: radius.md,
+                borderWidth: 1.5,
+                borderColor: isToday && !selected ? colors.primary : 'transparent',
                 backgroundColor: selected ? colors.primary : 'transparent',
               }}
             >
-              <Text style={[typography.small, selected && { color: colors.onPrimary }]}>{day.toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
+              <Text style={[typography.label, { fontSize: 11 }, selected && { color: colors.onPrimary }]}>{day.toLocaleDateString(undefined, { weekday: 'narrow' })}</Text>
               <Text style={[
                 typography.subheading,
                 selected && { color: colors.onPrimary },
-                date === today && !selected && { color: colors.primary },
+                isToday && !selected && { color: colors.primary, fontWeight: '800' },
               ]}>
                 {day.getDate()}
               </Text>
-              <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 2, backgroundColor: selected ? colors.onPrimary : 'transparent' }} />
+              <View style={{ width: 5, height: 5, borderRadius: 3, marginTop: 2, backgroundColor: isToday ? (selected ? colors.onPrimary : colors.primary) : 'transparent' }} />
             </Pressable>
           );
         })}

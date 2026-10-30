@@ -7,7 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, HeroCta, Loading, Notice, TextField } from '../../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, HeroCta, Loading, Notice, Step, TextField } from '../../src/components/ui';
 import { config } from '../../src/lib/config';
 import { PlanRecipePicker, type PlanChoice } from '../../src/components/PlanRecipePicker';
 import { DateNavigator } from '../../src/components/date/DateNavigator';
@@ -18,7 +18,7 @@ import { formatDay, MEALS } from '../../src/lib/diary';
 import { computeRecipeNutrition } from '../../src/lib/recipes/nutrition';
 import { STARTER_RECIPES, starterRecipeDraft } from '../../src/lib/recipes/library';
 import { intakeMacros, MACRO_KEYS, type KnownMacros, type MealCandidate } from '../../src/lib/recipes/recommendations';
-import { generateWeeklyMealPlan, mealPlanSnapshot, mealSlotKey, type WeeklyEntry } from '../../src/lib/recipes/weeklyPlan';
+import { generateWeeklyMealPlan, MEAL_PLAN_STYLES, mealPlanSnapshot, mealSlotKey, type MealPlanStyle, type WeeklyEntry } from '../../src/lib/recipes/weeklyPlan';
 import { loadPlanningPreferences, savePlanningPreferences, type PlanningPreferences } from '../../src/lib/planning/preferences';
 import { fuelLabel, fuelWeek } from '../../src/lib/planning/fueling';
 import { loadPlannedWorkouts, type PlannedWorkoutRow } from '../../src/lib/fitness/data';
@@ -42,6 +42,12 @@ type EntryRow = MealPlanEntry;
 const weeklyEntries = (rows: EntryRow[]): WeeklyEntry[] => rows.map((row) => ({
   id: row.id, date: row.planned_on, meal: row.meal, recipeId: row.recipe_id, servings: row.servings, logged: !!row.logged_at,
 }));
+
+const MEAL_PRESETS: { label: string; meals: Meal[] }[] = [
+  { label: '3 meals', meals: ['breakfast', 'lunch', 'dinner'] },
+  { label: '3 meals + snack', meals: ['breakfast', 'lunch', 'dinner', 'snack'] },
+  { label: '2 meals', meals: ['lunch', 'dinner'] },
+];
 
 export default function Plan() {
   const router = useRouter();
@@ -71,6 +77,7 @@ export default function Plan() {
   const [generateQueued, setGenerateQueued] = useState(false);
   const [generatorDays, setGeneratorDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [generatorMeals, setGeneratorMeals] = useState<Meal[]>(['breakfast', 'lunch', 'dinner']);
+  const [mealStyle, setMealStyle] = useState<MealPlanStyle>('balanced');
   const [replaceSlots, setReplaceSlots] = useState<string[]>([]);
   const [preferences, setPreferences] = useState<{ owner: string; value: PlanningPreferences } | null>(null);
   const [exclusionText, setExclusionText] = useState('');
@@ -197,9 +204,9 @@ export default function Plan() {
       servings: draft.servings, ingredients: draft.ingredients, meal: recipe.meal.toLowerCase() as Meal,
     })),
   ], [recipes, libraryIdeas]);
-  const generatorContext = useMemo(() => JSON.stringify([start, generatorDays, generatorMeals, replaceSlots,
+  const generatorContext = useMemo(() => JSON.stringify([start, generatorDays, generatorMeals, mealStyle, replaceSlots,
     activePreferences?.excludedFoods, exclusionText, profile?.diet_prefs, targets, dailyTargets, intake, candidates]),
-  [start, generatorDays, generatorMeals, replaceSlots, activePreferences?.excludedFoods, exclusionText,
+  [start, generatorDays, generatorMeals, mealStyle, replaceSlots, activePreferences?.excludedFoods, exclusionText,
     profile?.diet_prefs, targets, dailyTargets, intake, candidates]);
   const liveGeneratorContext = useRef(generatorContext);
   liveGeneratorContext.current = generatorContext;
@@ -216,7 +223,7 @@ export default function Plan() {
     return MACRO_KEYS.map((key) => `${key === 'calories' ? 'Calories' : key.replace('_g', '')}: ${macros[key] === null ? 'unknown' : `${Math.round(macros[key]!)} ${key === 'calories' ? 'kcal' : 'g'}`}`).join(' · ');
   }
 
-  function generatePreview(swaps: Record<string, string[]> = swappedOut) {
+  function generatePreview(swaps: Record<string, string[]> = swappedOut, pinned?: Record<string, string>) {
     if (!session || !activePreferences || !profile || error) return;
     setPreview({
       owner: session.user.id, signature: mealPlanSnapshot(weeklyEntries(entries)), context: generatorContext,
@@ -225,7 +232,7 @@ export default function Plan() {
         replaceSlots, entries: weeklyEntries(entries), candidates, preferences: profile.diet_prefs,
         foodExclusions: activePreferences.excludedFoods, targets, dailyTargets, today,
         intake: intake?.owner === session.user.id && intake.date === today ? intake.macros : null,
-        swappedOut: swaps,
+        swappedOut: swaps, style: mealStyle, pinned,
       }),
     });
   }
@@ -234,7 +241,11 @@ export default function Plan() {
     const key = mealSlotKey(date, meal);
     const next = { ...swappedOut, [key]: [...(swappedOut[key] ?? []), recipeId] };
     setSwappedOut(next);
-    generatePreview(next);
+    // Keep every other previewed meal exactly as it was.
+    const pinned = Object.fromEntries((preview?.result.slots ?? [])
+      .filter((slot) => slot.candidate && mealSlotKey(slot.date, slot.meal) !== key)
+      .map((slot) => [mealSlotKey(slot.date, slot.meal), slot.candidate!.id]));
+    generatePreview(next, pinned);
   }
 
   async function previewWeek() {
@@ -488,27 +499,44 @@ export default function Plan() {
           ) : null}
           {removed ? <Button title="Undo remove meal" variant="ghost" disabled={pending} onPress={() => { void undoRemove(); }} /> : null}
           {!loaded ? <Loading /> : null}
-          {loaded ? <HeroCta eyebrow={`Week of ${formatDay(start)}`} title="Plan my week"
-            body="Buko fills your empty meals with recipes that fit your targets. You review everything before it’s added."
-            action={generatorOpen ? 'Hide setup' : 'Generate my week'} icon={generatorOpen ? 'chevron-up' : 'sparkles-outline'}
-            onPress={() => setGeneratorOpen((open) => !open)} /> : null}
+          {loaded && !generatorOpen ? <HeroCta eyebrow={`Week of ${formatDay(start)}`} title="Plan my week"
+            body="Recipes that fit your targets. You review before anything is added."
+            action="Generate my week" icon="sparkles-outline"
+            onPress={() => setGeneratorOpen(true)} /> : null}
           {loaded && generatorOpen ? <Card>
-            <Eyebrow>1 · Days</Eyebrow>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flex: 1 }}>
+                <Eyebrow>{`Week of ${formatDay(start)}`}</Eyebrow>
+                <Text accessibilityRole="header" style={typography.heading}>Plan my week</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close meal plan generator" hitSlop={8}
+                onPress={() => setGeneratorOpen(false)} style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="close" size={24} color={colors.textMuted} />
+              </Pressable>
+            </View>
+            <Step n={1}>Plan style</Step>
+            <ChipRow>{MEAL_PLAN_STYLES.map((item) => <Chip key={item.key} label={item.label} selected={mealStyle === item.key} disabled={pending}
+              onPress={() => setMealStyle(item.key)} />)}</ChipRow>
+            <Text style={typography.small}>{MEAL_PLAN_STYLES.find((item) => item.key === mealStyle)!.hint}</Text>
+            <Step n={2}>Days</Step>
             <ChipRow>{Array.from({ length: 7 }, (_, index) => <Chip key={index} label={formatDay(addDays(start, index))} selected={generatorDays.includes(index)} disabled={pending}
               onPress={() => setGeneratorDays((days) => days.includes(index) ? days.filter((day) => day !== index) : [...days, index].sort())} />)}</ChipRow>
-            <Eyebrow>2 · Meals</Eyebrow>
+            <Step n={3}>Meals</Step>
+            <ChipRow>{MEAL_PRESETS.map((preset) => <Chip key={preset.label} label={preset.label} disabled={pending}
+              selected={preset.meals.length === generatorMeals.length && preset.meals.every((meal) => generatorMeals.includes(meal))}
+              onPress={() => setGeneratorMeals(preset.meals)} />)}</ChipRow>
             <ChipRow>{MEALS.map(({ key, label }) => <Chip key={key} label={label} selected={generatorMeals.includes(key)} disabled={pending}
               onPress={() => setGeneratorMeals((meals) => meals.includes(key) ? meals.filter((meal) => meal !== key) : [...meals, key])} />)}</ChipRow>
-            <Eyebrow>3 · Foods to skip</Eyebrow>
+            <Step n={4}>Foods to skip</Step>
             <TextField label="Foods to skip (comma or new line)" value={exclusionText} onChangeText={setExclusionText} multiline editable={!pending && !savingPreferences} />
-            <Text style={typography.small}>Remembered for next time. Matches recipe names and ingredients, but isn’t an allergy guarantee.</Text>
+            <Text style={typography.small}>Saved for next time. Not an allergy guarantee.</Text>
             {preferenceError ? <Notice tone="danger">{preferenceError}</Notice> : null}
-            <Eyebrow>4 · Training</Eyebrow>
+            <Step n={5}>Training</Step>
             {trainingDays ? <>
               <ChipRow><Chip label={`Fuel my ${trainingDays} training day${trainingDays === 1 ? '' : 's'}`} selected={fuelOn} disabled={pending} onPress={() => setFuelOn((on) => !on)} /></ChipRow>
-              <Text style={typography.small}>More carbs on workout days and a little less on rest days. Your weekly calories stay the same.</Text>
+              <Text style={typography.small}>More carbs on workout days, same weekly calories.</Text>
             </> : <>
-              <Text style={typography.small}>No workouts planned this week. Add a training plan and Buko will give you more fuel on workout days.</Text>
+              <Text style={typography.small}>No workouts this week. Add a plan to fuel workout days.</Text>
               <Button title="Build a training plan" icon="barbell-outline" variant="ghost" onPress={() => router.push('/workout/plan')} />
             </>}
             {!activePreferences ? <Button title="Load saved foods to skip" variant="secondary" disabled={pending} onPress={() => { void loadExclusions(); }} /> : null}

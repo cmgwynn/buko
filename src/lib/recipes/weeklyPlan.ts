@@ -10,6 +10,19 @@ export interface WeeklyEntry {
   servings: number;
   logged: boolean;
 }
+export type MealPlanStyle = 'balanced' | 'high_protein' | 'batch';
+export const MEAL_PLAN_STYLES: { key: MealPlanStyle; label: string; hint: string }[] = [
+  { key: 'balanced', label: 'Balanced', hint: 'Most variety' },
+  { key: 'high_protein', label: 'High protein', hint: 'Protein-dense picks first' },
+  { key: 'batch', label: 'Batch cook', hint: 'Cook once, eat up to 3 days' },
+];
+/** Batch cooking reuses a recipe within this many calendar days of cooking it. */
+export const BATCH_DAYS = 3;
+const proteinBand = (macros: KnownMacros | null) => {
+  if (!macros?.calories || macros.protein_g == null) return 0;
+  // 5%-of-calories bands keep variety among similarly protein-dense recipes.
+  return Math.floor((macros.protein_g * 4 / macros.calories) * 20);
+};
 export const mealSlotKey = (date: string, meal: Meal) => `${date}:${meal}`;
 const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
@@ -40,7 +53,12 @@ export function generateWeeklyMealPlan(input: {
   intake: KnownMacros | null;
   /** Recipe ids the user swapped away from, per slot key. */
   swappedOut?: Readonly<Record<string, readonly string[]>>;
+  style?: MealPlanStyle;
+  /** Slot key -> recipe id to keep from a previous preview, so swapping one meal leaves the rest alone. */
+  pinned?: Readonly<Record<string, string>>;
 }) {
+  const style = input.style ?? 'balanced';
+  const batches = new Map<Meal, { id: string; cookedOn: string }>();
   const week = Array.from({ length: 7 }, (_, index) => addDays(input.weekStart, index));
   const dates = week.filter((date) => input.dates.includes(date));
   const meals = (['breakfast', 'lunch', 'dinner', 'snack'] as Meal[]).filter((meal) => input.meals.includes(meal));
@@ -77,24 +95,34 @@ export function generateWeeklyMealPlan(input: {
       });
       // Prefer variety among recipes with equally usable goal data, then deterministic goal fit.
       const ranked = result.recommendations.filter((choice) => eligible.has(choice.candidate.id)).sort((a, b) => a.missing - b.missing
+        || (style === 'high_protein' ? proteinBand(b.macros) - proteinBand(a.macros) : 0)
         || (usage.get(normalize(a.candidate.title)) ?? 0) - (usage.get(normalize(b.candidate.title)) ?? 0)
         || a.distance - b.distance || b.known - a.known
         || (a.candidate.id < b.candidate.id ? -1 : a.candidate.id > b.candidate.id ? 1 : 0));
       const swapped = input.swappedOut?.[mealSlotKey(date, meal)] ?? [];
       const fresh = ranked.filter((option) => !swapped.includes(option.candidate.id));
       // Once every option has been swapped away, cycle back to the best fit instead of leaving the slot empty.
-      const choice = (fresh.length ? fresh : ranked)[0];
+      const batch = style === 'batch' && meal !== 'snack' ? batches.get(meal) : undefined;
+      const inWindow = batch && date <= addDays(batch.cookedOn, BATCH_DAYS - 1);
+      const pinnedId = input.pinned?.[mealSlotKey(date, meal)];
+      const pinnedChoice = pinnedId ? ranked.find((option) => option.candidate.id === pinnedId) : undefined;
+      const leftover = inWindow ? (pinnedChoice ?? fresh.find((option) => option.candidate.id === batch.id)) : undefined;
+      const choice = pinnedChoice ?? leftover ?? (fresh.length ? fresh : ranked)[0];
+      const isLeftover = !!inWindow && choice?.candidate.id === batch?.id;
       if (!choice) {
         slots.push({ date, meal, candidate: null, servings: 0, macros: null, replaceIds: [], reason: 'No eligible recipe; existing meals stay unchanged.' });
         // Failed replacements still contribute their actual retained nutrition to later slots.
         planned = [...planned, ...existing.map((entry) => ({ recipeId: entry.recipeId, meal, servings: entry.servings, logged: entry.logged }))];
         continue;
       }
+      if (style === 'batch' && meal !== 'snack') {
+        if (!isLeftover) batches.set(meal, { id: choice.candidate.id, cookedOn: date });
+      }
       const title = normalize(choice.candidate.title);
       usage.set(title, (usage.get(title) ?? 0) + 1);
       slots.push({
         date, meal, candidate: choice.candidate, servings: 1, macros: choice.macros, replaceIds: existing.map((entry) => entry.id),
-        reason: `${existing.length ? 'Replace selected slot' : 'Fill empty slot'}; ${result.usedIntake ? 'today’s intake + unlogged plans' : 'planned meals only'}; ${result.incompletePlan ? 'some planned nutrition unknown; ' : ''}${choice.missing ? 'limited goal comparison' : 'variety, then available calorie/macro fit'}.`,
+        reason: isLeftover ? 'Batch cook: leftovers from an earlier day.' : `${existing.length ? 'Replace selected slot' : 'Fill empty slot'}; ${result.usedIntake ? 'today’s intake + unlogged plans' : 'planned meals only'}; ${result.incompletePlan ? 'some planned nutrition unknown; ' : ''}${choice.missing ? 'limited goal comparison' : 'variety, then available calorie/macro fit'}.`,
       });
       planned.push({ recipeId: choice.candidate.id, meal, servings: 1, logged: false });
     }

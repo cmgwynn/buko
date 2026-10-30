@@ -64,7 +64,7 @@ export default function Plus() {
       <Eyebrow onHero>Buko Plus</Eyebrow>
       <Text accessibilityRole="header" style={[typography.title, { color: colors.onHero, marginTop: spacing.xs }]}>{paywallHeadline(from)}</Text>
       <Text style={[typography.small, { color: colors.onHeroMuted, marginTop: spacing.xs, marginBottom: spacing.md }]}>
-        Tell Buko your goal and your days. It plans the meals and the training, and you just follow along.
+        Set your goal and schedule. Buko plans meals and training.
       </Text>
       {PLUS.map((row) => <View key={row.text} style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center', marginBottom: spacing.sm }}>
         <Ionicons name={row.icon} size={18} color={colors.heroAccent} />
@@ -102,7 +102,7 @@ export default function Plus() {
     </Card> : null}
 
     <Card>
-      <Body muted>Always free: food diary, barcode scanning, food scores, manual meal planning, recipes, workout logging and grocery lists. No ads, ever.</Body>
+      <Body muted>Always free: diary, scans, scores, manual meal planning, recipes, workouts and groceries. No ads.</Body>
     </Card>
 
     <Disclosure title="Restore, manage or cancel">

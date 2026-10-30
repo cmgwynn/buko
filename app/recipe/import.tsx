@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { SavedPageImport } from '../../src/components/SavedPageImport';
-import { Body, Button, Card, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { config } from '../../src/lib/config';
 import { setDraft } from '../../src/lib/recipes/draft';
 import { importRecipeFromHtml, importRecipeViaBackend, SUPPORTED_RECIPE_SITES } from '../../src/lib/recipes/importer';
@@ -72,11 +72,11 @@ export default function ImportRecipe() {
         <Chip label="Paste text" selected={mode === 'paste'} onPress={() => setMode('paste')} />
       </ChipRow>
       {mode === 'url' ? <>
-        <Body muted>Import structured recipe data from a supported HTTPS link. Some publishers block automatic import.</Body>
+        <Body muted>Import recipe data from supported HTTPS links. Some publishers block imports.</Body>
         <TextField label="Recipe web address" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" returnKeyType="go" onSubmitEditing={run} editable={!busy} />
         <Button title="Import recipe" onPress={run} loading={busy} disabled={!url.trim()} />
       </> : <>
-        <Body muted>Copy the ingredients and instructions from a recipe you can access. Everything stays in a private editable draft until you save it.</Body>
+        <Body muted>Paste ingredients and steps. Drafts stay private until you save.</Body>
         <TextField label="Source link (optional)" placeholder="https://…" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" editable={!busy} />
         <TextField label="Publisher / attribution (optional)" value={sourceName} onChangeText={setSourceName} placeholder="Publisher, author or family recipe" editable={!busy} />
         <TextField label="Recipe title" value={title} onChangeText={setTitle} placeholder="Weeknight lentil soup" editable={!busy} />
@@ -87,12 +87,12 @@ export default function ImportRecipe() {
       </>}
       {error ? <Notice tone="danger">{error}</Notice> : null}
       {mode === 'url' ? <Card style={{ marginTop: spacing.lg }}>
-        <Body muted>
-          Supported sites only: {SUPPORTED_RECIPE_SITES}. Buko reads published structured recipe data, not stories or photos, and keeps the source link. Publisher restrictions are not bypassed. Review imported ingredients and amounts before saving.
-        </Body>
+        <Disclosure title="About recipe imports">
+          <Body muted>Supported sites only: {SUPPORTED_RECIPE_SITES}. Buko reads published structured recipe data, not stories or photos, and keeps the source link. Publisher restrictions are not bypassed. Review imported ingredients and amounts before saving.</Body>
+        </Disclosure>
         <Button title={showAdvanced ? 'Hide advanced saved HTML import' : 'Advanced: import a saved HTML page'} variant="ghost" onPress={() => setShowAdvanced(!showAdvanced)} />
         {showAdvanced ? <>
-          <Body muted>If you already have a full saved .html page, enter its original address above and choose the file. Files are read locally, never executed or uploaded. PDF, screenshots and Reader view are not supported.</Body>
+          <Disclosure title="About saved HTML"><Body muted>If you already have a full saved .html page, enter its original address above and choose the file. Files are read locally, never executed or uploaded. PDF, screenshots and Reader view are not supported.</Body></Disclosure>
           <SavedPageImport disabled={busy || !url.trim()} onLoad={importSavedPage} onError={setError} />
         </> : null}
       </Card> : null}

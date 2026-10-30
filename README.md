@@ -217,16 +217,24 @@ These features are published on the web version. No paid AI service is used.
   current targets, intake, diet preferences and reusable account-level food
   exclusions. Preview additions and estimates before saving. Only explicitly
   selected existing slots may be replaced; logged meals are protected. Start
-  from the **Plan my week** card at the top of Plan: pick days (defaults to
-  today onward), meals and foods to skip (saved automatically when you
+  from the **Plan my week** card at the top of Plan: pick a plan style
+  (**Balanced** for variety, **High protein** ranks protein-dense recipes
+  first, **Batch cook** repeats each meal's recipe for up to 3 planned days),
+  days (defaults to today onward), meals (presets: 3 meals, 3 meals + snack,
+  2 meals) and foods to skip (saved automatically when you
   preview), then review a day-by-day preview before **Add to my plan**. Tap ⇄
   on any previewed meal to swap only that meal (other slots, targets and
   exclusions are kept). An empty Diary day today or later offers **Generate
   my week**, which opens Plan with the generator expanded (`/plan?generate=1`).
   Diary keeps food-history search behind the header search icon.
-- Generate a four-week general-fitness run/walk and optional light-strength
-  schedule from the user's comfortable run duration, frequency and preferred
-  weekdays. Running time increases by at most 5% in each of weeks 2 and 3, then
+- Generate a four-week training plan. Plan types: **Run + strength** (easy
+  run/walk plus optional light strength), **Full body** (2–3 days, A/B
+  sessions with a rest day between), **Upper / lower** (2–4 days) and
+  **Push / pull / legs** (3–6 days). Strength splits pick exercises for the
+  chosen equipment (no equipment, dumbbells, full gym; simpler options fill
+  gaps), skip excluded exercises, and progress 2×10 → 3×10 → 3×8 → a 2×8
+  deload week. Loads are left blank to choose on the day. The run plan uses
+  the user's comfortable run duration, frequency and preferred weekdays. Running time increases by at most 5% in each of weeks 2 and 3, then
   week 4 is a recovery week. Review and edit every week before saving; existing
   workouts are preserved unless the user selects a specific uncompleted slot
   for replacement. Open it from **Build my training plan** on Train (or from

@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { Text, View } from 'react-native';
-import { Body, Button, Card, CardGrid, Heading, Notice, Screen } from '../../src/components/ui';
+import { Body, Button, Card, CardGrid, Disclosure, Heading, Notice, Screen } from '../../src/components/ui';
 import { STARTER_WORKOUTS } from '../../src/lib/fitness/library';
 import { spacing, typography } from '../../src/theme';
 
@@ -9,7 +9,8 @@ export default function WorkoutLibrary() {
   return (
     <Screen>
       <Heading>A little inspiration for your next session</Heading>
-      <Notice tone="info">These are general ideas, not individualized training plans. Warm up, choose comfortable loads and stop if you feel pain or unwell. Adjust to your abilities and ask a qualified professional if unsure.</Notice>
+      <Notice tone="info">General workout ideas, not personal plans. Stop if you feel pain or unwell.</Notice>
+      <Disclosure title="Training safety"><Notice tone="info">Warm up, choose comfortable loads and adjust to your abilities. Ask a qualified professional if unsure.</Notice></Disclosure>
       <CardGrid>
         {STARTER_WORKOUTS.map((workout) => (
           <Card key={workout.id}>
@@ -22,7 +23,7 @@ export default function WorkoutLibrary() {
           </Card>
         ))}
       </CardGrid>
-      <Body muted>Customize opens an editable routine. Save it to your routines before starting; it does not log a workout.</Body>
+      <Body muted>Customize and save a routine before starting. This doesn't log a workout.</Body>
     </Screen>
   );
 }

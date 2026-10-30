@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { BackHandler, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { WorkoutFinishSummary, type WorkoutRecordCard } from '../../src/components/workout/WorkoutFinishSummary';
 import { finishWorkoutOffline, summarizeActiveWorkout } from '../../src/lib/fitness/data';
@@ -126,7 +126,7 @@ export default function FinishWorkout() {
       </> : savedId ? <>
         <Card>
           <Text accessibilityLiveRegion="polite" style={typography.subheading}>{syncStatus === 'synced' ? 'Synced to your account' : 'Saved on device · sync pending'}</Text>
-          {healthRequested ? <Text style={typography.small}>Health export is handled separately after syncing and requires your health permissions. A failed health export never removes your Buko workout.</Text> : null}
+          {healthRequested ? <><Text style={typography.small}>Health export syncs separately; a failure won't delete your workout.</Text><Disclosure title="About health export"><Text style={typography.small}>Export happens after syncing and requires your health permissions. A failed export never removes your Buko workout.</Text></Disclosure></> : null}
           <Button title="Retry workout and health sync" variant="secondary" loading={mode.syncing} disabled={mode.online === false} onPress={() => {
             void mode.retry().then(async () => {
               const finished = session ? await getFinishedWorkout(session.user.id, savedId) : null;

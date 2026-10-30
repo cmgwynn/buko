@@ -1,7 +1,7 @@
 import { Link, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
-import { Body, Button, Card, CardGrid, Chip, ChipRow, Heading, Screen, TextField } from '../../src/components/ui';
+import { Body, Button, Card, CardGrid, Chip, ChipRow, Disclosure, Heading, Screen, TextField } from '../../src/components/ui';
 import { RecipeSourceNav } from '../../src/components/RecipeSourceNav';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
 import { setDraft } from '../../src/lib/recipes/draft';
@@ -16,7 +16,6 @@ export default function RecipeLibrary() {
   const [cuisine, setCuisine] = useState<RecipeCuisine | null>(null);
   const [search, setSearch] = useState('');
   const [visibleCount, setVisibleCount] = useState(12);
-  const [about, setAbout] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const recipes = useMemo(() => filterLibraryRecipes({ meal, cuisine, search }), [meal, cuisine, search]);
@@ -38,12 +37,13 @@ export default function RecipeLibrary() {
         {cuisine ? <Chip label={`${cuisine} ×`} selected onPress={() => { setCuisine(null); setVisibleCount(12); setExpanded(null); }} /> : null}
         <Chip label="Clear" onPress={reset} />
       </ChipRow> : null}
-      <Button title={about ? 'Hide score & preparation notes' : 'About scores & preparation'} variant="ghost" onPress={() => setAbout(!about)} />
-      {about ? <Card>
+      <Body muted>Scores and nutrition are estimates; check recipe details for context.</Body>
+      <Disclosure title="About scores & recipe safety">
         <Body>Scores are out of 100; Excellent starts at 75. Every unmodified library recipe meets that threshold under Buko&apos;s unchanged scoring model. Scores do not rank cultures or guarantee personal dietary suitability.</Body>
-        <Body muted>Nutrition is estimated from input weights and generic USDA foods, not measured cooked yield or lab testing. Brands and edits can change results. Processing level and additives are unknown and excluded. Cooked grain and bean ingredients require advance preparation; times exclude advance cooking and chilling.</Body>
-        <Body muted>Recipes are original Buko formulations, not copied from the references or endorsed by their authors. Cuisine links explain dish identities and techniques; ingredient links provide nutrition. Adaptation notes identify important changes. These recipes have not been kitchen-tested or reviewed by representatives of every cuisine.</Body>
-      </Card> : null}
+        <Body muted>Nutrition is estimated from input weights and generic USDA foods, not measured cooked yield or lab testing. Brands and edits can change results. Processing level and additives are unknown and excluded. Cooked grains and beans need advance preparation; times exclude advance cooking and chilling.</Body>
+        <Body muted>Recipes are original Buko formulations, not copied from references or endorsed by their authors. Cuisine links explain dish identities and techniques; ingredient links provide nutrition. Adaptation notes identify important changes. Recipes are not kitchen-tested or reviewed by representatives of every cuisine.</Body>
+        <Body muted>Refrigerate perishables. Cool cooked rice and grains promptly; reheat until steaming hot. Use separate utensils for raw meat and follow each recipe&apos;s cooking temperatures.</Body>
+      </Disclosure>
       {!recipes.length ? <Card><Heading>No recipes match</Heading><Body>Try another cuisine, meal type or ingredient, or clear the filters.</Body></Card> : null}
       <CardGrid>
         {recipes.slice(0, visibleCount).map((recipe) => {
@@ -85,8 +85,7 @@ export default function RecipeLibrary() {
         })}
       </CardGrid>
       {visibleCount < recipes.length ? <Button title={`Show more recipes (${recipes.length - visibleCount} remaining)`} variant="secondary" onPress={() => setVisibleCount((count) => count + 12)} /> : null}
-      <Body muted>Keep perishable foods refrigerated. Cool cooked rice and grains promptly and refrigerate; reheat until steaming hot. Use separate utensils for raw meat and check the cooking temperatures in each recipe.</Body>
-      <Body muted>Save a copy opens a private, editable recipe. It is added to My recipes only when you save it.</Body>
+      <Body muted>Save a copy stays private until you save it.</Body>
       <Modal transparent visible={showFilters} animationType="slide" onRequestClose={() => setShowFilters(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <Pressable accessibilityLabel="Close filters" onPress={() => setShowFilters(false)} style={{ flex: 1 }} />

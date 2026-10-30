@@ -188,3 +188,57 @@ describe('preview save safety', () => {
     assert.throws(() => prepare(days), /whole reps/);
   });
 });
+
+describe('strength split types', () => {
+  const gym = (id: string, name: string, equipment: string): Exercise => ({ ...exercise(id, name), equipment });
+  const full = [
+    gym('squat', 'Back Squat', 'barbell'), gym('goblet', 'Goblet Squat', 'dumbbell'), gym('bench', 'Barbell Bench Press', 'barbell'),
+    gym('dbbench', 'Dumbbell Bench Press', 'dumbbell'), gym('row', 'Seated Cable Row', 'cable'), gym('dbrow', 'Dumbbell Row', 'dumbbell'),
+    gym('ohp', 'Overhead Press', 'barbell'), gym('dbohp', 'Dumbbell Shoulder Press', 'dumbbell'), gym('pulldown', 'Lat Pulldown', 'cable'),
+    gym('pullup', 'Pull-Up', 'bodyweight'), gym('rdl', 'Romanian Deadlift', 'barbell'), gym('lunge', 'Walking Lunge', 'dumbbell'),
+    gym('plank', 'Plank', 'bodyweight'), gym('pushup', 'Push-Up', 'bodyweight'), gym('bridge', 'Glute Bridge', 'bodyweight'),
+    gym('curl', 'Dumbbell Curl', 'dumbbell'), gym('pushdown', 'Triceps Pushdown', 'cable'), gym('lateral', 'Lateral Raise', 'dumbbell'),
+    gym('stepup', 'Step-Up', 'dumbbell'), gym('dip', 'Bench Dip', 'bodyweight'),
+  ];
+  const split = (patch: Partial<TrainingInput>, excluded: string[] = []) =>
+    generateTrainingPlan({ ...input, preferredRunDays: [1, 2, 3, 4, 5], ...patch }, full, excluded, '2026-10-29');
+
+  it('rotates push / pull / legs across chosen days and progresses over four weeks', () => {
+    const plan = split({ split: 'ppl', sessionsPerWeek: 3, equipment: 'gym' });
+    const sessions = plan.days.filter((day) => day.kind === 'strength');
+    assert.equal(sessions.length, 12);
+    assert.deepEqual(sessions.slice(0, 4).map((day) => day.name), ['Push day', 'Pull day', 'Leg day', 'Push day']);
+    assert.equal(sessions[0].snapshot[0].exercise.name, 'Barbell Bench Press');
+    assert.equal(sessions[0].snapshot[0].sets.length, 2);
+    assert.equal(sessions[3].snapshot[0].sets.length, 3);
+    assert.equal(sessions.at(-1)!.snapshot[0].sets.length, 2);
+    assert.doesNotThrow(() => prepareTrainingSave(plan.days, [], [], [], 'owner', '2026-10-29', null));
+  });
+
+  it('full body keeps a rest day between sessions and alternates A/B', () => {
+    const plan = split({ split: 'full_body', sessionsPerWeek: 3 });
+    const week = plan.days.slice(0, 7).filter((day) => day.kind === 'strength');
+    assert.deepEqual(week.map((day) => day.date), ['2026-11-02', '2026-11-04', '2026-11-06']);
+    assert.deepEqual(week.map((day) => day.name), ['Full body A', 'Full body B', 'Full body A']);
+    assert.ok(week.every((day) => day.snapshot.every((item) => item.sets.every((set) => Number.isInteger(set.reps)))));
+  });
+
+  it('respects equipment and exclusions', () => {
+    const plan = split({ split: 'upper_lower', sessionsPerWeek: 2, equipment: 'dumbbells' }, ['dbbench']);
+    const names = plan.days.flatMap((day) => day.snapshot.map((item) => item.exercise.name));
+    assert.ok(names.includes('Goblet Squat'));
+    assert.ok(!names.includes('Back Squat'));
+    assert.ok(!names.includes('Dumbbell Bench Press'));
+    assert.ok(names.includes('Push-Up'));
+    assert.ok(!names.includes('Romanian Deadlift'));
+    const noKit = split({ split: 'ppl', equipment: 'bodyweight' }).days.flatMap((day) => day.snapshot.map((item) => item.exercise));
+    assert.ok(noKit.length > 0);
+    assert.ok(noKit.every((exercise) => exercise.equipment === 'bodyweight' || exercise.equipment === null));
+    assert.ok(!noKit.some((exercise) => /pull-up|chin-up/i.test(exercise.name)));
+  });
+
+  it('validates sessions per split', () => {
+    assert.throws(() => split({ split: 'full_body', sessionsPerWeek: 5 }), /2 to 3 sessions/);
+    assert.throws(() => split({ split: 'ppl', preferredRunDays: [] }), /training day/);
+  });
+});

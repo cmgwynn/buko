@@ -15,7 +15,7 @@ import { DateField } from './date/DateField';
 import { onboardingDraftKey, parseOnboardingDraft } from '../lib/nutrition/onboardingDraft';
 import { signOutSafely } from '../lib/recovery';
 import type { ActivityLevel, DietPref, Goal, Sex, Units } from '../types';
-import { Body, Button, Card, Chip, ChipRow, Heading, Label, Loading, Notice, Screen, TextField } from './ui';
+import { Body, Button, Card, Chip, ChipRow, Disclosure, Heading, Label, Loading, Notice, Screen, TextField } from './ui';
 
 const GOALS: { key: Goal; title: string; desc: string }[] = [
   { key: 'lose', title: 'Lose weight', desc: 'A gentle deficit of about 0.5 kg (1 lb) a week.' },
@@ -175,7 +175,8 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
       {!editing ? <><Text style={[typography.label, { marginTop: spacing.md }]}>
         Step {step + 1} of {STEPS.length} · {STEPS[step]}
       </Text>
-      <Body muted>About 2 minutes. These details help estimate personal targets; they are not a medical assessment. Setup progress stays on this device for up to 7 days and is cleared on sign-out.</Body>
+      <Body muted>About 2 minutes. Targets are estimates, not a medical assessment.</Body>
+      <Disclosure title="Setup privacy"><Body muted>Setup progress stays on this device for up to 7 days and is cleared on sign-out.</Body></Disclosure>
       {draftMessage ? <Notice tone="info">{draftMessage}</Notice> : null}
       {!ready ? <Notice tone="info">Restoring setup…</Notice> : null}
       <View style={{ flexDirection: 'row', gap: 4, marginVertical: spacing.md }}>
@@ -202,15 +203,15 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
             <Chip label="Male" selected={sex === 'male'} onPress={() => setSex('male')} />
             <Chip label="Prefer not to say" selected={sex === 'unspecified'} onPress={() => setSex('unspecified')} />
           </ChipRow>
-          <Body muted>The Mifflin-St Jeor equation differs slightly by sex. &quot;Prefer not to say&quot; uses the average of the two.</Body>
+          <Body muted>Prefer not to say uses the average of both formula values.</Body>
           <View style={{ height: spacing.lg }} />
           <Label>Birthday</Label>
-          <Body muted>Your birthday stays in your private profile. Age and formula-based targets update automatically on your birthday.</Body>
-          {profile && !profile.birth_date ? <Notice tone="info">We previously stored only an approximate birth year. Please enter your actual birthday once; we will not guess it.</Notice> : null}
+          <Body muted>Your birthday stays private. Age and targets update each birthday.</Body>
+          {profile && !profile.birth_date ? <Notice tone="info">Only your birth year was saved before. Enter your birthday; we won't guess.</Notice> : null}
           <DateField label="Birthday" placeholder="Choose your birthday" value={birthDate}
             maxDate={addLocalMonths(today, -12 * MIN_AGE)} minDate={addLocalDays(addLocalMonths(today, -12 * 101), 1)} openTo={addLocalMonths(today, -12 * 30)}
             onChange={(date) => { setBirthYear(date.slice(0, 4)); setBirthMonth(date.slice(5, 7)); setBirthDay(date.slice(8, 10)); }} />
-          <Body muted>Tip: tap the month and year at the top of the calendar to jump straight to your birth year.</Body>
+          <Body muted>Tap the month and year to jump to your birth year.</Body>
           {birthYear || birthMonth || birthDay ? (
             ageOk ? <Body muted>Age {ageNum} · updates automatically</Body>
               : <Notice tone="danger">Enter a valid birthday. Buko is for adults aged {MIN_AGE}–100.</Notice>
@@ -278,16 +279,14 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
               ))}
             </View>
           </Card>
-          <Body muted>
-            Calculated with the Mifflin-St Jeor equation: resting burn {result.bmr.toLocaleString()} kcal, about {result.tdee.toLocaleString()} kcal with your activity level.
-            These are estimates, not medical advice.
-          </Body>
+          <Body muted>Targets are estimates, not medical advice.</Body>
+          <Disclosure title="How targets are estimated"><Body muted>Mifflin-St Jeor estimates resting energy at {result.bmr.toLocaleString()} kcal. Your estimated daily energy use is about {result.tdee.toLocaleString()} kcal with your activity level.</Body></Disclosure>
         </>
       )}
 
       <View style={{ marginTop: spacing.xl }}>
         {error ? <Notice tone="danger">{error}</Notice> : null}
-        {editing && !result ? <Notice tone="info">Complete a valid birthday, body measurements, goal and activity level to preview and save your updated plan.</Notice> : null}
+        {editing && !result ? <Notice tone="info">Add your birthday, measurements, goal and activity level to preview your plan.</Notice> : null}
         {!editing && step < STEPS.length - 1 ? (
           <Button title="Continue" onPress={() => setStep(step + 1)} disabled={!canNext} />
         ) : (

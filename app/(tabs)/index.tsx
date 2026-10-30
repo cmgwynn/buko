@@ -309,20 +309,31 @@ export default function Diary() {
       {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
       <DateNavigator />
       {routeError ? <View><Notice tone="danger">{routeError}</Notice><Button title="Dismiss date warning" variant="ghost" onPress={() => setRouteError(null)} /></View> : null}
-      {date > today ? <Notice tone="info">Future date: use Plan to schedule meals. Log completed meals on today or an earlier date.</Notice> : null}
+      {date > today ? <Notice tone="info">Future day. Schedule meals in Plan; log them once eaten.</Notice> : null}
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
       {targets ? (<>
         <HeroCard>
-          <Eyebrow onHero>{remaining < 0 ? 'Over target' : 'Remaining today'}</Eyebrow>
+          <Eyebrow onHero>{remaining < 0 ? 'Over target' : date === today ? 'Remaining today' : 'Remaining'}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', marginTop: spacing.xs }}>
             <Text style={[typography.display, { color: remaining < 0 ? colors.heroDanger : colors.onHero }]}>
               {Math.abs(Math.round(remaining)).toLocaleString()}
             </Text>
             <Text style={[typography.subheading, { color: colors.onHeroMuted, marginLeft: spacing.sm }]}>kcal {remaining < 0 ? 'over' : 'left'}</Text>
           </View>
-          <Text style={[typography.small, { color: colors.onHeroMuted }]}>{Math.round(totals.calories).toLocaleString()} of {Math.round(targets.calories).toLocaleString()} eaten</Text>
+          <View accessibilityLabel={`Goal ${Math.round(targets.calories - (adjusted?.bonusKcal ?? 0))}, food ${Math.round(totals.calories)}${adjusted ? `, exercise ${Math.round(adjusted.bonusKcal)}` : ''}`}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.sm }}>
+            {([['Goal', targets.calories - (adjusted?.bonusKcal ?? 0), null], ['Food', totals.calories, '−'], ...(adjusted ? [['Exercise', adjusted.bonusKcal, '+'] as const] : [])] as const).map(([label, value, sign]) => (
+              <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                {sign ? <Text style={[typography.subheading, { color: colors.onHeroMuted }]}>{sign}</Text> : null}
+                <View>
+                  <Text style={[typography.subheading, { color: colors.onHero, fontVariant: ['tabular-nums'] }]}>{Math.round(value).toLocaleString()}</Text>
+                  <Text style={[typography.small, { color: colors.onHeroMuted, fontSize: 12 }]}>{label}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
           <View
             accessibilityRole="progressbar"
             accessibilityLabel="Calories"

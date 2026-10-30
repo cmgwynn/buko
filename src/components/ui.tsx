@@ -64,6 +64,16 @@ export const Eyebrow = ({ children, onHero }: { children: ReactNode; onHero?: bo
   <Text style={[typography.eyebrow, onHero && { color: colors.onHeroMuted }]}>{children}</Text>
 );
 
+/** Numbered section header for multi-step forms such as the plan generators. */
+export const Step = ({ n, children }: { n: number; children: ReactNode }) => (
+  <View accessibilityRole="header" style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.xl, marginBottom: spacing.sm }}>
+    <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ fontSize: 12, fontWeight: '800', color: colors.primary }}>{n}</Text>
+    </View>
+    <Text style={typography.subheading}>{children}</Text>
+  </View>
+);
+
 /** Prominent call to action for the personal plan generators. */
 export function HeroCta({ eyebrow, title, body, action, icon, onPress, disabled, children }: {
   eyebrow: string; title: string; body: string; action: string; icon?: ComponentProps<typeof Ionicons>['name'];
@@ -285,10 +295,10 @@ export const styles = StyleSheet.create({
     minHeight: 52, paddingHorizontal: spacing.lg, paddingVertical: 14, fontSize: 16, color: colors.text,
   },
   chip: {
-    paddingHorizontal: spacing.lg, paddingVertical: 10, borderRadius: radius.pill,
+    minHeight: 44, justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill,
     borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface,
   },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginVertical: spacing.xs },
   notice: { flexDirection: 'row', padding: spacing.md, borderRadius: radius.md, marginBottom: spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { BarChart, LineChart } from '../src/components/Charts';
-import { Button, Card, Chip, ChipRow, Notice, Screen } from '../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Notice, Screen } from '../src/components/ui';
 import { addDays, toDateString } from '../src/lib/diary';
 import { movingAverage7, personalRecords, setsByMuscle, weeklyVolume, type DatedSet } from '../src/lib/fitness/calc';
 import { loadAllTraining, loadMeasurements, localDate, type MeasurementRow } from '../src/lib/fitness/data';
@@ -139,7 +139,7 @@ export default function Progress() {
             </Text>
             <View style={{ height: spacing.md }} />
             <LineChart dots={points} line={isWeight ? avg : undefined} unit={unit} />
-            {isWeight ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Faint dots are daily readings; the line is the trailing 7-day average, so daily water swings don’t distract from the trend.</Text> : null}
+            {isWeight ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Dots are daily weigh-ins; the line is your 7-day average.</Text> : null}
           </>
         )}
         <View style={{ height: spacing.md }} />
@@ -150,7 +150,7 @@ export default function Progress() {
         <Card style={{ marginTop: spacing.lg }}>
           <Text style={typography.heading}>Weekly nutrition</Text>
           <Text style={[typography.small, { marginTop: spacing.xs }]}>
-            {insight.loggedDays} of 7 days with food logged. Averages use logged days only; unlogged days are not treated as zero.
+            {insight.loggedDays} of 7 days logged. Averages exclude unlogged days.
           </Text>
           {insight.average ? (
             <View style={{ marginTop: spacing.sm, gap: spacing.xs }}>
@@ -176,7 +176,8 @@ export default function Progress() {
               <Text style={[typography.body, { marginTop: spacing.xs }]}>
                 {suggestion.reason} Suggested daily target: {suggestion.targetCalories.toLocaleString()} kcal, {targets?.protein_g} g protein, {suggestion.targetCarbsG} g carbs, {targets?.fat_g} g fat.
               </Text>
-              <Text style={[typography.small, { marginTop: spacing.xs }]}>This changes only after you accept. It is based on recent self-reported data, is capped at 100 kcal per review and 200 kcal total from the original target, and is not medical advice.</Text>
+              <Text style={[typography.small, { marginTop: spacing.xs }]}>Changes only with your approval. Not medical advice.</Text>
+              <Disclosure title="About this suggestion"><Text style={typography.small}>Based on recent self-reported data. Changes are capped at 100 kcal per review and 200 kcal total from your original target.</Text></Disclosure>
               <Button title={`Accept ${suggestion.changeKcal > 0 ? '+' : ''}${suggestion.changeKcal} kcal target change`} loading={savingTarget} disabled={!session} onPress={() => { void acceptTargetSuggestion(); }} />
             </>
           )}

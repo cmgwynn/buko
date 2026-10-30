@@ -7,7 +7,7 @@ import { useProfile } from '../../providers/ProfileProvider';
 import { loadPlanningPreferences, savePlanningPreferences } from '../../lib/planning/preferences';
 import { loadExercises, loadPlannedWorkouts, type PlannedWorkoutRow } from '../../lib/fitness/data';
 import {
-  generateTrainingPlan, prepareTrainingSave, trainingAddDays, trainingDate, TRAINING_DAYS,
+  generateTrainingPlan, prepareTrainingSave, trainingAddDays, trainingDate, TRAINING_DAYS, TRAINING_EQUIPMENT, TRAINING_SPLITS,
   type TrainingDay, type TrainingInput, type TrainingPreview,
 } from '../../lib/fitness/progression';
 import { saveTrainingSlot } from '../../lib/fitness/progressionStorage';
@@ -15,7 +15,7 @@ import { getSession, workoutSessionStore } from '../../lib/fitness/session';
 import { fromDisplayWeight, parseNum, toDisplayWeight, weightUnit } from '../../lib/fitness/format';
 import { toDateString } from '../../lib/diary';
 import type { Exercise, WorkoutSet } from '../../lib/fitness/types';
-import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, Heading, Notice, TextField } from '../ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, Heading, Notice, Step, TextField } from '../ui';
 import { useConfirm } from '../ConfirmProvider';
 import { DateField } from '../date/DateField';
 import { colors, radius, spacing, typography } from '../../theme';
@@ -183,32 +183,44 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
   const off = busy || disabled;
   const today = toDateString(new Date());
   const selectedCount = preview?.days.filter((day) => day.save && day.kind !== 'rest').length ?? 0;
+  const splitOption = TRAINING_SPLITS.find((item) => item.key === (input.split ?? 'run'))!;
+  const isRun = splitOption.key === 'run';
+  const sessions = isRun ? input.comfortableRunsPerWeek : input.sessionsPerWeek ?? splitOption.defaultSessions;
+  const sessionCounts = Array.from({ length: splitOption.sessions[1] - splitOption.sessions[0] + 1 }, (_, index) => splitOption.sessions[0] + index);
   return <Card>
-    <Heading>Run + strength plan</Heading>
-    <Text style={typography.small}>Four editable weeks for general fitness. Nothing is saved until you confirm.</Text>
+    <Heading>Training plan</Heading>
+    <Text style={typography.small}>Four weeks that build up, then ease off. You review before saving.</Text>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {status ? <Notice tone="info">{status}</Notice> : null}
-    {!open || owner !== userId ? <Button title="Build a weekly training plan" variant="secondary" loading={busy} disabled={disabled || !userId} onPress={() => { void load(); }} /> : <>
-      <Eyebrow>1 · When to start</Eyebrow>
+    {!open || owner !== userId ? <Button title="Build a training plan" variant="secondary" loading={busy} disabled={disabled || !userId} onPress={() => { void load(); }} /> : <>
+      <Step n={1}>Plan type</Step>
+      <ChipRow>{TRAINING_SPLITS.map((item) => <Chip key={item.key} label={item.label} selected={splitOption.key === item.key} disabled={off}
+        onPress={() => changeInput({ split: item.key, sessionsPerWeek: item.defaultSessions,
+          preferredRunDays: item.key === 'run' ? [1, 3, 6] : item.defaultSessions >= 4 ? [1, 2, 4, 5] : [1, 3, 5] })} />)}</ChipRow>
+      <Text style={typography.small}>{splitOption.hint}</Text>
+      {!isRun ? <ChipRow>{TRAINING_EQUIPMENT.map((item) => <Chip key={item.key} label={item.label} selected={(input.equipment ?? 'gym') === item.key} disabled={off}
+        onPress={() => changeInput({ equipment: item.key })} />)}</ChipRow> : null}
+      <Step n={2}>Start</Step>
       <ChipRow>
         <Chip label="Tomorrow" selected={input.startDate === trainingAddDays(today, 1)} disabled={off} onPress={() => changeInput({ startDate: trainingAddDays(today, 1) })} />
         <Chip label="Next Monday" selected={input.startDate === nextMonday(today)} disabled={off} onPress={() => changeInput({ startDate: nextMonday(today) })} />
       </ChipRow>
       <DateField label="Or pick a start date" value={input.startDate} minDate={today} disabled={off} onChange={(startDate) => changeInput({ startDate })} />
-      <Eyebrow>2 · Your run days</Eyebrow>
+      <Step n={3}>Days</Step>
       <ChipRow>{TRAINING_DAYS.map((day, index) => <Chip key={day} label={day} selected={input.preferredRunDays.includes(index)} disabled={off}
         onPress={() => changeInput({ preferredRunDays: input.preferredRunDays.includes(index) ? input.preferredRunDays.filter((value) => value !== index) : [...input.preferredRunDays, index] })} />)}</ChipRow>
-      <Text style={typography.subheading}>Comfortable run sessions per week</Text>
-      <ChipRow>{[1, 2, 3].map((count) => <Chip key={count} label={String(count)} selected={input.comfortableRunsPerWeek === count} disabled={off}
-        onPress={() => changeInput({ comfortableRunsPerWeek: count })} />)}</ChipRow>
-      <Eyebrow>3 · Where you are now</Eyebrow>
-      <TextField label="Comfortable easy run/walk minutes (5–60)" keyboardType="decimal-pad" value={numeric(input.comfortableMinutes)} editable={!off}
-        onChangeText={(value) => changeInput({ comfortableMinutes: parseNum(value) ?? NaN })} />
-      <Text style={typography.small}>What feels easy today, not a goal. New to running? Keep run/walk on and start short.</Text>
-      <ChipRow>
-        <Chip label="Run / walk" selected={input.runWalk} disabled={off} onPress={() => changeInput({ runWalk: !input.runWalk })} />
-        <Chip label="Include light strength" selected={input.includeStrength} disabled={off} onPress={() => changeInput({ includeStrength: !input.includeStrength })} />
-      </ChipRow>
+      <Text style={typography.subheading}>{isRun ? 'Runs per week' : 'Sessions per week'}</Text>
+      <ChipRow>{sessionCounts.map((count) => <Chip key={count} label={String(count)} selected={sessions === count} disabled={off}
+        onPress={() => changeInput(isRun ? { comfortableRunsPerWeek: count } : { sessionsPerWeek: count })} />)}</ChipRow>
+      {isRun ? <>
+        <Step n={4}>Where you are now</Step>
+        <TextField label="Easy run/walk minutes today (5–60)" keyboardType="decimal-pad" value={numeric(input.comfortableMinutes)} editable={!off}
+          onChangeText={(value) => changeInput({ comfortableMinutes: parseNum(value) ?? NaN })} />
+        <ChipRow>
+          <Chip label="Run / walk" selected={input.runWalk} disabled={off} onPress={() => changeInput({ runWalk: !input.runWalk })} />
+          <Chip label="Include light strength" selected={input.includeStrength} disabled={off} onPress={() => changeInput({ includeStrength: !input.includeStrength })} />
+        </ChipRow>
+      </> : null}
       <Disclosure title={`Exercises to skip${savedExcluded.length ? ` (${savedExcluded.length})` : ''}`}>
       <Text style={typography.small}>Skipped exercises are never generated. Existing plans and logs are unchanged.</Text>
       <TextField label="Find exercises to exclude" value={search} editable={!off} onChangeText={setSearch} />
@@ -265,7 +277,7 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
                     <View style={{ flex: 1 }}><TextField label={`Workout ${index + 1} ${item.exercise.name} set ${setIndex + 1} reps`} value={numeric(set.reps)} keyboardType="number-pad" editable={!off}
                       onChangeText={(value) => patchSet(index, itemIndex, setIndex, { reps: parseNum(value) ?? NaN })} /></View>
                     <View style={{ flex: 1 }}><TextField label={`Workout ${index + 1} ${item.exercise.name} set ${setIndex + 1} ${weightUnit(units)}`} value={numeric(set.weight_kg == null ? null : toDisplayWeight(set.weight_kg, units))} keyboardType="decimal-pad" editable={!off}
-                      onChangeText={(value) => patchSet(index, itemIndex, setIndex, { weight_kg: fromDisplayWeight(parseNum(value) ?? NaN, units) })} /></View>
+                      onChangeText={(value) => patchSet(index, itemIndex, setIndex, { weight_kg: value.trim() ? fromDisplayWeight(parseNum(value) ?? NaN, units) : null })} /></View>
                   </View>}
                 <Button title={`Remove set ${setIndex + 1} from workout ${index + 1} ${item.exercise.name}`} variant="ghost" disabled={off || item.sets.length <= 1}
                   onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, n) => n === itemIndex ? { ...value, sets: value.sets.filter((_, s) => s !== setIndex) } : value) })} />

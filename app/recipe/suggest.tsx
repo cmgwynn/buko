@@ -2,7 +2,7 @@ import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Text } from 'react-native';
-import { Button, Card, Chip, ChipRow, Heading, Notice, Screen, TextField } from '../../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Heading, Notice, Screen, TextField } from '../../src/components/ui';
 import { loadApprovedRecipes, loadQualityStatus, loadTasteProfile, qualityRequest, type CuratedVersion, type SuggestionRequest } from '../../src/lib/recipes/qualityClient';
 import { useProfile } from '../../src/providers/ProfileProvider';
 import { typography } from '../../src/theme';
@@ -59,11 +59,12 @@ export default function SuggestRecipe() {
   }
   return <Screen edges={[]} variant="form">
     <Heading>Find a tested meal</Heading>
-    <Text style={typography.body}>Start from a human-tested approved recipe. Optional AI can make limited adaptations, followed by a separate chef review. Macro targets are approximate, not guarantees.</Text>
-    <Text style={typography.small}>Requesting a meal saves one private recipe copy. Nothing is shared, planned or logged as eaten automatically.</Text>
+    <Text style={typography.body}>Start with an approved, human-tested recipe.</Text>
+    <Disclosure title="About meal suggestions"><Text style={typography.small}>AI adaptations are limited and get a separate chef review. Nutrition targets are estimates, not guarantees.</Text></Disclosure>
+    <Text style={typography.small}>Saves one private copy. Nothing is shared, planned, or logged as eaten.</Text>
     {error ? <Notice tone="danger">{error}</Notice> : null}
-    {enabled === false ? <Notice tone="info">Paid AI is off. We can choose an unchanged approved recipe without sending data to a model.</Notice> : null}
-    {enabled === true ? <Notice tone="info">AI adaptations need your saved permission in Taste preferences. Without it, choose an unchanged approved recipe.</Notice> : null}
+    {enabled === false ? <Notice tone="info">Paid AI is off. Choose an approved recipe without model processing.</Notice> : null}
+    {enabled === true ? <Notice tone="info">AI adaptations need your saved consent in Taste preferences.</Notice> : null}
     <Button title="Taste preferences & AI consent" variant="ghost" onPress={() => router.push('/recipe/taste')} />
     <TextField label="Cuisine (optional)" value={cuisine} onChangeText={setCuisine} editable={!busy} maxLength={80} />
     <ChipRow>{['breakfast', 'lunch', 'dinner', 'snack'].map((value) => <Chip key={value} label={value} selected={meal === value} disabled={busy} onPress={() => setMeal(value)} />)}</ChipRow>
@@ -72,7 +73,7 @@ export default function SuggestRecipe() {
     <TextField label="Calories per serving (optional)" value={calories} onChangeText={setCalories} keyboardType="number-pad" editable={!busy} />
     <TextField label="Protein grams per serving (optional)" value={protein} onChangeText={setProtein} keyboardType="decimal-pad" editable={!busy} />
     <Heading>Approved starting recipes</Heading>
-    {!versions.length ? <Text style={typography.body}>No approved bases loaded. An admin must record a cooking test and approve recipes before suggestions can begin. Existing recipe libraries are unchanged.</Text> : <ChipRow>
+    {!versions.length ? <><Text style={typography.body}>No approved recipes yet.</Text><Text style={typography.small}>An admin must test and approve bases; existing libraries are unchanged.</Text></> : <ChipRow>
       <Chip label="Closest match" selected={!base} disabled={busy} onPress={() => setBase(undefined)} />
       {versions.map((version) => <Chip key={version.id} label={version.recipe.title} selected={base === version.id} disabled={busy} onPress={() => setBase(version.id)} />)}
     </ChipRow>}

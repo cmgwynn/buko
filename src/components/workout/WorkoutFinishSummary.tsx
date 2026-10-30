@@ -1,6 +1,6 @@
 import { Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Card, Heading, Notice } from '../ui';
+import { Card, Disclosure, Heading, Notice } from '../ui';
 import { formatDuration, toDisplayWeight, weightUnit } from '../../lib/fitness/format';
 import { colors, spacing, typography } from '../../theme';
 
@@ -17,7 +17,8 @@ export function WorkoutFinishSummary({ durationSec, volumeKg, completedSets, rec
         <View><Text style={{ ...typography.heading, fontSize: 28 }}>{completedSets}</Text><Text style={typography.small}>Sets completed</Text></View>
         <View><Text style={{ ...typography.heading, fontSize: 28 }}>{Math.round(toDisplayWeight(volumeKg, units)).toLocaleString()}</Text><Text style={typography.small}>{weightUnit(units)} working-set volume</Text></View>
       </View>
-      <Text style={typography.small}>Volume is external weight × repetitions for completed working sets. Warm-ups, unfinished sets and cardio distance are not added to lifting volume.</Text>
+      <Text style={typography.small}>Volume counts completed working sets only; warm-ups and cardio are excluded.</Text>
+      <Disclosure title="How volume is counted"><Text style={typography.small}>Volume is external weight × repetitions for completed working sets. Warm-ups, unfinished sets and cardio distance are excluded from lifting volume.</Text></Disclosure>
     </Card>
     {records.length ? <Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -29,6 +30,6 @@ export function WorkoutFinishSummary({ durationSec, volumeKg, completedSets, rec
         <Text style={typography.body}>{record.detail}</Text>
       </View>)}
     </Card> : null}
-    {cachedHistory ? <Notice tone="info">Record comparisons use history saved on this device. Records are provisional until checked against your synced history. No cached history means a baseline, not a new record.</Notice> : null}
+    {cachedHistory ? <><Notice tone="info">Records use this device&apos;s history and are provisional until synced.</Notice><Disclosure title="About record comparisons"><Text style={typography.small}>Without cached history, a result is a baseline, not a new record.</Text></Disclosure></> : null}
   </View>;
 }

@@ -215,13 +215,13 @@ export default function Grocery() {
       {addedCount > 0 ? <Notice tone="info">Added {addedCount} item{addedCount === 1 ? '' : 's'} from your meal plan.{config.groceryOrdering ? ' Order them below or shop in store.' : ' Check them off as you shop.'}</Notice> : null}
       {config.groceryOrdering && todo.length && addedCount > 0 ? <>
         <Button title={`Order ${todo.length} item${todo.length === 1 ? '' : 's'} on Instacart`} icon="cart-outline" loading={ordering} onPress={() => { void orderOnInstacart(); }} />
-        <Text style={[typography.small, { marginTop: spacing.xs, marginBottom: spacing.sm }]}>Opens Instacart to pick a store and check out. Only item names are shared. Buko may earn a commission.</Text>
+        <Text style={[typography.small, { marginTop: spacing.xs, marginBottom: spacing.sm }]}>Only item names are shared with Instacart. Buko may earn a commission.</Text>
       </> : null}
       <Button title="Make list from meal plan" icon="calendar-outline" variant="secondary" onPress={() => router.push('/grocery/generate')} />
       {config.groceryOrdering && todo.length && !addedCount ? <>
         <View style={{ height: spacing.sm }} />
         <Button title={`Order ${todo.length} item${todo.length === 1 ? '' : 's'} on Instacart`} icon="cart-outline" loading={ordering} onPress={() => { void orderOnInstacart(); }} />
-        <Text style={[typography.small, { marginTop: spacing.xs }]}>Opens Instacart to pick a store and check out. Only item names are shared. Buko may earn a commission.</Text>
+        <Text style={[typography.small, { marginTop: spacing.xs }]}>Only item names are shared with Instacart. Buko may earn a commission.</Text>
       </> : null}
       <View style={{ height: spacing.md }} />
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
