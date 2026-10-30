@@ -140,8 +140,10 @@ export default function GenerateGrocery() {
               </Card>
             );
           })}
-          <Notice tone="info">Adding replaces this week&apos;s earlier unchecked generated items. Items you added by hand or already checked off are kept.</Notice>
-          <Button title={`Add ${items.length} item${items.length === 1 ? '' : 's'} to grocery list`} onPress={save} loading={busy} disabled={items.length === 0} />
+          {items.length ? <>
+            <Notice tone="info">Adding replaces this week&apos;s earlier unchecked generated items. Items you added by hand or already checked off are kept.</Notice>
+            <Button title={`Add ${items.length} item${items.length === 1 ? '' : 's'} to grocery list`} onPress={save} loading={busy} />
+          </> : <Button title="Plan meals for this week" icon="calendar-outline" onPress={() => router.push({ pathname: '/(tabs)/plan', params: { generate: '1' } })} />}
           {config.groceryOrdering && items.length ? <Text style={[typography.small, { marginTop: spacing.xs }]}>Next: order them on Instacart in one tap.</Text> : null}
           <Button title="Manage pantry" variant="ghost" onPress={() => router.push('/pantry')} />
         </>
