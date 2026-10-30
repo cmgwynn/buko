@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Image, Pressable, Text, View } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import { Attribution } from '../../src/components/Attribution';
-import { FactorCard } from '../../src/components/FactorCard';
+import { AlternativesRail, FactorSection, NutritionFacts, ScoreScale, splitFactors } from '../../src/components/product/ProductInsights';
 import { ScoreBadge, scoreColor } from '../../src/components/ScoreBadge';
-import { Body, Button, Card, Heading, Loading, Notice, Screen } from '../../src/components/ui';
-import { incompleteNutritionMessage, mainScoreReasons } from '../../src/lib/foodLogging';
+import { Body, Button, Card, Loading, Notice, Screen } from '../../src/components/ui';
+import { incompleteNutritionMessage } from '../../src/lib/foodLogging';
 import { findAlternatives, type Alternative } from '../../src/lib/api/alternatives';
 import { getProductByBarcode } from '../../src/lib/api/openFoodFacts';
 import { dietConflicts } from '../../src/lib/diet';
@@ -28,7 +28,6 @@ export default function ProductScreen() {
   const [alts, setAlts] = useState<Alternative[] | null>(null);
   const [added, setAdded] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [showFactors, setShowFactors] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [altsFailed, setAltsFailed] = useState(false);
   const [altsAttempt, setAltsAttempt] = useState(0);
@@ -41,7 +40,6 @@ export default function ProductScreen() {
     setAlts(null);
     setAdded(false);
     setAddError(null);
-    setShowFactors(false);
     getProductByBarcode(barcode)
       .then((p) => { if (!cancelled) setProduct(p); })
       .catch((e) => { if (!cancelled) setError(e instanceof Error ? e.message : 'Something went wrong.'); })
@@ -90,55 +88,45 @@ export default function ProductScreen() {
 
   const totalWeight = result.factors.reduce((s, f) => s + f.weight, 0);
   const conflicts = profile ? dietConflicts(product, profile.diet_prefs) : [];
+  const hasDiet = !!profile?.diet_prefs.length;
   const color = scoreColor(result.rating);
-  const reasons = mainScoreReasons(result.factors, 3);
+  const { negatives, positives, missing } = splitFactors(result.factors);
   const incomplete = incompleteNutritionMessage(product.per100g);
 
   return (
     <Screen edges={[]}>
       <Stack.Screen options={{ title: product.name.length > 24 ? `${product.name.slice(0, 22)}…` : product.name }} />
       <Card>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={{ width: 72, height: 72, borderRadius: radius.md, marginRight: spacing.lg, backgroundColor: colors.surfaceMuted }} resizeMode="contain" />
-          ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+          <View style={{ width: 96, height: 96, borderRadius: radius.md, backgroundColor: colors.surfaceMuted, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            {product.imageUrl
+              ? <Image accessibilityIgnoresInvertColors source={{ uri: product.imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+              : <Ionicons name="image-outline" size={32} color={colors.textMuted} />}
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={typography.heading} numberOfLines={3}>{product.name}</Text>
-            {product.brand ? <Text style={typography.small}>{product.brand}</Text> : null}
+            {product.brand ? <Text style={[typography.small, { marginTop: 2 }]}>{product.brand}</Text> : null}
+            {product.servingLabel ? <Text style={typography.small}>Serving {product.servingLabel}</Text> : null}
           </View>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg }}>
-          <ScoreBadge score={result.score} rating={result.rating} />
-          <View style={{ marginLeft: spacing.lg, flex: 1 }}>
-            <Text style={{ fontSize: 22, fontWeight: '700', color }}>{result.ratingLabel}</Text>
-            {result.score === null ? (
-              <Text style={typography.small}>This product doesn&apos;t list enough information to score it fairly.</Text>
-            ) : result.confidence < 1 ? (
-              <Text style={typography.small}>Based on the {Math.round(result.confidence * 100)}% of factors with data available.</Text>
-            ) : null}
+        <View style={{ height: 1, backgroundColor: colors.surfaceMuted, marginVertical: spacing.lg }} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.lg }}>
+          <ScoreBadge score={result.score} rating={result.rating} size={84} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 26, fontWeight: '800', color }}>{result.ratingLabel}</Text>
+            <Text style={typography.small}>
+              {result.score === null ? 'Not enough label data to score fairly.' : `${result.score} out of 100`}
+              {result.score !== null && result.confidence < 1 ? ` · ${Math.round(result.confidence * 100)}% of data` : ''}
+            </Text>
           </View>
         </View>
+        {result.score !== null ? <ScoreScale score={result.score} /> : null}
+        {conflicts.length || hasDiet ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.lg }}>
+          {conflicts.length ? conflicts.map((c) => <Pill key={c} tone="danger" icon="alert-circle" text={c.replace(/\.$/, '')} />)
+            : <Pill tone="ok" icon="checkmark-circle" text="Fits your diet" />}
+        </View> : null}
       </Card>
 
-      {reasons.length ? (
-        <Card>
-          <Text style={[typography.label, { marginBottom: spacing.sm }]}>Main reasons</Text>
-          {reasons.map((f) => (
-            <View key={f.id} style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.xs }}>
-              <Ionicons name={f.points! >= 50 ? 'checkmark-circle' : 'alert-circle'} size={18} color={f.points! >= 50 ? colors.score.excellent : colors.score.poor} style={{ marginRight: spacing.sm, marginTop: 2 }} />
-              <Text style={[typography.body, { flex: 1 }]}><Text style={{ fontWeight: '600' }}>{f.label}:</Text> {f.value}</Text>
-            </View>
-          ))}
-        </Card>
-      ) : null}
-
-      {conflicts.length ? (
-        <Notice tone="danger">
-          Conflicts with your preferences: {conflicts.join(' ')}
-        </Notice>
-      ) : null}
-
-      {incomplete ? <Notice>{incomplete}</Notice> : null}
       <View style={{ flexDirection: 'row', gap: spacing.sm }}>
         <View style={{ flex: 1 }}>
           {incomplete ? (
@@ -151,52 +139,43 @@ export default function ProductScreen() {
           <Button title={added ? 'Added ✓' : 'Add to list'} icon="cart-outline" variant="secondary" disabled={added} onPress={addToGrocery} />
         </View>
       </View>
+      {incomplete ? <Notice>{incomplete}</Notice> : null}
       {addError ? <Notice tone="danger">{addError}</Notice> : null}
+
+      <FactorSection title="Negatives" tone="negative" factors={negatives} totalWeight={totalWeight} />
+      <FactorSection title="Positives" tone="positive" factors={positives} totalWeight={totalWeight} />
+      {missing.length ? <Text style={[typography.small, { marginTop: spacing.sm }]}>
+        Not scored (no data): {missing.map((f) => f.label).join(', ')}. Their weight is shared by the factors above.
+      </Text> : null}
 
       {result.score !== null && result.score < 50 ? (
         <View style={{ marginTop: spacing.lg }}>
-          <Heading>Better alternatives</Heading>
-          <View style={{ height: spacing.md }} />
-          {alts === null ? <Body muted>Looking for higher-scoring products in the same category…</Body> : null}
+          <Text accessibilityRole="header" style={[typography.heading, { marginBottom: spacing.sm }]}>Better alternatives</Text>
+          {alts === null ? <Body muted>Finding higher-scoring products in this category…</Body> : null}
           {alts?.length === 0 && altsFailed ? <>
             <Body muted>The food database is busy, so alternatives couldn&apos;t load.</Body>
             <Button title="Try again" variant="secondary" onPress={() => setAltsAttempt((n) => n + 1)} />
           </> : null}
-          {alts?.length === 0 && !altsFailed ? <Body muted>We couldn&apos;t find clearly better products in this category.</Body> : null}
-          {alts?.map(({ product: a, result: r }) => (
-            <Pressable key={a.barcode} accessibilityRole="button" accessibilityLabel={`${a.name}, score ${r.score ?? 'unknown'}`} onPress={() => router.push({ pathname: '/product/[barcode]', params: { barcode: a.barcode } })}>
-              <Card style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <ScoreBadge score={r.score} rating={r.rating} size={52} />
-                <View style={{ flex: 1, marginHorizontal: spacing.md }}>
-                  <Text style={typography.subheading} numberOfLines={2}>{a.name}</Text>
-                  {a.brand ? <Text style={typography.small}>{a.brand}</Text> : null}
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </Card>
-            </Pressable>
-          ))}
+          {alts?.length === 0 && !altsFailed ? <Body muted>No clearly better products found in this category.</Body> : null}
+          {alts?.length ? <AlternativesRail items={alts} onOpen={(code) => router.push({ pathname: '/product/[barcode]', params: { barcode: code } })} /> : null}
         </View>
       ) : null}
 
-      <Pressable
-        onPress={() => setShowFactors(!showFactors)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: showFactors }}
-        aria-expanded={showFactors}
-        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, marginTop: spacing.md }}
-      >
-        <Heading>Why this score</Heading>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={[typography.small, { color: colors.primary, marginRight: spacing.xs }]}>{showFactors ? 'Hide' : `All ${result.factors.length} factors`}</Text>
-          <Ionicons name={showFactors ? 'chevron-up' : 'chevron-down'} size={20} color={colors.primary} />
-        </View>
-      </Pressable>
-      {showFactors ? result.factors.map((f) => <FactorCard key={f.id} factor={f} totalWeight={totalWeight} />) : null}
-      <Body muted>
-        Buko&apos;s score is an estimate that combines these factors. It is not medical advice, and each factor links to its source.
-      </Body>
+      <NutritionFacts per100g={product.per100g} servingG={product.servingG} servingLabel={product.servingLabel} factors={result.factors} />
 
+      <Text style={[typography.small, { marginTop: spacing.lg }]}>
+        Tap any factor to see how it&apos;s scored and its source. Buko&apos;s score is an estimate, not medical advice.
+      </Text>
       <Attribution />
     </Screen>
   );
+}
+
+function Pill({ tone, icon, text }: { tone: 'danger' | 'ok'; icon: 'alert-circle' | 'checkmark-circle'; text: string }) {
+  const fg = tone === 'danger' ? colors.danger : colors.score.excellent;
+  return <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.md, paddingVertical: spacing.xs,
+    borderRadius: radius.pill, backgroundColor: tone === 'danger' ? colors.dangerSoft : colors.primarySoft }}>
+    <Ionicons name={icon} size={16} color={fg} />
+    <Text style={[typography.label, { color: fg }]}>{text}</Text>
+  </View>;
 }

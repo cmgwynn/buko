@@ -53,3 +53,19 @@ test('alternatives must be meaningfully better and are sorted', () => {
   ]);
   assert.deepEqual(alts.map((a) => a.product.barcode), ['a', 'c']);
 });
+
+test('missing Nutri-Score is estimated from complete label nutrition', () => {
+  // Nutella-like: very sweet, high saturated fat, no official grade.
+  const spread = make({ novaGroup: 3, per100g: { calories: 539, protein: 6.3, carbs: 57.5, fat: 30.9, sugars: 56.3, saturatedFat: 10.6, sodiumMg: 43, fiber: 0 } });
+  const factor = scoreProduct(spread).factors.find((f) => f.id === 'nutriscore')!;
+  assert.equal(factor.points, 0);
+  assert.match(factor.value, /Grade E \(estimated\)/);
+  assert.ok(scoreProduct(spread).score! < 50);
+});
+
+test('Nutri-Score is not estimated for drinks or when nutrition is incomplete', () => {
+  const full = { calories: 42, protein: 0, carbs: 10.6, fat: 0, sugars: 10.6, saturatedFat: 0, sodiumMg: 4, fiber: 0 };
+  const soda = make({ categoryTags: ['en:beverages'], per100g: full });
+  assert.equal(scoreProduct(soda).factors.find((f) => f.id === 'nutriscore')!.points, null);
+  assert.equal(scoreProduct(make({})).factors.find((f) => f.id === 'nutriscore')!.points, null);
+});

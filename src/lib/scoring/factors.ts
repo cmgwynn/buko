@@ -1,4 +1,5 @@
 import type { Product } from '../../types/index.ts';
+import { computeNutriScore } from './nutriscore.ts';
 import {
   ADDITIVE_PENALTY_EACH,
   ADDITIVE_PENALTY_FLAGGED,
@@ -33,13 +34,18 @@ export function linearScore(value: number, best: number, worst: number): number 
   return Math.round(clamp(((worst - value) / (worst - best)) * 100, 0, 100));
 }
 
+/** Drinks, fats/oils and cheese use different Nutri-Score tables, so they are never estimated with the general-food table. */
+const SEPARATE_NUTRISCORE_TABLE = ['en:beverages', 'en:fats', 'en:vegetable-oils', 'en:cheeses'];
+
 /** Factor 1: Nutri-Score letter grade (A–E) as published by Open Food Facts. */
 export function nutriscoreFactor(p: Product): Factor {
   const base = { id: 'nutriscore', label: 'Nutri-Score', weight: WEIGHTS.nutriscore, source: SOURCES.nutriscore } as const;
-  if (!p.nutriscoreGrade) {
+  const estimate = !p.nutriscoreGrade && !SEPARATE_NUTRISCORE_TABLE.some((tag) => p.categoryTags?.includes(tag))
+    ? computeNutriScore(p.per100g, 0) : null;
+  const grade = p.nutriscoreGrade ?? estimate?.grade;
+  if (!grade) {
     return { ...base, points: null, value: 'Not available', explanation: 'No Nutri-Score is available for this product, so it is left out of the score.' };
   }
-  const grade = p.nutriscoreGrade;
   const text: Record<string, string> = {
     a: 'the best grade: a nutritionally favourable profile.',
     b: 'a good grade: generally favourable nutrition.',
@@ -47,6 +53,10 @@ export function nutriscoreFactor(p: Product): Factor {
     d: 'a poor grade: more sugar, salt or saturated fat (or less fibre/protein) than ideal.',
     e: 'the worst grade: nutritionally unfavourable for regular eating.',
   };
+  if (!p.nutriscoreGrade) {
+    return { ...base, points: NUTRISCORE_POINTS[grade], value: `Grade ${grade.toUpperCase()} (estimated)`,
+      explanation: `Estimated Nutri-Score ${grade.toUpperCase()} from the label's nutrition, since the database has no official grade. It is ${text[grade]}` };
+  }
   return { ...base, points: NUTRISCORE_POINTS[grade], value: `Grade ${grade.toUpperCase()}`, explanation: `Nutri-Score ${grade.toUpperCase()} is ${text[grade]}` };
 }
 
