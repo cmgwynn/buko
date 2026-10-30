@@ -1,27 +1,28 @@
 export const colors = {
-  background: '#F7F5EF',
+  background: '#F4F3EE',
   surface: '#FFFFFF',
-  surfaceMuted: '#EEEAE0',
-  border: '#E3DDD0',
-  text: '#182923',
-  textMuted: '#716354',
+  surfaceMuted: '#EEECE6',
+  border: '#DAD7CD',
+  text: '#344E41',
+  textMuted: '#5E6B60',
   brandBrown: '#684632',
-  primary: '#356A55',
-  primaryPressed: '#285340',
-  primarySoft: '#E5F1E9',
+  primary: '#4E7450',
+  primaryPressed: '#3A5A40',
+  primarySoft: '#EDF1E6',
   onPrimary: '#FFFFFF',
   danger: '#C2503F',
   dangerSoft: '#F8E6E2',
   warning: '#B7791F',
   warningSoft: '#FAF0DC',
 
-  // Dark "hero" surfaces reuse the palette's deep forest text color with cream foregrounds.
-  hero: '#182923',
-  heroRaised: '#22382F',
-  onHero: '#F7F5EF',
-  onHeroMuted: 'rgba(247, 245, 239, 0.72)',
-  heroTrack: 'rgba(247, 245, 239, 0.16)',
-  heroAccent: '#8DB255',
+  // "Sage Minimal" (Coolors dad7cd · a3b18a · 588157 · 3a5a40 · 344e41), shades tuned for WCAG AA contrast.
+  hero: '#344E41',
+  heroRaised: '#3A5A40',
+  onHero: '#F4F3EE',
+  onHeroMuted: 'rgba(244, 243, 238, 0.78)',
+  heroTrack: 'rgba(244, 243, 238, 0.18)',
+  heroAccent: '#B9C4A4',
+  heroDanger: '#F4B3A5',
 
   // Health score ratings (see src/lib/scoring/config.ts for the bands)
   score: {
@@ -33,7 +34,7 @@ export const colors = {
   },
 
   macro: {
-    calories: '#356A55',
+    calories: '#588157',
     protein: '#6C8EBF',
     carbs: '#E0A13A',
     fat: '#C98B7A',
@@ -59,14 +60,14 @@ export const typography = {
 
 export const shadow = {
   card: {
-    shadowColor: '#1F2A26',
+    shadowColor: '#344E41',
     shadowOpacity: 0.04,
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
   },
   elevated: {
-    shadowColor: '#182923',
+    shadowColor: '#344E41',
     shadowOpacity: 0.18,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },

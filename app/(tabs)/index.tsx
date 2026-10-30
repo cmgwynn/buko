@@ -302,7 +302,7 @@ export default function Diary() {
         <HeroCard>
           <Eyebrow onHero>{remaining < 0 ? 'Over target' : 'Remaining today'}</Eyebrow>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', marginTop: spacing.xs }}>
-            <Text style={[typography.display, { color: remaining < 0 ? colors.score.poor : colors.onHero }]}>
+            <Text style={[typography.display, { color: remaining < 0 ? colors.heroDanger : colors.onHero }]}>
               {Math.abs(Math.round(remaining)).toLocaleString()}
             </Text>
             <Text style={[typography.subheading, { color: colors.onHeroMuted, marginLeft: spacing.sm }]}>kcal {remaining < 0 ? 'over' : 'left'}</Text>
@@ -314,7 +314,7 @@ export default function Diary() {
             accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round((totals.calories / Math.max(1, targets.calories)) * 100)) }}
             style={{ height: 8, borderRadius: radius.pill, backgroundColor: colors.heroTrack, overflow: 'hidden', marginVertical: spacing.lg }}
           >
-            <View style={{ height: 8, borderRadius: radius.pill, width: `${Math.min(100, (totals.calories / Math.max(1, targets.calories)) * 100)}%`, backgroundColor: remaining < 0 ? colors.score.poor : colors.heroAccent }} />
+            <View style={{ height: 8, borderRadius: radius.pill, width: `${Math.min(100, (totals.calories / Math.max(1, targets.calories)) * 100)}%`, backgroundColor: remaining < 0 ? colors.heroDanger : colors.heroAccent }} />
           </View>
           <View style={{ flexDirection: 'row', gap: spacing.sm }}>
             {([['Protein', totals.protein, targets.protein_g, colors.macro.protein], ['Carbs', totals.carbs, targets.carbs_g, colors.macro.carbs], ['Fat', totals.fat, targets.fat_g, colors.macro.fat]] as const).map(([label, value, target, color]) => (

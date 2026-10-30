@@ -17,7 +17,7 @@ import { Button, Card, Chip, ChipRow, Eyebrow, Heading, Notice, TextField } from
 import { useConfirm } from '../ConfirmProvider';
 import { colors, radius, spacing, typography } from '../../theme';
 
-const KIND_ACCENT = { run: colors.heroAccent, strength: colors.macro.protein, rest: colors.score.unknown } as const;
+const KIND_ACCENT = { run: colors.primary, strength: colors.macro.protein, rest: colors.score.unknown } as const;
 
 const numeric = (value: number | null) => value != null && Number.isFinite(value) ? String(value) : '';
 
