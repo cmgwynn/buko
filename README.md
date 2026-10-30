@@ -4,7 +4,7 @@ Scan products, rate them, track what you eat. See [PROJECT.md](./PROJECT.md) for
 
 Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records app IDs, listing text, account/health declarations and independent device/store acceptance work.
 
-Phases 1-8 are published on web, including subscriptions, owner-verified account export/deletion, dedicated workout mode and recipe-quality workflows. The Phase 9 nutrition and personalized-plan features described below are implemented in the current worktree but are not yet published; migrations `0015` and `0016` have not been applied. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks; native features require a new app build.
+Phases 1-9 are published on web, including subscriptions, owner-verified account export/deletion, dedicated workout mode, recipe-quality workflows, micronutrients and personalized weekly plans. Phase 9 was published from commit `94cbc1a` on 2026-10-29. The connected backend responds to schema checks for the Phase 9 fields/table; Supabase CLI migration history is not recorded for this project, so do not rerun or bulk-push migrations based on CLI status alone. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks; native features require a new app build.
 
 Phase 1 includes: email sign-up and onboarding with calorie/macro targets, a barcode scanner with an explainable 0–100 health score and better-product suggestions, a food diary with daily dashboard, and a grocery list.
 
@@ -201,8 +201,7 @@ physically tasted. No paid calls run automatically after cooking feedback.
 
 ## Phase 9: personalized nutrition and weekly plans
 
-These features are implemented in this worktree but are not yet on the public
-website or a released app. No paid AI service is used.
+These features are published on the web version. No paid AI service is used.
 
 - Micronutrient tracking adds optional calcium, iron, potassium, vitamin C and
   vitamin D data from USDA/Open Food Facts or manual labels. Unknown source
@@ -229,7 +228,7 @@ website or a released app. No paid AI service is used.
   conservative, and recipes are not guaranteed kitchen-tested, allergy-safe or
   compatible with every dietary need; inspect ingredients and labels.
 
-Before publishing Phase 9, apply [`0015_nutrition_insights.sql`](./supabase/migrations/0015_nutrition_insights.sql) and then [`0016_planning_preferences.sql`](./supabase/migrations/0016_planning_preferences.sql) once each, after `0014`. The first adds optional nutrient snapshots and accepted-adjustment storage; the second adds owner-only saved planning exclusions. GitHub Pages does not apply migrations. Test them against the live project and verify account export/deletion before deployment; neither migration nor the website has been applied/published by this work.
+Migrations [`0015_nutrition_insights.sql`](./supabase/migrations/0015_nutrition_insights.sql) and [`0016_planning_preferences.sql`](./supabase/migrations/0016_planning_preferences.sql) define the required optional nutrient snapshots, accepted-adjustment storage and owner-only planning exclusions. The connected project's REST schema checks confirmed the required fields/table are present. Its Supabase CLI migration history is blank, so do not blindly rerun migrations or run a bulk `db push`; reconcile migration history with the project owner before future schema changes. GitHub Pages does not apply SQL.
 
 ## Coach: later activation of Anthropic (optional, metered)
 Only do this after deciding to fund API usage. A free Claude chat account is not free Anthropic API credit.
