@@ -100,7 +100,9 @@ async function preview() {
 
 test('generation is preview-only, full four weeks are visible, and cancelling confirmation writes nothing', async () => {
   await preview();
-  expect(screen.getAllByText(/Week [1-4] ·/)).toHaveLength(28);
+  expect(screen.getAllByText(/^Week [1-4]( · easier)?$/)).toHaveLength(4);
+  expect(screen.getAllByText('Edit workout').length).toBeGreaterThan(0);
+  expect(screen.queryByText(/Skip workout|Adjust workout/)).toBeNull();
   expect(mockSaveSlot).not.toHaveBeenCalled();
   await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(mockConfirm).toHaveBeenCalledTimes(1);
@@ -125,14 +127,27 @@ test('occupied dates are preserved unless one specific uncompleted slot is selec
   const existing = [mockExisting('replace me'), mockExisting('keep me'), mockExisting('completed', true)];
   mockLoadPlans.mockResolvedValue(existing);
   await preview();
-  expect(screen.getByRole('button', { name: 'Include workout 1' })).toBeTruthy();
-  expect(screen.queryByRole('button', { name: `Replace existing completed on ${mockStartDate}` })).toBeNull();
-  await fireEvent.press(screen.getByRole('button', { name: `Replace existing replace me on ${mockStartDate}` }));
+  expect(screen.getByRole('button', { name: 'Keep existing' }).props.accessibilityState.selected).toBe(true);
+  expect(screen.queryByRole('button', { name: 'Replace completed' })).toBeNull();
+  await fireEvent.press(screen.getByRole('button', { name: 'Replace replace me' }));
   mockConfirm.mockResolvedValue(true);
   await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   await screen.findByText(/Saved 16 workouts/);
   expect(mockSaveSlot.mock.calls[0][1].replace?.id).toBe('replace me');
   expect(mockSaveSlot.mock.calls.some(([, operation]) => ['keep me', 'completed'].includes(operation.replace?.id ?? ''))).toBe(false);
+});
+
+test('moving a workout swaps it with a rest day in the same week', async () => {
+  await preview();
+  const restDay = trainingAddDays(mockStartDate, 3);
+  const label = new Date(`${restDay}T00:00:00`).toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+  await fireEvent.press(screen.getAllByRole('button', { name: label })[0]);
+  mockConfirm.mockResolvedValue(true);
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
+  await screen.findByText(/Saved 16 workouts/);
+  const dates = mockSaveSlot.mock.calls.map(([, operation]) => operation.day.date);
+  expect(dates).toContain(restDay);
+  expect(dates).not.toContain(mockStartDate);
 });
 
 test('saving exclusions preserves food preferences and excluded running produces no run targets', async () => {
@@ -162,7 +177,7 @@ test('missing preference storage fails closed without generating or saving', asy
 test('changed or completed replacements are rejected before confirmation and writes', async () => {
   mockLoadPlans.mockResolvedValue([mockExisting('slot')]);
   await preview();
-  await fireEvent.press(screen.getByRole('button', { name: `Replace existing slot on ${mockStartDate}` }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Replace slot' }));
   mockLoadPlans.mockResolvedValue([mockExisting('slot', true)]);
   await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(await screen.findByText(/selected replacement changed/)).toBeTruthy();

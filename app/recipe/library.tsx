@@ -1,6 +1,7 @@
 import { Link, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Body, Button, Card, CardGrid, Chip, ChipRow, Disclosure, Heading, Screen, TextField } from '../../src/components/ui';
 import { RecipeSourceNav } from '../../src/components/RecipeSourceNav';
 import { ScoreBadge } from '../../src/components/ScoreBadge';
@@ -18,6 +19,7 @@ export default function RecipeLibrary() {
   const [visibleCount, setVisibleCount] = useState(12);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const filterCount = (meal ? 1 : 0) + (cuisine ? 1 : 0);
   const recipes = useMemo(() => filterLibraryRecipes({ meal, cuisine, search }), [meal, cuisine, search]);
   function reset() {
     setMeal(null); setCuisine(null); setSearch(''); setExpanded(null); setVisibleCount(12);
@@ -25,20 +27,21 @@ export default function RecipeLibrary() {
   return (
     <Screen>
       <RecipeSourceNav active="library" />
-      <Heading>Find a recipe</Heading>
-      <Body muted>{STARTER_RECIPES.length} original Buko recipes. Estimated scores are not personal suitability advice.</Body>
-      <TextField label="Search recipes or ingredients" placeholder="Try chicken, lentils or tofu" value={search} onChangeText={(value) => { setSearch(value); setVisibleCount(12); setExpanded(null); }} autoCorrect={false} />
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.sm }}>
-        <Body>{recipes.length} found</Body>
-        <Button title={`Filters${meal || cuisine ? ' (1+)' : ''}`} variant="secondary" onPress={() => setShowFilters(true)} />
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+        <View style={{ flex: 1 }}>
+          <TextField placeholder="Search chicken, lentils, tofu…" accessibilityLabel="Search recipes or ingredients" value={search} onChangeText={(value) => { setSearch(value); setVisibleCount(12); setExpanded(null); }} autoCorrect={false} />
+        </View>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Filters${filterCount ? ` (${filterCount} on)` : ''}`} onPress={() => setShowFilters(true)}
+          style={{ width: 52, height: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', backgroundColor: filterCount ? colors.hero : colors.primarySoft }}>
+          <Ionicons name="options-outline" size={22} color={filterCount ? colors.onHero : colors.primary} />
+        </Pressable>
       </View>
-      {meal || cuisine ? <ChipRow>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm, marginTop: -spacing.sm, marginBottom: spacing.sm }}>
+        <Text style={typography.label}>{recipes.length} of {STARTER_RECIPES.length} recipes</Text>
         {meal ? <Chip label={`${meal} ×`} selected onPress={() => { setMeal(null); setVisibleCount(12); setExpanded(null); }} /> : null}
         {cuisine ? <Chip label={`${cuisine} ×`} selected onPress={() => { setCuisine(null); setVisibleCount(12); setExpanded(null); }} /> : null}
-        <Chip label="Clear" onPress={reset} />
-      </ChipRow> : null}
-      <Body muted>Scores and nutrition are estimates; check recipe details for context.</Body>
-      <Disclosure title="About scores & recipe safety">
+      </View>
+      <Disclosure title="About scores & food safety">
         <Body>Scores are out of 100; Excellent starts at 75. Every unmodified library recipe meets that threshold under Buko&apos;s unchanged scoring model. Scores do not rank cultures or guarantee personal dietary suitability.</Body>
         <Body muted>Nutrition is estimated from input weights and generic USDA foods, not measured cooked yield or lab testing. Brands and edits can change results. Processing level and additives are unknown and excluded. Cooked grains and beans need advance preparation; times exclude advance cooking and chilling.</Body>
         <Body muted>Recipes are original Buko formulations, not copied from references or endorsed by their authors. Cuisine links explain dish identities and techniques; ingredient links provide nutrition. Adaptation notes identify important changes. Recipes are not kitchen-tested or reviewed by representatives of every cuisine.</Body>
@@ -51,18 +54,16 @@ export default function RecipeLibrary() {
           return (
             <Card key={recipe.id}>
             <Text style={typography.label}>{recipe.cuisine} · {recipe.meal} · {recipe.prepMinutes + recipe.cookMinutes} min · {recipe.servings} serving{recipe.servings === 1 ? '' : 's'}</Text>
-            <Heading>{recipe.title}</Heading>
-            <Body muted>{recipe.description}</Body>
-            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginVertical: spacing.md }}>
-              <ScoreBadge score={result.score} rating={result.rating} size={60} />
+            <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center', marginTop: spacing.xs }}>
               <View style={{ flex: 1 }}>
-                <Body>{result.ratingLabel} · estimated score</Body>
-                <Body muted>{Math.round(nutrition.perServing.calories)} kcal · {Math.round(nutrition.perServing.protein_g)} g protein per serving</Body>
+                <Heading>{recipe.title}</Heading>
+                <Text style={typography.small} numberOfLines={2}>{recipe.description}</Text>
+                <Text style={[typography.small, { marginTop: spacing.xs, fontWeight: '600' }]}>{Math.round(nutrition.perServing.calories)} kcal · {Math.round(nutrition.perServing.protein_g)} g protein</Text>
               </View>
+              <ScoreBadge score={result.score} rating={result.rating} size={52} />
             </View>
-            <Button title={expanded === recipe.id ? 'Hide ingredients and steps' : 'Preview ingredients and steps'} variant="ghost" onPress={() => setExpanded(expanded === recipe.id ? null : recipe.id)} />
             {expanded === recipe.id ? (
-              <View style={{ marginBottom: spacing.md }}>
+              <View style={{ marginTop: spacing.md }}>
                 <Text style={typography.subheading}>Recipe context</Text>
                 {recipe.adaptation ? <Body>{recipe.adaptation}</Body> : null}
                 <Body muted>{CUISINE_REFERENCES[recipe.cuisine].context}</Body>
@@ -76,16 +77,19 @@ export default function RecipeLibrary() {
                 {recipe.steps.map((text, index) => <Text key={text} style={[typography.body, { marginBottom: spacing.sm }]}>{index + 1}. {text}</Text>)}
               </View>
             ) : null}
-            <Button title="Save a copy" onPress={() => {
-              setDraft(starterRecipeDraft(recipe));
-              router.push('/recipe/edit');
-            }} />
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <View style={{ flex: 1 }}><Button title={expanded === recipe.id ? 'Hide' : 'Details'} icon={expanded === recipe.id ? 'chevron-up' : 'chevron-down'} variant="secondary"
+                onPress={() => setExpanded(expanded === recipe.id ? null : recipe.id)} /></View>
+              <View style={{ flex: 1 }}><Button title="Save copy" icon="bookmark-outline" onPress={() => {
+                setDraft(starterRecipeDraft(recipe));
+                router.push('/recipe/edit');
+              }} /></View>
+            </View>
             </Card>
           );
         })}
       </CardGrid>
       {visibleCount < recipes.length ? <Button title={`Show more recipes (${recipes.length - visibleCount} remaining)`} variant="secondary" onPress={() => setVisibleCount((count) => count + 12)} /> : null}
-      <Body muted>Save a copy stays private until you save it.</Body>
       <Modal transparent visible={showFilters} animationType="slide" onRequestClose={() => setShowFilters(false)}>
         <View style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}>
           <Pressable accessibilityLabel="Close filters" onPress={() => setShowFilters(false)} style={{ flex: 1 }} />

@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { Pressable, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../providers/AuthProvider';
 import { useBilling } from '../../providers/BillingProvider';
@@ -27,6 +28,21 @@ const numeric = (value: number | null) => value != null && Number.isFinite(value
 function friendlyDate(date: string) {
   const parsed = new Date(`${date}T00:00:00`);
   return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function shortDay(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric' });
+}
+
+function IconAction({ icon, label, text, disabled, onPress }: {
+  icon: ComponentProps<typeof Ionicons>['name']; label: string; text?: string; disabled?: boolean; onPress: () => void;
+}) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }} disabled={disabled} onPress={onPress} hitSlop={4}
+    style={{ minHeight: 44, minWidth: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, alignSelf: text ? 'flex-start' : 'auto', opacity: disabled ? 0.35 : 1 }}>
+    <Ionicons name={icon} size={20} color={colors.primary} />
+    {text ? <Text style={[typography.label, { color: colors.primary }]}>{text}</Text> : null}
+  </Pressable>;
 }
 
 function nextMonday(today: string) {
@@ -135,6 +151,14 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
     setPreview((current) => current && ({ ...current, days: current.days.map((day, n) => n === index ? { ...day, ...patch } : day) }));
     setStatus(null);
   }
+  function moveDay(from: number, to: number) {
+    setPreview((current) => {
+      if (!current) return current;
+      const a = current.days[from].date, b = current.days[to].date;
+      return { ...current, days: current.days.map((day, k) => k === from ? { ...day, date: b, save: true, replaceId: null } : k === to ? { ...day, date: a } : day) };
+    });
+    setStatus(null);
+  }
   function patchSet(dayIndex: number, itemIndex: number, setIndex: number, patch: Partial<WorkoutSet>) {
     const day = preview!.days[dayIndex];
     patchDay(dayIndex, { snapshot: day.snapshot.map((item, n) => n === itemIndex
@@ -182,6 +206,8 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
   }
   const off = busy || disabled;
   const today = toDateString(new Date());
+  const workoutNumber = new Map((preview?.days ?? []).map((day, index) => ({ day, index })).filter(({ day }) => day.kind !== 'rest')
+    .map(({ index }, k) => [index, k + 1] as const));
   const selectedCount = preview?.days.filter((day) => day.save && day.kind !== 'rest').length ?? 0;
   const splitOption = TRAINING_SPLITS.find((item) => item.key === (input.split ?? 'run'))!;
   const isRun = splitOption.key === 'run';
@@ -236,60 +262,82 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
       <Button title="Preview my 4-week plan" loading={busy} disabled={disabled || dirty} onPress={() => { void generate(); }} />
       {preview ? <>
         <Heading>Review all four weeks</Heading>
-        <Text style={typography.small}>{selectedCount} workouts selected. Tap a workout to adjust it, or skip it.</Text>
+        <Text style={typography.small}>{selectedCount} workouts over 4 weeks. Open Edit workout to change or move one.</Text>
         <Disclosure title="Why this plan">
         {preview.rationale.map((reason) => <Text key={reason} style={[typography.small, { marginVertical: spacing.xs }]}>{reason}</Text>)}
         <Text style={typography.small}>Excluded: {preview.exclusions.join(', ') || 'none'}. Dates that already have a plan are skipped by default; you can add alongside or replace an uncompleted one. Edited targets can exceed the conservative defaults.</Text>
         </Disclosure>
-        {preview.days.map((day, index) => <View key={index} style={{
-          marginVertical: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background,
-          borderLeftWidth: 4, borderLeftColor: KIND_ACCENT[day.kind], opacity: day.kind === 'rest' || !day.save ? 0.75 : 1,
-        }}>
-          <Eyebrow>Week {day.week} · {friendlyDate(day.date)}</Eyebrow>
-          <Text style={[day.kind === 'rest' ? typography.body : typography.subheading, { marginTop: 2 }]}>{day.name}</Text>
-          {day.kind === 'rest' ? null : <>
-            <Text style={typography.small}>{day.snapshot.map((item) => item.exercise.name).join(' · ')}</Text>
-            <Button title={`${day.save ? 'Skip' : 'Include'} workout ${index + 1}`} variant="ghost" disabled={off}
-              onPress={() => patchDay(index, { save: !day.save, replaceId: null })} />
-            {existing.filter((plan) => plan.planned_for === day.date).map((plan) => <View key={plan.id}>
-              <Text style={typography.small}>Existing: {plan.name}{plan.completed_workout_id ? ' · completed, preserved' : ''}</Text>
-              {!plan.completed_workout_id ? <Button title={`${day.replaceId === plan.id ? 'Keep' : 'Replace'} existing ${plan.name} on ${day.date}`}
-                variant="ghost" disabled={off} onPress={() => patchDay(index, { replaceId: day.replaceId === plan.id ? null : plan.id, save: day.replaceId !== plan.id })} /> : null}
-            </View>)}
-            {day.save && !day.replaceId && existing.some((plan) => plan.planned_for === day.date) ? <Notice tone="info">This adds alongside existing plans; none will be replaced.</Notice> : null}
-            <Disclosure title={`Adjust workout ${index + 1}`}>
-            <Text style={typography.small}>{day.rationale}</Text>
-            <DateField label={`Workout ${index + 1} date`} value={day.date} minDate={today} disabled={off} onChange={(date) => patchDay(index, { date, replaceId: null, save: false })} />
-            <TextField label={`Workout ${index + 1} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
-            <TextField label={`Workout ${index + 1} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
-            <TextField label={`Find replacement exercises for workout ${index + 1}`} value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
-            {day.snapshot.map((item, itemIndex) => <View key={itemIndex}>
-              <Text style={typography.body}>{item.exercise.name}</Text>
-              <ChipRow>{catalog.filter((exercise) => !savedExcluded.includes(exercise.id) && exercise.category === item.exercise.category
-                && (day.kind !== 'run' || exercise.name.toLowerCase() === 'running')
-                && (exercise.id === item.exercise.id || exercise.name.toLowerCase().includes(exerciseSearch.toLowerCase()))).slice(0, 6).map((exercise) => <Chip key={exercise.id} label={exercise.name}
-                selected={item.exercise.id === exercise.id} disabled={off} onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, n) => n === itemIndex ? { ...value, exercise } : value) })} />)}</ChipRow>
-              {item.sets.map((set, setIndex) => <View key={setIndex}>
-                {item.exercise.category === 'cardio'
-                  ? <TextField label={`Workout ${index + 1} ${item.exercise.name} minutes`} value={numeric(set.duration_s == null ? null : set.duration_s / 60)} keyboardType="decimal-pad" editable={!off}
-                    onChangeText={(value) => patchSet(index, itemIndex, setIndex, { duration_s: (parseNum(value) ?? NaN) * 60 })} />
-                  : <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-                    <View style={{ flex: 1 }}><TextField label={`Workout ${index + 1} ${item.exercise.name} set ${setIndex + 1} reps`} value={numeric(set.reps)} keyboardType="number-pad" editable={!off}
-                      onChangeText={(value) => patchSet(index, itemIndex, setIndex, { reps: parseNum(value) ?? NaN })} /></View>
-                    <View style={{ flex: 1 }}><TextField label={`Workout ${index + 1} ${item.exercise.name} set ${setIndex + 1} ${weightUnit(units)}`} value={numeric(set.weight_kg == null ? null : toDisplayWeight(set.weight_kg, units))} keyboardType="decimal-pad" editable={!off}
-                      onChangeText={(value) => patchSet(index, itemIndex, setIndex, { weight_kg: value.trim() ? fromDisplayWeight(parseNum(value) ?? NaN, units) : null })} /></View>
-                  </View>}
-                <Button title={`Remove set ${setIndex + 1} from workout ${index + 1} ${item.exercise.name}`} variant="ghost" disabled={off || item.sets.length <= 1}
-                  onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, n) => n === itemIndex ? { ...value, sets: value.sets.filter((_, s) => s !== setIndex) } : value) })} />
-              </View>)}
-              {item.exercise.category === 'strength' ? <Button title={`Add set to workout ${index + 1} ${item.exercise.name}`} variant="ghost" disabled={off || item.sets.length >= 5}
-                onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, n) => n === itemIndex ? { ...value, sets: [...value.sets, { ...value.sets[value.sets.length - 1], position: value.sets.length }] } : value) })} /> : null}
-              <Button title={`Remove ${item.exercise.name} from workout ${index + 1}`} variant="ghost" disabled={off || day.snapshot.length <= 1}
-                onPress={() => patchDay(index, { snapshot: day.snapshot.filter((_, n) => n !== itemIndex) })} />
-            </View>)}
-            </Disclosure>
-          </>}
-        </View>)}
+        {[...new Set(preview.days.map((day) => day.week))].map((week) => {
+          const inWeek = preview.days.map((day, index) => ({ day, index })).filter(({ day }) => day.week === week)
+            .sort((a, b) => a.day.date.localeCompare(b.day.date));
+          const rest = inWeek.filter(({ day }) => day.kind === 'rest');
+          return <View key={week} style={{ marginTop: spacing.md }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: spacing.sm }}>
+              <Text style={typography.subheading}>Week {week}{week === 4 ? ' · easier' : ''}</Text>
+              {rest.length ? <Text style={[typography.small, { flexShrink: 1, textAlign: 'right' }]}>Rest {rest.map(({ day }) => shortDay(day.date)).join(', ')}</Text> : null}
+            </View>
+            {inWeek.filter(({ day }) => day.kind !== 'rest').map(({ day, index }) => {
+              const n = workoutNumber.get(index)!;
+              const conflicts = existing.filter((plan) => plan.planned_for === day.date);
+              return <View key={index} style={{
+                marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background,
+                borderLeftWidth: 4, borderLeftColor: KIND_ACCENT[day.kind], opacity: day.save ? 1 : 0.7,
+              }}>
+                <Eyebrow>{friendlyDate(day.date)}</Eyebrow>
+                <Text style={[typography.subheading, { marginTop: 2 }]}>{day.name}</Text>
+                <Text style={typography.small}>{day.snapshot.map((item) => item.exercise.name).join(' · ')}</Text>
+                {conflicts.length ? <View style={{ marginTop: spacing.sm }}>
+                  <Text style={typography.small}>Already planned: {conflicts.map((plan) => `${plan.name}${plan.completed_workout_id ? ' (done)' : ''}`).join(', ')}</Text>
+                  <ChipRow>
+                    <Chip label="Keep existing" selected={!day.save} disabled={off} onPress={() => patchDay(index, { save: false, replaceId: null })} />
+                    <Chip label="Add both" selected={day.save && !day.replaceId} disabled={off} onPress={() => patchDay(index, { save: true, replaceId: null })} />
+                    {conflicts.filter((plan) => !plan.completed_workout_id).map((plan) => <Chip key={plan.id} label={`Replace ${plan.name}`}
+                      selected={day.replaceId === plan.id} disabled={off} onPress={() => patchDay(index, { save: true, replaceId: plan.id })} />)}
+                  </ChipRow>
+                </View> : null}
+                <Disclosure title="Edit workout">
+                  <Text style={typography.small}>{day.rationale}</Text>
+                  {rest.length ? <>
+                    <Text style={[typography.label, { marginTop: spacing.sm }]}>Move to</Text>
+                    <ChipRow>
+                      <Chip label={shortDay(day.date)} selected disabled={off} onPress={() => undefined} />
+                      {rest.map(({ day: free, index: freeIndex }) => <Chip key={freeIndex} label={shortDay(free.date)} disabled={off || free.date < today}
+                        onPress={() => moveDay(index, freeIndex)} />)}
+                    </ChipRow>
+                  </> : null}
+                  <TextField label="Name" accessibilityLabel={`Workout ${n} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
+                  <TextField label="Notes" accessibilityLabel={`Workout ${n} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
+                  <TextField label="Search swaps" accessibilityLabel={`Find replacement exercises for workout ${n}`} placeholder="e.g. squat" value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
+                  {day.snapshot.map((item, itemIndex) => <View key={itemIndex} style={{ marginBottom: spacing.md }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={[typography.subheading, { flex: 1 }]}>{item.exercise.name}</Text>
+                      <IconAction icon="trash-outline" label={`Remove ${item.exercise.name} from workout ${n}`} disabled={off || day.snapshot.length <= 1}
+                        onPress={() => patchDay(index, { snapshot: day.snapshot.filter((_, k) => k !== itemIndex) })} />
+                    </View>
+                    <ChipRow>{catalog.filter((exercise) => !savedExcluded.includes(exercise.id) && exercise.category === item.exercise.category
+                      && (day.kind !== 'run' || exercise.name.toLowerCase() === 'running')
+                      && (exercise.id === item.exercise.id || exercise.name.toLowerCase().includes(exerciseSearch.toLowerCase()))).slice(0, 6).map((exercise) => <Chip key={exercise.id} label={exercise.name}
+                      selected={item.exercise.id === exercise.id} disabled={off} onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, k) => k === itemIndex ? { ...value, exercise } : value) })} />)}</ChipRow>
+                    {item.sets.map((set, setIndex) => item.exercise.category === 'cardio'
+                      ? <TextField key={setIndex} label="Minutes" accessibilityLabel={`Workout ${n} ${item.exercise.name} minutes`} value={numeric(set.duration_s == null ? null : set.duration_s / 60)} keyboardType="decimal-pad" editable={!off}
+                        onChangeText={(value) => patchSet(index, itemIndex, setIndex, { duration_s: (parseNum(value) ?? NaN) * 60 })} />
+                      : <View key={setIndex} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
+                        <Text style={[typography.label, { width: 44 }]}>Set {setIndex + 1}</Text>
+                        <View style={{ flex: 1 }}><TextField placeholder="Reps" accessibilityLabel={`Workout ${n} ${item.exercise.name} set ${setIndex + 1} reps`} value={numeric(set.reps)} keyboardType="number-pad" editable={!off}
+                          onChangeText={(value) => patchSet(index, itemIndex, setIndex, { reps: parseNum(value) ?? NaN })} /></View>
+                        <View style={{ flex: 1 }}><TextField placeholder={weightUnit(units)} accessibilityLabel={`Workout ${n} ${item.exercise.name} set ${setIndex + 1} ${weightUnit(units)}`} value={numeric(set.weight_kg == null ? null : toDisplayWeight(set.weight_kg, units))} keyboardType="decimal-pad" editable={!off}
+                          onChangeText={(value) => patchSet(index, itemIndex, setIndex, { weight_kg: value.trim() ? fromDisplayWeight(parseNum(value) ?? NaN, units) : null })} /></View>
+                        <IconAction icon="close" label={`Remove set ${setIndex + 1} from workout ${n} ${item.exercise.name}`} disabled={off || item.sets.length <= 1}
+                          onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, k) => k === itemIndex ? { ...value, sets: value.sets.filter((_, s) => s !== setIndex) } : value) })} />
+                      </View>)}
+                    {item.exercise.category === 'strength' && item.sets.length < 5 ? <IconAction icon="add" text="Add set" label={`Add set to workout ${n} ${item.exercise.name}`} disabled={off}
+                      onPress={() => patchDay(index, { snapshot: day.snapshot.map((value, k) => k === itemIndex ? { ...value, sets: [...value.sets, { ...value.sets[value.sets.length - 1], position: value.sets.length }] } : value) })} /> : null}
+                  </View>)}
+                </Disclosure>
+              </View>;
+            })}
+          </View>;
+        })}
         {!billing.allowed ? <Text style={typography.small}>Previews are free. Saving generated plans is part of Buko Plus, with a free trial.</Text> : null}
         <Button title={billing.allowed ? `Save ${selectedCount} workouts to my plan` : 'Save with Buko Plus'} loading={busy} disabled={disabled || dirty || saveBlocked || !preview.days.some((day) => day.save)} onPress={() => { void save(); }} />
       </> : null}
