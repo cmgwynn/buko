@@ -18,19 +18,21 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarActiveTintColor: colors.heroAccent,
+        tabBarInactiveTintColor: colors.onHeroMuted,
         animation: reducedMotion ? 'none' : 'fade',
-        tabBarActiveBackgroundColor: colors.primarySoft,
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarActiveBackgroundColor: colors.heroRaised,
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '700', letterSpacing: 0.3 },
         tabBarItemStyle: { borderRadius: radius.md, marginHorizontal: 3 },
         tabBarStyle: {
           height: (height < 500 ? 56 : 64) + insets.bottom,
           paddingTop: 6,
           paddingBottom: Math.max(insets.bottom, 6),
           paddingHorizontal: 6,
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
+          backgroundColor: colors.hero,
+          borderTopWidth: 0,
+          borderTopLeftRadius: radius.lg,
+          borderTopRightRadius: radius.lg,
           elevation: 0,
         },
       }}

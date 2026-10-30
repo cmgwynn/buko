@@ -13,9 +13,11 @@ import { getSession, workoutSessionStore } from '../../lib/fitness/session';
 import { fromDisplayWeight, parseNum, toDisplayWeight, weightUnit } from '../../lib/fitness/format';
 import { toDateString } from '../../lib/diary';
 import type { Exercise, WorkoutSet } from '../../lib/fitness/types';
-import { Button, Card, Chip, ChipRow, Heading, Notice, TextField } from '../ui';
+import { Button, Card, Chip, ChipRow, Eyebrow, Heading, Notice, TextField } from '../ui';
 import { useConfirm } from '../ConfirmProvider';
-import { spacing, typography } from '../../theme';
+import { colors, radius, spacing, typography } from '../../theme';
+
+const KIND_ACCENT = { run: colors.heroAccent, strength: colors.macro.protein, rest: colors.score.unknown } as const;
 
 const numeric = (value: number | null) => value != null && Number.isFinite(value) ? String(value) : '';
 
@@ -194,8 +196,12 @@ export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean })
         {preview.rationale.map((reason) => <Text key={reason} style={[typography.small, { marginVertical: spacing.xs }]}>{reason}</Text>)}
         <Text style={typography.small}>Excluded: {preview.exclusions.join(', ') || 'none'}. Existing dates are skipped by default. Choose “add alongside” or an individual uncompleted slot to replace. Editing targets can exceed the generator’s conservative defaults; review carefully. Saving uses only selected workouts.</Text>
         <TextField label="Find replacement exercises for preview" value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
-        {preview.days.map((day, index) => <View key={index} style={{ marginVertical: spacing.md }}>
-          <Text style={typography.subheading}>Week {day.week} · {day.date} · {day.name}</Text>
+        {preview.days.map((day, index) => <View key={index} style={{
+          marginVertical: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background,
+          borderLeftWidth: 4, borderLeftColor: KIND_ACCENT[day.kind], opacity: day.kind === 'rest' ? 0.85 : 1,
+        }}>
+          <Eyebrow>Week {day.week} · {day.date}</Eyebrow>
+          <Text style={[typography.subheading, { marginTop: 2 }]}>{day.name}</Text>
           <Text style={typography.small}>{day.rationale}</Text>
           {day.kind === 'rest' ? <Text style={typography.small}>{day.notes}</Text> : <>
             <Button title={`${day.save ? 'Skip' : 'Include'} workout ${index + 1}`} variant="secondary" disabled={off}

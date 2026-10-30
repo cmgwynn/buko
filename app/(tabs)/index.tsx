@@ -6,7 +6,7 @@ import { MacroBar } from '../../src/components/MacroBar';
 import { CoachDiaryPanel } from '../../src/components/CoachDiaryPanel';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, CardGrid, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, CardGrid, Eyebrow, HeroCard, Notice, Screen } from '../../src/components/ui';
 import { addDays, defaultMeal, formatDay, MEALS, toDateString } from '../../src/lib/diary';
 import { planMealCopy, restoreEntryRow, sumEntries } from '../../src/lib/foodLogging';
 import { activityAdjustedTargets } from '../../src/lib/fitness/calc';
@@ -288,8 +288,6 @@ export default function Diary() {
     else router.push({ pathname: '/log/search', params: { meal, date, filter: target === 'recent' ? 'recent' : 'all' } });
   }
 
-  const pct = (v: number, t: number) => (t > 0 ? `${Math.round(v)}/${Math.round(t)} g` : `${Math.round(v)} g`);
-
   return (
     <DaySwipe><Screen>
       <TabHeader title="Diary" />
@@ -300,24 +298,32 @@ export default function Diary() {
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
-      {targets ? (
-        <Card style={{ paddingVertical: spacing.md }}>
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-              <Text style={{ fontSize: 32, fontWeight: '700', letterSpacing: -1, fontVariant: ['tabular-nums'], color: remaining < 0 ? colors.danger : colors.primary }}>
-                {Math.abs(Math.round(remaining)).toLocaleString()}
-              </Text>
-              <Text style={[typography.body, { marginLeft: spacing.xs }]}>kcal {remaining < 0 ? 'over' : 'left'}</Text>
-            </View>
-            <Text style={typography.small}>{Math.round(totals.calories).toLocaleString()} of {Math.round(targets.calories).toLocaleString()} eaten</Text>
+      {targets ? (<>
+        <HeroCard>
+          <Eyebrow onHero>{remaining < 0 ? 'Over target' : 'Remaining today'}</Eyebrow>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap', marginTop: spacing.xs }}>
+            <Text style={[typography.display, { color: remaining < 0 ? colors.score.poor : colors.onHero }]}>
+              {Math.abs(Math.round(remaining)).toLocaleString()}
+            </Text>
+            <Text style={[typography.subheading, { color: colors.onHeroMuted, marginLeft: spacing.sm }]}>kcal {remaining < 0 ? 'over' : 'left'}</Text>
           </View>
+          <Text style={[typography.small, { color: colors.onHeroMuted }]}>{Math.round(totals.calories).toLocaleString()} of {Math.round(targets.calories).toLocaleString()} eaten</Text>
           <View
             accessibilityRole="progressbar"
             accessibilityLabel="Calories"
             accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round((totals.calories / Math.max(1, targets.calories)) * 100)) }}
-            style={{ height: 6, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, overflow: 'hidden', marginVertical: spacing.sm }}
+            style={{ height: 8, borderRadius: radius.pill, backgroundColor: colors.heroTrack, overflow: 'hidden', marginVertical: spacing.lg }}
           >
-            <View style={{ height: 6, width: `${Math.min(100, (totals.calories / Math.max(1, targets.calories)) * 100)}%`, backgroundColor: remaining < 0 ? colors.danger : colors.macro.calories }} />
+            <View style={{ height: 8, borderRadius: radius.pill, width: `${Math.min(100, (totals.calories / Math.max(1, targets.calories)) * 100)}%`, backgroundColor: remaining < 0 ? colors.score.poor : colors.heroAccent }} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            {([['Protein', totals.protein, targets.protein_g, colors.macro.protein], ['Carbs', totals.carbs, targets.carbs_g, colors.macro.carbs], ['Fat', totals.fat, targets.fat_g, colors.macro.fat]] as const).map(([label, value, target, color]) => (
+              <View key={label} style={{ flex: 1, minWidth: 0, backgroundColor: colors.heroRaised, borderRadius: radius.md, paddingVertical: spacing.md, paddingHorizontal: 10, borderTopWidth: 3, borderTopColor: color }}>
+                <Text style={[typography.eyebrow, { color: colors.onHeroMuted, letterSpacing: 0.4 }]} numberOfLines={1}>{label}</Text>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: colors.onHero, fontVariant: ['tabular-nums'], marginTop: 2 }} numberOfLines={1}>{Math.round(value)}g</Text>
+                <Text style={[typography.small, { color: colors.onHeroMuted }]} numberOfLines={1}>{target > 0 ? `of ${Math.round(target)}g` : 'no target'}</Text>
+              </View>
+            ))}
           </View>
           <Pressable
             onPress={() => setDetails(!details)}
@@ -325,15 +331,15 @@ export default function Diary() {
             accessibilityState={{ expanded: details }}
             aria-expanded={details}
             accessibilityLabel={details ? 'Hide nutrition details' : 'Show nutrition details'}
-            style={{ flexDirection: 'row', alignItems: 'center', minHeight: 32 }}
+            style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.xs, minHeight: 44, marginTop: spacing.md }}
           >
-            <Text style={[typography.small, { flex: 1 }]}>
-              P {pct(totals.protein, targets.protein_g)} · C {pct(totals.carbs, targets.carbs_g)} · F {pct(totals.fat, targets.fat_g)}
-            </Text>
-            <Ionicons name={details ? 'chevron-up' : 'chevron-down'} size={18} color={colors.primary} />
+            <Text style={[typography.label, { color: colors.onHero }]}>{details ? 'Hide details' : 'Nutrition details'}</Text>
+            <Ionicons name={details ? 'chevron-up' : 'chevron-down'} size={18} color={colors.onHero} />
           </Pressable>
-          {details ? (
-            <View style={{ marginTop: spacing.md }}>
+        </HeroCard>
+        {details ? (
+          <Card>
+            <View>
               {adjusted ? (
                 <Text style={[typography.small, { marginBottom: spacing.md }]}>
                   {adjusted.baseCalories.toLocaleString()} base + {adjusted.bonusKcal.toLocaleString()} from activity ({Math.round((settings?.activity_share ?? 0) * 100)}% of {Math.round(burned)} kcal burned)
@@ -377,9 +383,9 @@ export default function Diary() {
                 })}
               </View>
             </View>
-          ) : null}
-        </Card>
-      ) : null}
+          </Card>
+        ) : null}
+      </>) : null}
 
       <Button title="Add food" icon="add-circle-outline" onPress={() => setAddFor(addFor === 'top' ? null : 'top')} />
       {addFor === 'top' ? (

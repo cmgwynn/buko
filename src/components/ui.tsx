@@ -51,9 +51,18 @@ export function CardGrid({ children }: { children: ReactNode }) {
   );
 }
 
-export function Card({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+export function Card({ children, style, accent }: { children: ReactNode; style?: StyleProp<ViewStyle>; accent?: string }) {
+  return <View style={[styles.card, accent ? { borderLeftWidth: 4, borderLeftColor: accent } : null, style]}>{children}</View>;
 }
+
+/** Dark, high-contrast summary surface for a screen's single most important number or action. */
+export function HeroCard({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  return <View style={[styles.hero, style]}>{children}</View>;
+}
+
+export const Eyebrow = ({ children, onHero }: { children: ReactNode; onHero?: boolean }) => (
+  <Text style={[typography.eyebrow, onHero && { color: colors.onHeroMuted }]}>{children}</Text>
+);
 
 export const Title = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.title}>{children}</Text>;
 export const Heading = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.heading}>{children}</Text>;
@@ -65,8 +74,8 @@ export const Label = ({ children }: { children: ReactNode }) => <Text style={[ty
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function MotionPressable({
-  style, disabled, onPressIn, onPressOut, onFocus, onBlur, ...props
-}: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle> }) {
+  style, disabled, onPressIn, onPressOut, onFocus, onBlur, focusColor = colors.primary, ...props
+}: Omit<PressableProps, 'style'> & { style?: StyleProp<ViewStyle>; focusColor?: string }) {
   const scale = useSharedValue(1);
   const [focused, setFocused] = useState(false);
   const animatedStyle = useAnimatedStyle(() => ({
@@ -85,7 +94,7 @@ export function MotionPressable({
       aria-busy={props['aria-busy'] ?? props.accessibilityState?.busy}
       aria-disabled={props['aria-disabled'] ?? disabled ?? props.accessibilityState?.disabled}
       disabled={disabled}
-      style={[style, animatedStyle, Platform.OS === 'web' && focused && { outlineColor: colors.primary, outlineWidth: 2, outlineOffset: 2, outlineStyle: 'solid' }]}
+      style={[style, animatedStyle, Platform.OS === 'web' && focused && { outlineColor: focusColor, outlineWidth: 2, outlineOffset: 2, outlineStyle: 'solid' }]}
       onFocus={(event) => { setFocused(true); onFocus?.(event); }}
       onBlur={(event) => { setFocused(false); onBlur?.(event); }}
       onPressIn={(event) => { if (!disabled) animate(0.98); onPressIn?.(event); }}
@@ -99,13 +108,13 @@ export function Button({
 }: {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'accent';
   loading?: boolean;
   disabled?: boolean;
   icon?: ComponentProps<typeof Ionicons>['name'];
 }) {
   const off = disabled || loading;
-  const fg = variant === 'primary' ? colors.onPrimary : variant === 'danger' ? colors.danger : colors.primary;
+  const fg = variant === 'primary' ? colors.onPrimary : variant === 'accent' ? colors.hero : variant === 'danger' ? colors.danger : colors.primary;
   return (
     <MotionPressable
       accessibilityRole="button"
@@ -113,12 +122,14 @@ export function Button({
       accessibilityState={{ disabled: Boolean(off), busy: Boolean(loading) }}
       onPress={onPress}
       disabled={off}
+      focusColor={variant === 'accent' ? colors.onHero : undefined}
       style={[
         styles.button,
         variant === 'primary' && { backgroundColor: colors.primary },
         variant === 'secondary' && { backgroundColor: colors.primarySoft },
         variant === 'danger' && { backgroundColor: colors.dangerSoft },
         variant === 'ghost' && { backgroundColor: 'transparent' },
+        variant === 'accent' && { backgroundColor: colors.heroAccent },
         off && { opacity: 0.5 },
       ]}
     >
@@ -158,9 +169,9 @@ export function Chip({ label, selected, disabled, onPress }: { label: string; se
       disabled={disabled}
       accessibilityRole="button"
       accessibilityState={{ selected: !!selected, disabled: !!disabled }}
-      style={[styles.chip, selected && { backgroundColor: colors.primary, borderColor: colors.primary }, disabled && { opacity: 0.5 }]}
+      style={[styles.chip, selected && { backgroundColor: colors.hero, borderColor: colors.hero }, disabled && { opacity: 0.5 }]}
     >
-      <Text style={[typography.body, selected && { color: colors.onPrimary, fontWeight: '600' }]}>{label}</Text>
+      <Text style={[typography.body, { fontWeight: '500' }, selected && { color: colors.onHero, fontWeight: '700' }]}>{label}</Text>
     </MotionPressable>
   );
 }
@@ -244,9 +255,17 @@ export const styles = StyleSheet.create({
     borderColor: colors.border,
     ...shadow.card,
   },
+  hero: {
+    backgroundColor: colors.hero,
+    borderRadius: radius.lg + 4,
+    padding: spacing.xl,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+    ...shadow.elevated,
+  },
   row: { flexDirection: 'row', alignItems: 'center' },
-  button: { minHeight: 52, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, marginVertical: spacing.xs },
-  buttonText: { fontSize: 16, fontWeight: '600' },
+  button: { minHeight: 52, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, paddingVertical: spacing.md, marginVertical: spacing.xs },
+  buttonText: { fontSize: 16, fontWeight: '700', letterSpacing: 0.2 },
   input: {
     backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md,
     minHeight: 52, paddingHorizontal: spacing.lg, paddingVertical: 14, fontSize: 16, color: colors.text,

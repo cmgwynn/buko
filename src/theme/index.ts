@@ -15,6 +15,14 @@ export const colors = {
   warning: '#B7791F',
   warningSoft: '#FAF0DC',
 
+  // Dark "hero" surfaces reuse the palette's deep forest text color with cream foregrounds.
+  hero: '#182923',
+  heroRaised: '#22382F',
+  onHero: '#F7F5EF',
+  onHeroMuted: 'rgba(247, 245, 239, 0.72)',
+  heroTrack: 'rgba(247, 245, 239, 0.16)',
+  heroAccent: '#8DB255',
+
   // Health score ratings (see src/lib/scoring/config.ts for the bands)
   score: {
     excellent: '#3E9B6A',
@@ -39,7 +47,9 @@ export const layout = { appMaxWidth: 1040, contentMaxWidth: 880, formMaxWidth: 5
 export const radius = { sm: 10, md: 16, lg: 24, pill: 999 } as const;
 
 export const typography = {
-  title: { fontSize: 32, fontWeight: '700' as const, letterSpacing: -0.8, color: colors.text },
+  display: { fontSize: 52, fontWeight: '800' as const, letterSpacing: -2, lineHeight: 56, fontVariant: ['tabular-nums' as const], color: colors.text },
+  eyebrow: { fontSize: 11, fontWeight: '700' as const, letterSpacing: 1.4, textTransform: 'uppercase' as const, color: colors.textMuted },
+  title: { fontSize: 32, fontWeight: '800' as const, letterSpacing: -1, color: colors.text },
   heading: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.3, color: colors.text },
   subheading: { fontSize: 16, fontWeight: '600' as const, color: colors.text },
   body: { fontSize: 15, fontWeight: '400' as const, color: colors.text, lineHeight: 21 },
@@ -54,6 +64,13 @@ export const shadow = {
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 4 },
     elevation: 1,
+  },
+  elevated: {
+    shadowColor: '#182923',
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 6,
   },
 };
 

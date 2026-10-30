@@ -5,7 +5,7 @@ import { Pressable, Text, View } from 'react-native';
 import { TabHeader } from '../../src/components/TabHeader';
 import { DateNavigator } from '../../src/components/date/DateNavigator';
 import { DaySwipe } from '../../src/components/date/DaySwipe';
-import { Button, Card, Empty, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
+import { Button, Card, Empty, Eyebrow, HeroCard, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
 import { addLocalDays, localDateStartIso, mondayOfWeek, parseLocalDate } from '../../src/lib/dates';
 import { loadRoutines, type RoutineRow, type TrainingRow, type WorkoutListRow } from '../../src/lib/fitness/data';
 import { setVolume } from '../../src/lib/fitness/calc';
@@ -137,11 +137,22 @@ export default function Train() {
         <Notice tone="info">Browsing {new Date(`${selectedDate}T00:00:00`).toLocaleDateString()}. Starting a workout always records the actual current time, not the selected date.</Notice>
       ) : null}
 
-      {active.active ? (
-        <Button title="Resume workout" icon="play" disabled={!recovery.ready} onPress={() => start()} />
-      ) : (
-        <Button title={selectedDate === today ? 'Start workout' : 'Start workout now'} icon="barbell-outline" disabled={!recovery.ready} onPress={() => start()} />
-      )}
+      <HeroCard>
+        <Eyebrow onHero>
+          {active.active ? 'Workout in progress' : `Week of ${parseLocalDate(mondayOfWeek(selectedDate)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} – ${parseLocalDate(addLocalDays(mondayOfWeek(selectedDate), 6)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`}
+        </Eyebrow>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, justifyContent: 'space-between', marginVertical: spacing.lg }}>
+          <Stat value={String(week.workouts)} label="workouts" />
+          <Stat value={String(week.minutes)} label="minutes" />
+          <Stat value={Math.round(toDisplayWeight(week.volumeKg, units)).toLocaleString()} label={`${weightUnit(units)} lifted`} />
+          {steps != null ? <Stat value={steps.toLocaleString()} label={`steps ${selectedDate === today ? 'today' : `on ${parseLocalDate(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}`} /> : null}
+        </View>
+        {active.active ? (
+          <Button title="Resume workout" icon="play" variant="accent" disabled={!recovery.ready} onPress={() => start()} />
+        ) : (
+          <Button title={selectedDate === today ? 'Start workout' : 'Start workout now'} icon="barbell-outline" variant="accent" disabled={!recovery.ready} onPress={() => start()} />
+        )}
+      </HeroCard>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
         <Text style={typography.heading}>Your routines</Text>
         <Button title="Create" icon="add" variant="ghost" onPress={() => router.push('/routine/edit')} />
@@ -154,7 +165,7 @@ export default function Train() {
         </Card>
       ) : (
         routines.map((r) => (
-            <Card key={r.id} style={{ padding: spacing.md }}>
+            <Card key={r.id} accent={colors.primary} style={{ padding: spacing.md }}>
               <View>
                 <Text style={typography.subheading}>{r.name}</Text>
                 <Text style={typography.small} numberOfLines={1}>{r.routine_exercises.map((x) => x.exercises.name).join(' · ')}</Text>
@@ -168,18 +179,6 @@ export default function Train() {
       )}
 
       <PlannedWorkouts routines={routines} />
-      <Card>
-        <Text style={typography.label}>
-          Week of {parseLocalDate(mondayOfWeek(selectedDate)).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} –{' '}
-          {parseLocalDate(addLocalDays(mondayOfWeek(selectedDate), 6)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-        </Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, justifyContent: 'space-between', marginTop: spacing.sm }}>
-          <Stat value={String(week.workouts)} label="workouts" />
-          <Stat value={String(week.minutes)} label="minutes" />
-          <Stat value={Math.round(toDisplayWeight(week.volumeKg, units)).toLocaleString()} label={`${weightUnit(units)} lifted`} />
-          {steps != null ? <Stat value={steps.toLocaleString()} label={`steps ${selectedDate === today ? 'today' : `on ${parseLocalDate(selectedDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`}`} /> : null}
-        </View>
-      </Card>
       <Card>
         <NavigationRow title="Workout library" icon="library-outline" onPress={() => router.push('/workout/library')} />
         <NavigationRow title="Exercises" icon="search-outline" onPress={() => router.push('/workout/exercises')} />
@@ -211,8 +210,8 @@ export default function Train() {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <View>
-      <Text style={{ fontSize: 22, fontWeight: '800', color: colors.primary }}>{value}</Text>
-      <Text style={typography.small}>{label}</Text>
+      <Text style={{ fontSize: 30, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'], color: colors.onHero }}>{value}</Text>
+      <Text style={[typography.eyebrow, { color: colors.onHeroMuted }]}>{label}</Text>
     </View>
   );
 }

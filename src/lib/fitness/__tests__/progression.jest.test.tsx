@@ -37,6 +37,7 @@ jest.mock('../../../components/ui', () => {
   return {
     Card: ({ children }: { children: unknown }) => React.createElement(View, null, children),
     Heading: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
+    Eyebrow: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     Notice: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     ChipRow: ({ children }: { children: unknown }) => React.createElement(View, null, children),
     Button: ({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) =>
