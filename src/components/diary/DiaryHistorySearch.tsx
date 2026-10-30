@@ -9,7 +9,7 @@ import type { FoodLogEntry } from '../../types';
 import { spacing, typography } from '../../theme';
 import { Button, Card, Loading, Notice, TextField } from '../ui';
 
-export function DiaryHistorySearch() {
+export function DiaryHistorySearch({ autoFocus = false }: { autoFocus?: boolean } = {}) {
   const router = useRouter();
   const { selectedDate, setSelectedDate, today } = useSelectedDate();
   const [query, setQuery] = useState('');
@@ -35,7 +35,7 @@ export function DiaryHistorySearch() {
     finally { if (version.current === request) setLoading(false); }
   }
   return <View>
-    <TextField label="Search your food history" placeholder="When did I last eat salmon?" value={query} maxLength={100}
+    <TextField label="Search your food history" autoFocus={autoFocus} placeholder="When did I last eat salmon?" value={query} maxLength={100}
       onChangeText={(text) => { version.current++; setLoading(false); setQuery(text); setSubmitted(null); setRows([]); setMore(false); setError(null); }}
       onSubmitEditing={() => { void search(); }} returnKeyType="search" />
     <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: -spacing.sm }}>

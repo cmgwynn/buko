@@ -19,6 +19,7 @@ import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { useSettings } from '../../src/providers/SettingsProvider';
 import { colors, spacing, typography } from '../../src/theme';
 import { PlannedWorkouts } from '../../src/components/workout/PlannedWorkouts';
+import { WeekAtAGlance } from '../../src/components/workout/WeekAtAGlance';
 import { useWorkoutMode } from '../../src/providers/WorkoutModeProvider';
 
 export default function Train() {
@@ -153,12 +154,7 @@ export default function Train() {
           <Button title={selectedDate === today ? 'Start workout' : 'Start workout now'} icon="barbell-outline" variant="accent" disabled={!recovery.ready} onPress={() => start()} />
         )}
       </HeroCard>
-      <Card accent={colors.hero}>
-        <Eyebrow>Personal plan</Eyebrow>
-        <Text style={typography.subheading}>Build my training plan</Text>
-        <Text style={typography.small}>Choose your run days. Buko ramps you up over 4 weeks.</Text>
-        <Button title="Build my plan" icon="sparkles-outline" onPress={() => router.push('/workout/plan')} />
-      </Card>
+      <WeekAtAGlance />
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
         <Text style={typography.heading}>Your routines</Text>
         <Button title="Create" icon="add" variant="ghost" onPress={() => router.push('/routine/edit')} />

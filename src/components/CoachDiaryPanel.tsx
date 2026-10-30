@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Switch, View } from 'react-native';
-import { Body, Button, Card, Notice } from './ui';
+import { Body, Card, NavigationRow, Notice } from './ui';
 import { loadCoachPreferences } from '../lib/coach/client';
 import { COACH_CONSENT_VERSION } from '../lib/coach/types';
 import { supabase } from '../lib/supabase';
@@ -52,14 +52,14 @@ export function CoachDiaryPanel({ day, today, targets }: { day: string; today: s
     finally { setBusy(false); }
   }
   return (
-    <Card>
-      <Button title="Coach & weekly review" icon="chatbubbles-outline" variant="secondary" onPress={() => router.push('/coach')} />
+    <Card style={{ paddingVertical: spacing.sm }}>
+      <NavigationRow title="Coach & weekly review" icon="chatbubbles-outline" onPress={() => router.push('/coach')} />
       {consented ? (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-          <View style={{ flex: 1 }}><Body>Food logging complete for this day</Body><Body muted>Mark only when all meals, snacks and drinks are logged. Missing days stay unknown.</Body></View>
+          <View style={{ flex: 1 }}><Body>Day fully logged</Body><Body muted>Improves your weekly review.</Body></View>
           <Switch accessibilityLabel="Food logging complete for this day" disabled={busy} value={complete} onValueChange={toggle} />
         </View>
-      ) : <Body muted>Optional, preference-driven wellness support. Live AI stays off until configured.</Body>}
+      ) : null}
       {error ? <Notice tone="info">{error}</Notice> : null}
     </Card>
   );

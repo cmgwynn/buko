@@ -219,7 +219,11 @@ These features are published on the web version. No paid AI service is used.
   selected existing slots may be replaced; logged meals are protected. Start
   from the **Plan my week** card at the top of Plan: pick days (defaults to
   today onward), meals and foods to skip (saved automatically when you
-  preview), then review a day-by-day preview before **Add to my plan**.
+  preview), then review a day-by-day preview before **Add to my plan**. Tap ⇄
+  on any previewed meal to swap only that meal (other slots, targets and
+  exclusions are kept). An empty Diary day today or later offers **Generate
+  my week**, which opens Plan with the generator expanded (`/plan?generate=1`).
+  Diary keeps food-history search behind the header search icon.
 - Generate a four-week general-fitness run/walk and optional light-strength
   schedule from the user's comfortable run duration, frequency and preferred
   weekdays. Running time increases by at most 5% in each of weeks 2 and 3, then
@@ -227,7 +231,9 @@ These features are published on the web version. No paid AI service is used.
   workouts are preserved unless the user selects a specific uncompleted slot
   for replacement. Open it from **Build my training plan** on Train (or from
   Start workout); it has its own screen at `/workout/plan`. Per-workout edits
-  sit under each session's **Adjust** section.
+  sit under each session's **Adjust** section. Once a week has planned
+  workouts, Train shows a week strip (run/strength dots, check marks when
+  done); tap a day to jump to it or **Edit plan** to regenerate.
 - Saved food and exercise exclusions are account-scoped and reusable. These
   plans are estimates and not medical advice. Ingredient phrase matching is
   conservative, and recipes are not guaranteed kitchen-tested, allergy-safe or

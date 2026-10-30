@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View, type View as RNView } from 'react-native';
 import { Gesture, GestureDetector, ScrollView as GHScrollView } from 'react-native-gesture-handler';
@@ -60,6 +60,12 @@ function PlanContent() {
   const [message, setMessage] = useState<string | null>(null);
   const [removed, setRemoved] = useState<EntryRow | null>(null);
   const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [swappedOut, setSwappedOut] = useState<Record<string, string[]>>({});
+  const { generate: generateParam } = useLocalSearchParams<{ generate?: string }>();
+  useEffect(() => {
+    // Other screens deep-link here with ?generate=1 to open the weekly generator.
+    if (generateParam) { setGeneratorOpen(true); router.setParams({ generate: undefined }); }
+  }, [generateParam]);
   const [generateQueued, setGenerateQueued] = useState(false);
   const [generatorDays, setGeneratorDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [generatorMeals, setGeneratorMeals] = useState<Meal[]>(['breakfast', 'lunch', 'dinner']);
@@ -173,7 +179,7 @@ function PlanContent() {
     profile?.diet_prefs, targets, intake, candidates]);
   const liveGeneratorContext = useRef(generatorContext);
   liveGeneratorContext.current = generatorContext;
-  useEffect(() => { setPreview(null); }, [generatorContext]);
+  useEffect(() => { setPreview(null); setSwappedOut({}); }, [generatorContext]);
   useEffect(() => { setReplaceSlots([]); setPreview(null); }, [start, session?.user.id]);
   useEffect(() => {
     // Default to the remaining days of the week; past days are opt-in.
@@ -186,7 +192,7 @@ function PlanContent() {
     return MACRO_KEYS.map((key) => `${key === 'calories' ? 'Calories' : key.replace('_g', '')}: ${macros[key] === null ? 'unknown' : `${Math.round(macros[key]!)} ${key === 'calories' ? 'kcal' : 'g'}`}`).join(' · ');
   }
 
-  function generatePreview() {
+  function generatePreview(swaps: Record<string, string[]> = swappedOut) {
     if (!session || !activePreferences || !profile || error) return;
     setPreview({
       owner: session.user.id, signature: mealPlanSnapshot(weeklyEntries(entries)), context: generatorContext,
@@ -195,20 +201,29 @@ function PlanContent() {
         replaceSlots, entries: weeklyEntries(entries), candidates, preferences: profile.diet_prefs,
         foodExclusions: activePreferences.excludedFoods, targets, today,
         intake: intake?.owner === session.user.id && intake.date === today ? intake.macros : null,
+        swappedOut: swaps,
       }),
     });
   }
 
+  function swapSlot(date: string, meal: Meal, recipeId: string) {
+    const key = mealSlotKey(date, meal);
+    const next = { ...swappedOut, [key]: [...(swappedOut[key] ?? []), recipeId] };
+    setSwappedOut(next);
+    generatePreview(next);
+  }
+
   async function previewWeek() {
     if (!activePreferences) return;
-    if (exclusionText === activePreferences.excludedFoods.join('\n')) { generatePreview(); return; }
+    setSwappedOut({});
+    if (exclusionText === activePreferences.excludedFoods.join('\n')) { generatePreview({}); return; }
     // Saved exclusions update state asynchronously; generate once the saved list matches the field.
     if (await saveExclusions()) setGenerateQueued(true);
   }
   useEffect(() => {
     if (!generateQueued || !activePreferences || exclusionText !== activePreferences.excludedFoods.join('\n')) return;
     setGenerateQueued(false);
-    generatePreview();
+    generatePreview({});
   });
 
   async function applyPreview() {
@@ -490,6 +505,7 @@ function PlanContent() {
               <Text accessibilityRole="header" style={[typography.subheading, { marginTop: spacing.md }]}>
                 Your week · {preview.result.additions} meal{preview.result.additions === 1 ? '' : 's'}{preview.result.replaceIds.length ? ` · ${preview.result.replaceIds.length} replaced` : ''}
               </Text>
+              <Text style={typography.small}>Not feeling one? Tap ⇄ to swap just that meal.</Text>
               {preview.result.dailyTotals.map(({ date, totals }) => {
                 const slots = preview.result.slots.filter((slot) => slot.date === date);
                 return <View key={date} style={{ marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
@@ -503,7 +519,7 @@ function PlanContent() {
                       const entry = entries.find((row) => row.id === id);
                       return entry ? recipeById.get(entry.recipe_id)?.title ?? 'Unavailable recipe' : id;
                     });
-                    return <View key={mealSlotKey(slot.date, slot.meal)} style={{ flexDirection: 'row', gap: spacing.sm, paddingVertical: 6 }}>
+                    return <View key={mealSlotKey(slot.date, slot.meal)} style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 }}>
                       <Text style={[typography.small, { width: 72 }]}>{label}</Text>
                       <View style={{ flex: 1 }}>
                         <Text style={slot.candidate ? typography.body : typography.small} numberOfLines={2}>
@@ -512,6 +528,11 @@ function PlanContent() {
                         {removedTitles.length ? <Text style={typography.small}>Replaces {removedTitles.join(', ')}</Text> : null}
                       </View>
                       {slot.macros?.calories != null ? <Text style={typography.small}>{Math.round(slot.macros.calories)} kcal</Text> : null}
+                      {slot.candidate ? <Pressable accessibilityRole="button" accessibilityLabel={`Swap ${label} on ${formatDay(slot.date)}`} disabled={pending}
+                        onPress={() => swapSlot(slot.date, slot.meal, slot.candidate!.id)} hitSlop={8}
+                        style={{ minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'center' }}>
+                        <Ionicons name="shuffle" size={18} color={colors.primary} />
+                      </Pressable> : null}
                     </View>;
                   })}
                   <Disclosure title="Ingredients & macros">

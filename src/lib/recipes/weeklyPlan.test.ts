@@ -131,3 +131,14 @@ test('real library generates a complete 21-meal week from measured snapshots, wi
   }
   assert.equal(new Set(result.slots.map((slot) => slot.candidate!.id)).size, 21);
 });
+
+test('swapping one slot changes only that recipe and cycles back once every option is swapped', () => {
+  const first = generateWeeklyMealPlan(base);
+  const key = mealSlotKey('2026-10-26', 'dinner');
+  const original = first.slots[0].candidate!.id;
+  const swapped = generateWeeklyMealPlan({ ...base, swappedOut: { [key]: [original] } });
+  assert.notEqual(swapped.slots[0].candidate?.id, original);
+  assert.equal(swapped.additions, first.additions);
+  const all = generateWeeklyMealPlan({ ...base, swappedOut: { [key]: ['a', 'b', 'c'] } });
+  assert.ok(all.slots[0].candidate);
+});

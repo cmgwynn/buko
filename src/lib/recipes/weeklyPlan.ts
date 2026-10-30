@@ -36,6 +36,8 @@ export function generateWeeklyMealPlan(input: {
   targets: Partial<KnownMacros> | null;
   today: string;
   intake: KnownMacros | null;
+  /** Recipe ids the user swapped away from, per slot key. */
+  swappedOut?: Readonly<Record<string, readonly string[]>>;
 }) {
   const week = Array.from({ length: 7 }, (_, index) => addDays(input.weekStart, index));
   const dates = week.filter((date) => input.dates.includes(date));
@@ -76,7 +78,10 @@ export function generateWeeklyMealPlan(input: {
         || (usage.get(normalize(a.candidate.title)) ?? 0) - (usage.get(normalize(b.candidate.title)) ?? 0)
         || a.distance - b.distance || b.known - a.known
         || (a.candidate.id < b.candidate.id ? -1 : a.candidate.id > b.candidate.id ? 1 : 0));
-      const choice = ranked[0];
+      const swapped = input.swappedOut?.[mealSlotKey(date, meal)] ?? [];
+      const fresh = ranked.filter((option) => !swapped.includes(option.candidate.id));
+      // Once every option has been swapped away, cycle back to the best fit instead of leaving the slot empty.
+      const choice = (fresh.length ? fresh : ranked)[0];
       if (!choice) {
         slots.push({ date, meal, candidate: null, servings: 0, macros: null, replaceIds: [], reason: 'No eligible recipe; existing meals stay unchanged.' });
         // Failed replacements still contribute their actual retained nutrition to later slots.

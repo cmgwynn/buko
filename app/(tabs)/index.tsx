@@ -91,6 +91,8 @@ export default function Diary() {
   const [restoring, setRestoring] = useState(false);
   const [actionEntry, setActionEntry] = useState<FoodLogEntry | null>(null);
   const [transfer, setTransfer] = useState<TransferSelection | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [plansLoadedFor, setPlansLoadedFor] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const viewKey = `${session?.user.id ?? ''}:${date}`;
   const activeView = useRef(viewKey);
@@ -139,6 +141,7 @@ export default function Diary() {
     if (!plan.error && !rec.error) {
       setPlanned(plan.data as MealPlanEntry[]);
       setRecipes(rec.data as RecipeWithNutrition[]);
+      setPlansLoadedFor(viewKey);
     } else setError(`Could not load your planned meals: ${plan.error?.message ?? rec.error?.message}`);
   }, [date, settings?.activity_adjust, session, viewKey]);
 
@@ -290,7 +293,14 @@ export default function Diary() {
 
   return (
     <DaySwipe><Screen>
-      <TabHeader title="Diary" />
+      <TabHeader title="Diary" right={
+        <Pressable onPress={() => setSearchOpen((open) => !open)} hitSlop={10} accessibilityRole="button"
+          accessibilityLabel={searchOpen ? 'Close food history search' : 'Search food history'} accessibilityState={{ expanded: searchOpen }}
+          style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name={searchOpen ? 'close' : 'search'} size={24} color={colors.primary} />
+        </Pressable>
+      } />
+      {searchOpen ? <DiaryHistorySearch key={session?.user.id} autoFocus /> : null}
       {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
       <DateNavigator />
       {routeError ? <View><Notice tone="danger">{routeError}</Notice><Button title="Dismiss date warning" variant="ghost" onPress={() => setRouteError(null)} /></View> : null}
@@ -404,7 +414,6 @@ export default function Diary() {
       ) : null}
       <View style={{ height: spacing.md }} />
 
-      <DiaryHistorySearch key={session?.user.id} />
       {entries.length ? <Button title="Copy this day to another date" variant="ghost" icon="copy-outline" onPress={() => setTransfer({ mode: 'day', sourceDate: date })} /> : null}
       {actionError ? <Notice tone="danger">{actionError}</Notice> : null}
       {undo ? (
@@ -419,6 +428,13 @@ export default function Diary() {
         </View>
       ) : null}
       {notice ? <Notice tone="info">{notice}</Notice> : null}
+      {plansLoadedFor === viewKey && !error && date >= today && !entries.length && !planned.length ? (
+        <Card accent={colors.hero}>
+          <Eyebrow>{date === today ? 'Nothing planned today' : `Nothing planned for ${formatDay(date)}`}</Eyebrow>
+          <Text style={typography.small}>Let Buko plan the rest of your week around your targets.</Text>
+          <Button title="Generate my week" icon="sparkles-outline" variant="secondary" onPress={() => router.push({ pathname: '/(tabs)/plan', params: { generate: '1' } })} />
+        </Card>
+      ) : null}
 
       <CardGrid>{MEALS.map(({ key, label }) => {
         const items = entries.filter((e) => e.meal === key);
