@@ -171,7 +171,7 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
         savedDates.push(operation.day.date);
         setPreview((current) => current && ({ ...current, days: current.days.map((day) => day.date === operation.day.date ? { ...day, save: false, replaceId: null } : day) }));
       }
-      if (request === version.current) setStatus(`Saved ${savedDates.length} workouts. Find them under Planned workouts in Train on each date. Nothing was started or logged.`);
+      if (request === version.current) setStatus(`Saved ${savedDates.length} workouts. Find them under Planned workouts in Train on each date. Nothing was started or logged. Plan my week now adds more fuel on these days.`);
     } catch (e) {
       if (request === version.current) {
         setSaveBlocked(writing);

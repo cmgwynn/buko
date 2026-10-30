@@ -142,3 +142,13 @@ test('swapping one slot changes only that recipe and cycles back once every opti
   const all = generateWeeklyMealPlan({ ...base, swappedOut: { [key]: ['a', 'b', 'c'] } });
   assert.ok(all.slots[0].candidate);
 });
+
+test('per-day targets steer each day independently', () => {
+  const lean = bowl('lean'); lean.ingredients[0].nutrition!.per100g.calories = 300; lean.ingredients[0].nutrition!.per100g.carbs = 20;
+  const fuel = bowl('fuel'); fuel.ingredients[0].nutrition!.per100g.calories = 900; fuel.ingredients[0].nutrition!.per100g.carbs = 150;
+  const input = { ...base, dates: ['2026-10-27'], candidates: [lean, fuel], meals: ['snack' as const], targets: { calories: 3000, protein_g: 250, carbs_g: 200, fat_g: 100 } };
+  assert.equal(generateWeeklyMealPlan(input).slots[0].candidate?.id, 'lean');
+  const fueled = generateWeeklyMealPlan({ ...input, dailyTargets: { '2026-10-27': { calories: 9000, protein_g: 250, carbs_g: 1500, fat_g: 100 } } });
+  assert.equal(fueled.slots[0].candidate?.id, 'fuel');
+  assert.equal(generateWeeklyMealPlan({ ...input, dailyTargets: { '2026-10-26': { calories: 9000, carbs_g: 1500 } } }).slots[0].candidate?.id, 'lean');
+});

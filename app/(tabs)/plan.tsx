@@ -19,6 +19,8 @@ import { STARTER_RECIPES, starterRecipeDraft } from '../../src/lib/recipes/libra
 import { intakeMacros, MACRO_KEYS, type KnownMacros, type MealCandidate } from '../../src/lib/recipes/recommendations';
 import { generateWeeklyMealPlan, mealPlanSnapshot, mealSlotKey, type WeeklyEntry } from '../../src/lib/recipes/weeklyPlan';
 import { loadPlanningPreferences, savePlanningPreferences, type PlanningPreferences } from '../../src/lib/planning/preferences';
+import { fuelLabel, fuelWeek } from '../../src/lib/planning/fueling';
+import { loadPlannedWorkouts, type PlannedWorkoutRow } from '../../src/lib/fitness/data';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from '../../src/lib/recipes/types';
 import { mondayOfWeek } from '../../src/lib/dates';
 import { addDays } from '../../src/lib/diary';
@@ -100,6 +102,28 @@ export default function Plan() {
     }
   }, [session?.user.id]);
   useFocusEffect(useCallback(() => { void loadExclusions(); }, [loadExclusions]));
+  const [training, setTraining] = useState<{ key: string; rows: PlannedWorkoutRow[] } | null>(null);
+  const [fuelOn, setFuelOn] = useState(true);
+  const trainingKey = `${session?.user.id ?? ''}:${start}`;
+  useFocusEffect(useCallback(() => {
+    if (!session) return;
+    let live = true;
+    const key = `${session.user.id}:${start}`;
+    // Training is optional context for fueling; failures just mean no training-day adjustments.
+    loadPlannedWorkouts(start, addDays(start, 6))
+      .then((rows) => { if (live) setTraining({ key, rows }); })
+      .catch(() => { if (live) setTraining({ key, rows: [] }); });
+    return () => { live = false; };
+  }, [session?.user.id, start]));
+  const fuelDays = useMemo(() => {
+    if (!targets || !profile || training?.key !== trainingKey) return null;
+    const base = { calories: targets.calories, protein_g: targets.protein_g, carbs_g: targets.carbs_g, fat_g: targets.fat_g };
+    return fuelWeek(Array.from({ length: 7 }, (_, index) => addDays(start, index)), training.rows, base, profile.weight_kg);
+  }, [targets, profile?.weight_kg, training, trainingKey, start]);
+  const trainingDays = fuelDays?.filter((day) => day.kind !== 'rest').length ?? 0;
+  const fuelFor = (date: string) => fuelOn && trainingDays ? fuelDays?.find((day) => day.date === date) ?? null : null;
+  const dailyTargets = useMemo(() => fuelOn && fuelDays
+    ? Object.fromEntries(fuelDays.filter((day) => day.shiftKcal).map((day) => [day.date, day.targets])) : undefined, [fuelOn, fuelDays]);
 
   async function saveExclusions(): Promise<boolean> {
     if (!session || savingPreferences) return false;
@@ -172,9 +196,9 @@ export default function Plan() {
     })),
   ], [recipes, libraryIdeas]);
   const generatorContext = useMemo(() => JSON.stringify([start, generatorDays, generatorMeals, replaceSlots,
-    activePreferences?.excludedFoods, exclusionText, profile?.diet_prefs, targets, intake, candidates]),
+    activePreferences?.excludedFoods, exclusionText, profile?.diet_prefs, targets, dailyTargets, intake, candidates]),
   [start, generatorDays, generatorMeals, replaceSlots, activePreferences?.excludedFoods, exclusionText,
-    profile?.diet_prefs, targets, intake, candidates]);
+    profile?.diet_prefs, targets, dailyTargets, intake, candidates]);
   const liveGeneratorContext = useRef(generatorContext);
   liveGeneratorContext.current = generatorContext;
   useEffect(() => { setPreview(null); setSwappedOut({}); }, [generatorContext]);
@@ -197,7 +221,7 @@ export default function Plan() {
       result: generateWeeklyMealPlan({
         weekStart: start, dates: generatorDays.map((index) => addDays(start, index)), meals: generatorMeals,
         replaceSlots, entries: weeklyEntries(entries), candidates, preferences: profile.diet_prefs,
-        foodExclusions: activePreferences.excludedFoods, targets, today,
+        foodExclusions: activePreferences.excludedFoods, targets, dailyTargets, today,
         intake: intake?.owner === session.user.id && intake.date === today ? intake.macros : null,
         swappedOut: swaps,
       }),
@@ -470,6 +494,14 @@ export default function Plan() {
             <TextField label="Foods to skip (comma or new line)" value={exclusionText} onChangeText={setExclusionText} multiline editable={!pending && !savingPreferences} />
             <Text style={typography.small}>Remembered for next time. Matches recipe names and ingredients, but isn’t an allergy guarantee.</Text>
             {preferenceError ? <Notice tone="danger">{preferenceError}</Notice> : null}
+            <Eyebrow>4 · Training</Eyebrow>
+            {trainingDays ? <>
+              <ChipRow><Chip label={`Fuel my ${trainingDays} training day${trainingDays === 1 ? '' : 's'}`} selected={fuelOn} disabled={pending} onPress={() => setFuelOn((on) => !on)} /></ChipRow>
+              <Text style={typography.small}>More carbs on workout days and a little less on rest days. Your weekly calories stay the same.</Text>
+            </> : <>
+              <Text style={typography.small}>No workouts planned this week. Add a training plan and Buko will give you more fuel on workout days.</Text>
+              <Button title="Build a training plan" icon="barbell-outline" variant="ghost" onPress={() => router.push('/workout/plan')} />
+            </>}
             {!activePreferences ? <Button title="Load saved foods to skip" variant="secondary" disabled={pending} onPress={() => { void loadExclusions(); }} /> : null}
             {(() => {
               const occupied = generatorDays.flatMap((index) => generatorMeals.map((meal) => {
@@ -512,6 +544,10 @@ export default function Plan() {
                     <Eyebrow>{formatDay(date)}</Eyebrow>
                     <Text style={typography.small}>{totals.calories == null ? 'kcal unknown' : `~${Math.round(totals.calories).toLocaleString()} kcal`}</Text>
                   </View>
+                  {(() => {
+                    const fuel = fuelFor(date);
+                    return fuel && fuel.kind !== 'rest' ? <Text style={[typography.label, { color: colors.primary }]}>{fuelLabel(fuel)}</Text> : null;
+                  })()}
                   {slots.map((slot) => {
                     const label = MEALS.find((item) => item.key === slot.meal)?.label ?? slot.meal;
                     const removedTitles = slot.replaceIds.map((id) => {
@@ -548,23 +584,25 @@ export default function Plan() {
             </> : null}
           </Card> : null}
 
-          {targets ? (
-            <Card>
-              <Text style={typography.label}>Planned {formatDay(selected)}</Text>
+          {targets ? (() => {
+            const fuel = fuelFor(selected);
+            const dayTarget = fuel?.targets ?? targets;
+            return <Card>
+              <Text style={typography.label}>Planned {formatDay(selected)}{fuel && (fuel.kind !== 'rest' || fuel.shiftKcal) ? ` · ${fuelLabel(fuel)}` : ''}</Text>
               <Text style={[typography.body, { marginVertical: spacing.sm }]}>
                 {totals.calories === 0
                   ? 'Nothing planned yet.'
-                  : `${Math.round(totals.calories).toLocaleString()} kcal · Target ${targets.calories.toLocaleString()} kcal`}
+                  : `${Math.round(totals.calories).toLocaleString()} kcal · Target ${dayTarget.calories.toLocaleString()} kcal`}
               </Text>
               {entries.some((e) => e.planned_on === selected && !perServing.get(e.recipe_id)?.complete) ? <Text style={typography.small}>Partial estimate: meals with incomplete nutrition are excluded.</Text> : null}
               <Disclosure title="Macro breakdown">
-              <MacroBar label="Calories" unit="kcal" value={totals.calories} target={targets.calories} color={colors.macro.calories} />
-              <MacroBar label="Protein" value={totals.protein} target={targets.protein_g} color={colors.macro.protein} />
-              <MacroBar label="Carbs" value={totals.carbs} target={targets.carbs_g} color={colors.macro.carbs} />
-              <MacroBar label="Fat" value={totals.fat} target={targets.fat_g} color={colors.macro.fat} />
+              <MacroBar label="Calories" unit="kcal" value={totals.calories} target={dayTarget.calories} color={colors.macro.calories} />
+              <MacroBar label="Protein" value={totals.protein} target={dayTarget.protein_g} color={colors.macro.protein} />
+              <MacroBar label="Carbs" value={totals.carbs} target={dayTarget.carbs_g} color={colors.macro.carbs} />
+              <MacroBar label="Fat" value={totals.fat} target={dayTarget.fat_g} color={colors.macro.fat} />
               </Disclosure>
-            </Card>
-          ) : null}
+            </Card>;
+          })() : null}
 
 
           {MEALS.map(({ key, label }) => {

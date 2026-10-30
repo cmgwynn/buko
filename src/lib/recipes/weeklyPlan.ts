@@ -34,6 +34,8 @@ export function generateWeeklyMealPlan(input: {
   preferences: readonly DietPref[];
   foodExclusions: readonly string[];
   targets: Partial<KnownMacros> | null;
+  /** Per-date targets (e.g. training-day fueling); falls back to `targets`. */
+  dailyTargets?: Readonly<Record<string, Partial<KnownMacros>>>;
   today: string;
   intake: KnownMacros | null;
   /** Recipe ids the user swapped away from, per slot key. */
@@ -70,7 +72,7 @@ export function generateWeeklyMealPlan(input: {
         continue;
       }
       const result = recommendMeals({
-        candidates: input.candidates, preferences: input.preferences, targets: input.targets, meal, planned,
+        candidates: input.candidates, preferences: input.preferences, targets: input.dailyTargets?.[date] ?? input.targets, meal, planned,
         intake: input.intake, isToday: date === input.today, limit: input.candidates.length,
       });
       // Prefer variety among recipes with equally usable goal data, then deterministic goal fit.
