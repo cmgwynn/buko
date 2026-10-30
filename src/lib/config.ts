@@ -16,6 +16,8 @@ export const config = {
   termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? '',
   /** Off until the owner approves ads, an ad network account exists and privacy disclosures are updated. */
   adsEnabled: process.env.EXPO_PUBLIC_ADS_ENABLED === 'true',
+  /** Shows "Order on Instacart" on Groceries. Requires the grocery-order function and an Instacart API key. */
+  groceryOrdering: process.env.EXPO_PUBLIC_GROCERY_ORDERING === 'true',
 };
 
 export const isSupabaseConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);

@@ -53,6 +53,7 @@ jobs:
           EXPO_PUBLIC_PRIVACY_URL: ${{ vars.EXPO_PUBLIC_PRIVACY_URL || 'https://cmgwynn.github.io/buko/legal/privacy.html' }}
           EXPO_PUBLIC_TERMS_URL: ${{ vars.EXPO_PUBLIC_TERMS_URL || 'https://cmgwynn.github.io/buko/legal/terms.html' }}
           EXPO_PUBLIC_ADS_ENABLED: ${{ vars.EXPO_PUBLIC_ADS_ENABLED || 'false' }}
+          EXPO_PUBLIC_GROCERY_ORDERING: ${{ vars.EXPO_PUBLIC_GROCERY_ORDERING || 'false' }}
       - name: Add route fallback
         run: |
           cp dist/index.html dist/404.html

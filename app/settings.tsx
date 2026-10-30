@@ -77,7 +77,7 @@ export default function Settings() {
       </View>
     </Card>
     <Card><Disclosure title="Privacy & data processing">
-      <Body muted>{adsCopy} No behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials.</Body>
+      <Body muted>{adsCopy} No behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials. Order on Instacart sends only your unchecked grocery item names, and Buko may earn a commission.</Body>
       <Body muted>Coach is optional. With consent, minimized context and chat may go to Anthropic; names, email and birthday are excluded from structured context. Avoid identifiers in free text. Imported health-app workouts and energy are excluded; weight sharing is a separate choice.</Body>
       <Body muted>Store subscriptions use RevenueCat with a pseudonymous identifier and purchase/device metadata. Exported files contain sensitive personal and health data. Deletion does not remove original Apple Health or Health Connect records.</Body>
     </Disclosure></Card>

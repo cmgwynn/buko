@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Platform, Pressable, Switch, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, Switch, Text, View } from 'react-native';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Body, Button, Card, Disclosure, Empty, Loading, NavigationRow, Notice, Screen, TextField } from '../../src/components/ui';
@@ -10,6 +10,8 @@ import { groceryCacheKey, queueGroceryCheck, readGroceryCache, writeGroceryCache
 import { sectionFor } from '../../src/lib/recipes/sections';
 import { SECTIONS } from '../../src/lib/recipes/types';
 import { supabase } from '../../src/lib/supabase';
+import { config } from '../../src/lib/config';
+import { createInstacartLink } from '../../src/lib/grocery/orderClient';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { accountStorageWrites } from '../../src/lib/account/storageWrites';
 import { colors, spacing, typography } from '../../src/theme';
@@ -26,6 +28,7 @@ export default function Grocery() {
   const [message, setMessage] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [ordering, setOrdering] = useState(false);
   const [offline, setOffline] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
   const [removed, setRemoved] = useState<GroceryItem[]>([]);
@@ -158,6 +161,16 @@ export default function Grocery() {
   }
 
   const todo = items.filter((i) => !i.checked);
+  async function orderOnInstacart() {
+    if (ordering || !todo.length) return;
+    setOrdering(true); setError(null);
+    try {
+      const url = await createInstacartLink(todo.slice(0, 100));
+      if (Platform.OS === 'web') window.open(url, '_blank', 'noopener');
+      else await Linking.openURL(url);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not open Instacart.'); }
+    finally { setOrdering(false); }
+  }
   const done = items.filter((i) => i.checked);
 
   const row = (item: GroceryItem) => (
@@ -196,6 +209,11 @@ export default function Grocery() {
       />
       <Text style={typography.small}>{todo.length} item{todo.length === 1 ? '' : 's'} to pick up</Text>
       <Button title="Make list from meal plan" icon="calendar-outline" variant="secondary" onPress={() => router.push('/grocery/generate')} />
+      {config.groceryOrdering && todo.length ? <>
+        <View style={{ height: spacing.sm }} />
+        <Button title={`Order ${todo.length} item${todo.length === 1 ? '' : 's'} on Instacart`} icon="cart-outline" loading={ordering} onPress={() => { void orderOnInstacart(); }} />
+        <Text style={[typography.small, { marginTop: spacing.xs }]}>Opens Instacart to pick a store and check out. Only item names are shared. Buko may earn a commission.</Text>
+      </> : null}
       <View style={{ height: spacing.md }} />
       <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' }}>
         <View style={{ flex: 1 }}>

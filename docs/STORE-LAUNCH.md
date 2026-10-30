@@ -240,14 +240,23 @@ No subscription is currently approved for a public launch. Current staged defaul
 - Keep purchase packages/paywalls disabled while the rollout is staged or either real legal/document URL is missing. Test sandbox purchases only against a separate test Supabase/RevenueCat setup; never turn on sandbox acceptance in production.
 - Confirm the database-side restrictive premium policies and Edge Function premium checks are active only in the explicitly approved enforcement rollout. In the current staged default, access enforcement is not publicly activated.
 
-### Buko Plus pricing and free-tier ads (owner direction)
+### Grocery ordering (Instacart affiliate)
+
+Groceries can show **Order N items on Instacart**. The `grocery-order` Edge Function sends only item names, quantity notes and valid 12/14-digit UPCs to Instacart's *Create shopping list page* API, and returns a link to a shopping list that expires after 7 days. The user then picks a store and checks out on Instacart. Commission (currently advertised at up to 5% of the cart) is tracked through Impact. Instacart adds the tracking parameters automatically, so never append them by hand.
+
+1. Apply for the Instacart Developer Platform at https://www.instacart.com/company/business/developers and get a **development** API key.
+2. Set the function secrets in Supabase (Edge Functions → Secrets): `INSTACART_API_KEY`, `INSTACART_BASE_URL=https://connect.dev.instacart.tools` and `GROCERY_ORDERING_ENABLED=true`. Then run `npx supabase functions deploy grocery-order`.
+3. In GitHub → Settings → Secrets and variables → Actions → Variables, add `EXPO_PUBLIC_GROCERY_ORDERING=true` and re-run the deploy.
+4. Test end to end, then request a **production** key from Instacart. Switch `INSTACART_BASE_URL` to `https://connect.instacart.com` and join the affiliate program through the Impact invite Instacart emails to active partners.
+5. US and Canada only. The button text discloses that Buko may earn a commission. Keep that disclosure, as the FTC requires.
+
 
 Model: **free with light ads, plus an optional low-cost Buko Plus**. Planning, recipe import, logging, scanning, workouts and grocery lists stay free. Plus adds no ads, Coach, AI tested-meal suggestions and health-app sync. It still uses the single RevenueCat entitlement `premium`.
 
 | Store product (proposed) | Price target | RevenueCat package |
 | --- | --- | --- |
-| `buko_plus_monthly` | $0.99 / month | `$rc_monthly` |
-| `buko_plus_annual` | $7.99 / year | `$rc_annual` |
+| `buko_plus_monthly` | $1.99 / month | `$rc_monthly` |
+| `buko_plus_annual` | $14.99 / year (about 37% off monthly) | `$rc_annual` |
 
 - Prices are set in each store. The app shows only the store's `priceString` and never hardcodes these amounts.
 - Enroll in the Apple Small Business Program and confirm Google Play's 15% subscription rate before launch.
