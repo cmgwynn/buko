@@ -10,7 +10,7 @@ import { useConfirm } from '../../src/components/ConfirmProvider';
 import { WorkoutSetRow } from '../../src/components/workout/WorkoutSetRow';
 import { ExerciseDemo } from '../../src/components/workout/ExerciseDemo';
 import {
-  adjustSessionRest, blankSet, completeSessionSet, endSession, pauseSession, prefillSessionHistory,
+  adjustSessionRest, blankSet, completeSessionSet, endSession, getSession, pauseSession, prefillSessionHistory,
   resumeSession, undoSessionSet, updateSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore,
 } from '../../src/lib/fitness/session';
 import { formatDuration } from '../../src/lib/fitness/format';
@@ -43,7 +43,8 @@ export default function ActiveWorkout() {
   }, [focused]);
   useFocusEffect(useCallback(() => {
     setFocused(true);
-    void prefillSessionHistory().catch((e: Error) => setError(e.message));
+    // Explicit planned targets must not be overwritten by last-session history.
+    if (!getSession().plannedWorkoutId) void prefillSessionHistory().catch((e: Error) => setError(e.message));
     const back = BackHandler.addEventListener('hardwareBackPress', () => {
       router.replace('/(tabs)/train'); return true;
     });

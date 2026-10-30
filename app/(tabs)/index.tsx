@@ -10,6 +10,8 @@ import { Button, Card, CardGrid, Notice, Screen } from '../../src/components/ui'
 import { addDays, defaultMeal, formatDay, MEALS, toDateString } from '../../src/lib/diary';
 import { planMealCopy, restoreEntryRow, sumEntries } from '../../src/lib/foodLogging';
 import { activityAdjustedTargets } from '../../src/lib/fitness/calc';
+import { applyAdaptiveCalorieAdjustment } from '../../src/lib/nutrition/targets';
+import { MICRONUTRIENTS, sumMicronutrients } from '../../src/lib/nutrition/micronutrients';
 import { loadBurnedForDay } from '../../src/lib/fitness/data';
 import { loadActivityForDay, maybeWriteNutrition, removeNutritionFromHealth, syncIfDue, type HealthRemoval } from '../../src/lib/health';
 import { logPlanEntry, type RecipeWithNutrition } from '../../src/lib/recipes/logging';
@@ -153,6 +155,7 @@ export default function Diary() {
   );
 
   const totals = sumEntries(entries);
+  const micronutrientTotals = sumMicronutrients(entries);
   const adjusted =
     settings?.activity_adjust && profile && baseTargets && age !== null
       ? activityAdjustedTargets(
@@ -161,7 +164,17 @@ export default function Diary() {
           settings.activity_share,
         )
       : null;
-  const targets = adjusted ? { ...baseTargets!, calories: adjusted.calories, protein_g: adjusted.protein_g, carbs_g: adjusted.carbs_g, fat_g: adjusted.fat_g } : baseTargets;
+  const targets = adjusted && baseTargets && profile
+    ? applyAdaptiveCalorieAdjustment({
+        ...baseTargets,
+        calories: adjusted.calories,
+        protein_g: adjusted.protein_g,
+        carbs_g: adjusted.carbs_g,
+        fat_g: adjusted.fat_g,
+        floor_applied: adjusted.floorApplied,
+        adaptive_calorie_adjustment: 0,
+      }, baseTargets.adaptive_calorie_adjustment ?? 0, profile.sex)
+    : baseTargets;
   const remaining = targets ? targets.calories - totals.calories : 0;
 
   async function confirmDelete(entry: FoodLogEntry) {
@@ -331,6 +344,38 @@ export default function Diary() {
               <MacroBar label="Protein" value={totals.protein} target={targets.protein_g} color={colors.macro.protein} />
               <MacroBar label="Carbs" value={totals.carbs} target={targets.carbs_g} color={colors.macro.carbs} />
               <MacroBar label="Fat" value={totals.fat} target={targets.fat_g} color={colors.macro.fat} />
+              <View style={{ marginTop: spacing.md }}>
+                <Text style={typography.label}>Micronutrients</Text>
+                <Text style={[typography.small, { marginVertical: spacing.xs }]}>
+                  FDA adult Daily Values are a general reference, not personal nutrition advice. Unknown source values are not counted as zero.
+                </Text>
+                {MICRONUTRIENTS.map((item) => {
+                  const total = micronutrientTotals[item.key];
+                  const complete = entries.length > 0 && total.missingEntries === 0;
+                  const reported = total.knownEntries > 0;
+                  const amount = total.amount.toLocaleString(undefined, { maximumFractionDigits: 1 });
+                  const detail = entries.length === 0 ? 'No foods logged'
+                    : !reported ? `Not reported for ${total.missingEntries} foods`
+                    : total.missingEntries > 0 ? `${amount} ${item.unit} reported · ${total.missingEntries} foods missing data`
+                    : `${amount} / ${item.dailyValue} ${item.unit} · ${Math.round((total.amount / item.dailyValue) * 100)}% DV`;
+                  return (
+                    <View key={item.key} style={{ marginTop: spacing.xs }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm }}>
+                        <Text style={typography.body}>{item.label}</Text>
+                        <Text style={[typography.small, { textAlign: 'right', flexShrink: 1 }]}>{detail}</Text>
+                      </View>
+                      {complete ? (
+                        <View accessibilityRole="progressbar"
+                          accessibilityLabel={`${item.label} percent of general adult Daily Value`}
+                          accessibilityValue={{ min: 0, max: 100, now: Math.min(100, Math.round((total.amount / item.dailyValue) * 100)) }}
+                          style={{ height: 5, borderRadius: radius.pill, backgroundColor: colors.surfaceMuted, overflow: 'hidden', marginTop: 4 }}>
+                          <View style={{ height: 5, width: `${Math.min(100, (total.amount / item.dailyValue) * 100)}%`, backgroundColor: colors.primary }} />
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
             </View>
           ) : null}
         </Card>

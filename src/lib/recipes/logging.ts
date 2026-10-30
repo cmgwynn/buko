@@ -6,6 +6,7 @@ import type { Meal } from '../../types';
 import { computeRecipeNutrition, recipeLoggingError } from './nutrition';
 import type { MealPlanEntry, Recipe, RecipeIngredient } from './types';
 import { invalidateDateHistory } from '../../components/date/dateHistory';
+import { micronutrientsForGrams } from '../nutrition/micronutrients';
 
 export type RecipeWithNutrition = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'grams' | 'nutrition'>[] };
 
@@ -35,6 +36,7 @@ export async function logRecipeServings(
     protein_g: round1(ps.protein_g * opts.servings),
     carbs_g: round1(ps.carbs_g * opts.servings),
     fat_g: round1(ps.fat_g * opts.servings),
+    micronutrients: micronutrientsForGrams(n.per100g, n.perServingGrams * opts.servings),
   }).select('id').single();
   if (error) return error.message;
   invalidateDateHistory();

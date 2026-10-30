@@ -14,6 +14,18 @@ const nutrients: Nutrients = {
 };
 
 describe('recipe nutrition', () => {
+  test('tracks supported micronutrients without making them required for recipe scoring', () => {
+    const result = computeRecipeNutrition([
+      { grams: 100, nutrition: { per100g: { ...nutrients, calciumMg: 100, ironMg: 2, potassiumMg: 250, vitaminCMg: 4, vitaminDMcg: 1 } } },
+      { grams: 100, nutrition: { per100g: { ...nutrients, calciumMg: 100, ironMg: 2, potassiumMg: 250, vitaminCMg: 4, vitaminDMcg: 1 } } },
+    ], 2);
+    expect(result.complete).toBe(true);
+    expect(result.micronutrientsPerServing).toEqual({ calciumMg: 100, ironMg: 2, potassiumMg: 250, vitaminCMg: 4, vitaminDMcg: 1 });
+    const unknown = computeRecipeNutrition([{ grams: 100, nutrition: { per100g: nutrients } }], 1);
+    expect(unknown.micronutrientsPerServing.calciumMg).toBeNull();
+    expect(unknown.complete).toBe(true);
+  });
+
   test('scales totals into per-serving macros', () => {
     const result = computeRecipeNutrition([
       { grams: 100, nutrition: { per100g: nutrients } },

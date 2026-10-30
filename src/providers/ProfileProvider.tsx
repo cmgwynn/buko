@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { accountStorageWrites } from '../lib/account/storageWrites';
 import { supabase } from '../lib/supabase';
 import { birthdayTargets, profileAge } from '../lib/nutrition/birthday';
+import { applyAdaptiveCalorieAdjustment } from '../lib/nutrition/targets';
 import { useLocalDay } from '../lib/useLocalDay';
 import type { NutritionTargets, Profile } from '../types';
 import { useAuth } from './AuthProvider';
@@ -16,7 +17,7 @@ interface ProfileContextValue {
   connectionError: string | null;
   /** True until the first profile fetch for the current user completes. */
   loading: boolean;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<boolean>;
 }
 
 const ProfileContext = createContext<ProfileContextValue>({
@@ -27,7 +28,7 @@ const ProfileContext = createContext<ProfileContextValue>({
   birthdayError: null,
   connectionError: null,
   loading: true,
-  refresh: async () => {},
+  refresh: async () => true,
 });
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
@@ -49,7 +50,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       setTargets(null);
       setLoadedFor(null);
       setConnectionError(null);
-      return;
+      return true;
     }
     const key = `buko:workout-profile:${userId}`;
     let cached: { profile: Profile; targets: NutritionTargets | null } | null = null;
@@ -69,11 +70,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       supabase.from('profiles').select('*').eq('user_id', userId).abortSignal(AbortSignal.timeout(10000)).maybeSingle(),
       supabase.from('nutrition_targets').select('*').eq('user_id', userId).abortSignal(AbortSignal.timeout(10000)).maybeSingle(),
     ]);
-    if (version !== request.current || activeUser.current !== userId) return;
+    if (version !== request.current || activeUser.current !== userId) return false;
     if (p.error || t.error) {
       setConnectionError(`${cached ? 'Using your saved profile for offline workouts.' : 'Your profile could not be loaded. Reconnect and retry.'} ${cacheError ?? p.error?.message ?? t.error?.message}`);
       setLoadedFor(userId);
-      return;
+      return false;
     }
     setProfile((p.data as Profile) ?? null);
     setTargets((t.data as NutritionTargets) ?? null);
@@ -86,6 +87,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
     } catch {
       if (version === request.current) setConnectionError('Profile loaded, but its offline workout copy could not be saved. Free device storage and retry.');
     }
+    return true;
   }, [userId]);
 
   useEffect(() => {
@@ -108,6 +110,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         currentTargets = null;
         birthdayError = err instanceof Error ? err.message : 'Could not calculate targets from your birthday. Please update your details.';
       }
+    }
+    if (currentProfile && currentTargets) {
+      currentTargets = applyAdaptiveCalorieAdjustment(
+        currentTargets,
+        targets?.adaptive_calorie_adjustment ?? 0,
+        currentProfile.sex,
+      );
     }
     return { profile: loadedFor === userId ? currentProfile : null, targets: currentTargets, age, today, birthdayError, connectionError, loading, refresh };
   }, [profile, targets, today, connectionError, loadedFor, userId, loading, refresh]);

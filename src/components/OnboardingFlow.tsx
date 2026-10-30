@@ -142,7 +142,8 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
     });
     const t = p.error ? null : await supabase.from('nutrition_targets').upsert({
       user_id: userId, calories: result.calories, protein_g: result.proteinG, carbs_g: result.carbsG,
-      fat_g: result.fatG, bmr: result.bmr, tdee: result.tdee, floor_applied: result.floorApplied, updated_at: now,
+      fat_g: result.fatG, bmr: result.bmr, tdee: result.tdee, floor_applied: result.floorApplied,
+      adaptive_calorie_adjustment: 0, updated_at: now,
     });
     const err = p.error ?? t?.error;
     if (err) {

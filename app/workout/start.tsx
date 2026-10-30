@@ -2,6 +2,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button, Card, Heading, Loading, Notice, Screen } from '../../src/components/ui';
+import { WeeklyTrainingPlan } from '../../src/components/workout/WeeklyTrainingPlan';
 import { loadRoutines, routineToItems, type RoutineRow } from '../../src/lib/fitness/data';
 import { getSession, startSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore } from '../../src/lib/fitness/session';
 import { spacing, typography } from '../../src/theme';
@@ -60,6 +61,7 @@ export default function StartWorkout() {
         {loading ? <Loading /> : routines.map((row) => <Card key={row.id}><Text style={typography.subheading}>{row.name}</Text>
           <Button title={`Use ${row.name}`} variant="secondary" disabled={busy} onPress={() => router.setParams({ routine: row.id })} /></Card>)}
       </> : null}
+      <WeeklyTrainingPlan disabled={busy || !recovery.ready} />
     </>}
   </Screen>;
 }

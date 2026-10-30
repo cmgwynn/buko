@@ -2,6 +2,8 @@ import type { Factor } from './scoring/factors.ts';
 import type { Food, FoodLogEntry, FoodSource, Meal, Nutrients } from '../types/index.ts';
 import { round1, type Macros } from './diary.ts';
 import { isDateString } from './dates.ts';
+import { emptyMicronutrients, MICRONUTRIENTS, MICRONUTRIENT_KEYS, micronutrientsForGrams, per100gMicronutrients } from './nutrition/micronutrients.ts';
+import type { MicronutrientKey, MicronutrientValues } from '../types';
 
 /** Nutrients that must be known before a food can be logged; unknown values are never stored as zero. */
 export const REQUIRED_MACROS = ['calories', 'protein', 'carbs', 'fat'] as const;
@@ -82,6 +84,7 @@ export function foodFromEntry(e: FoodLogEntry): { food: Food; last: LoggedAmount
     per100g: {
       calories: Number(e.calories) * k, protein: Number(e.protein_g) * k, carbs: Number(e.carbs_g) * k, fat: Number(e.fat_g) * k,
       sugars: null, saturatedFat: null, sodiumMg: null, fiber: null,
+      ...per100gMicronutrients(e.micronutrients, grams),
     },
     servingG: servingUnit ? grams / quantity : null,
     servingLabel: servingUnit ? `${round1(grams / quantity)} g as previously logged` : null,
@@ -129,6 +132,7 @@ export interface EntryInsert {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  micronutrients: MicronutrientValues;
 }
 
 /** Diary row for an amount of a food, or an error message when it can't be logged honestly. */
@@ -148,6 +152,7 @@ export function buildEntryInsert(
       source: food.source, source_id: food.sourceId, name: food.name, brand: food.brand,
       quantity: Number(opts.amount.trim().replace(',', '.')), unit: opts.unit, grams: round1(grams),
       calories: round1(m.calories), protein_g: round1(m.protein_g), carbs_g: round1(m.carbs_g), fat_g: round1(m.fat_g),
+      micronutrients: micronutrientsForGrams(food.per100g, grams),
     },
   };
 }
@@ -159,6 +164,7 @@ export function copyEntryRows(entries: FoodLogEntry[], opts: { userId: string; d
     source: e.source, source_id: e.source_id, name: e.name, brand: e.brand,
     quantity: Number(e.quantity), unit: e.unit === 'serving' ? 'serving' : 'g', grams: Number(e.grams),
     calories: Number(e.calories), protein_g: Number(e.protein_g), carbs_g: Number(e.carbs_g), fat_g: Number(e.fat_g),
+    micronutrients: { ...emptyMicronutrients(), ...(e.micronutrients ?? {}) },
   }));
 }
 
@@ -221,10 +227,16 @@ export interface ManualFoodForm {
   protein: string;
   carbs: string;
   fat: string;
+  [key: string]: string | undefined;
+  calciumMg?: string;
+  ironMg?: string;
+  potassiumMg?: string;
+  vitaminCMg?: string;
+  vitaminDMcg?: string;
   barcode?: string;
 }
 
-export type ManualFoodErrors = Partial<Record<'name' | 'basisGrams' | RequiredMacro | 'form', string>>;
+export type ManualFoodErrors = Partial<Record<'name' | 'basisGrams' | RequiredMacro | MicronutrientKey | 'form', string>>;
 
 const parseNumber = (s: string): number | null => {
   const t = s.trim().replace(',', '.');
@@ -245,11 +257,18 @@ export function parseManualFood(form: ManualFoodForm): { food: Food } | { errors
   const basis = parseNumber(form.basisGrams);
   if (basis === null || basis <= 0 || basis > MAX_LOG_GRAMS) errors.basisGrams = 'Enter the weight these values are for, in grams.';
   const values: Partial<Record<RequiredMacro, number>> = {};
+  const micronutrientValues = emptyMicronutrients();
   for (const k of REQUIRED_MACROS) {
     const v = parseNumber(form[k]);
     if (v === null) errors[k] = 'Required. Enter 0 only if the label says 0.';
     else if (v < 0) errors[k] = 'Must be 0 or more.';
     else values[k] = v;
+  }
+  for (const { key } of MICRONUTRIENTS) {
+    const raw = form[key] ?? '';
+    const value = parseNumber(raw);
+    if (raw.trim() && (value === null || value < 0)) errors[key] = 'Enter a value of 0 or more, or leave this optional field blank.';
+    else micronutrientValues[key] = value;
   }
   if (basis !== null && basis > 0 && values.protein !== undefined && values.carbs !== undefined && values.fat !== undefined) {
     if (values.protein + values.carbs + values.fat > basis * 1.05) {
@@ -271,6 +290,7 @@ export function parseManualFood(form: ManualFoodForm): { food: Food } | { errors
       per100g: {
         calories: values.calories! * k, protein: values.protein! * k, carbs: values.carbs! * k, fat: values.fat! * k,
         sugars: null, saturatedFat: null, sodiumMg: null, fiber: null,
+        ...Object.fromEntries(MICRONUTRIENT_KEYS.map((key) => [key, micronutrientValues[key] === null ? null : micronutrientValues[key]! * k])),
       },
       servingG: basis === 100 && !label ? null : basis!,
       servingLabel: label || null,
@@ -284,6 +304,8 @@ export function manualFormFromFood(food: Food | null, barcode?: string): ManualF
   return {
     name: food?.name ?? '', brand: food?.brand ?? '', basisGrams: '100', servingLabel: '',
     calories: v(food?.per100g.calories), protein: v(food?.per100g.protein), carbs: v(food?.per100g.carbs), fat: v(food?.per100g.fat),
+    calciumMg: v(food?.per100g.calciumMg), ironMg: v(food?.per100g.ironMg), potassiumMg: v(food?.per100g.potassiumMg),
+    vitaminCMg: v(food?.per100g.vitaminCMg), vitaminDMcg: v(food?.per100g.vitaminDMcg),
     barcode: barcode ?? (food && 'barcode' in food ? String((food as { barcode?: string }).barcode ?? '') : undefined),
   };
 }

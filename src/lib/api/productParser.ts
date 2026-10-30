@@ -28,6 +28,8 @@ export function parseProduct(raw: Raw): Product | null {
       sugars: num(n.sugars_100g), saturatedFat: num(n['saturated-fat_100g']),
       sodiumMg: sodiumG !== null ? sodiumG * 1000 : saltG !== null ? saltG / 2.5 * 1000 : null,
       fiber: num(n.fiber_100g),
+      calciumMg: num(n.calcium_100g), ironMg: num(n.iron_100g), potassiumMg: num(n.potassium_100g),
+      vitaminCMg: num(n['vitamin-c_100g']), vitaminDMcg: num(n['vitamin-d_100g']),
     },
     servingG: num(raw.serving_quantity), servingLabel: raw.serving_size ? String(raw.serving_size) : null,
     categoryTags: strings(raw.categories_tags),

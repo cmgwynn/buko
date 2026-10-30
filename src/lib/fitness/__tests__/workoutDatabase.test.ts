@@ -30,7 +30,7 @@ test('workout RPC is atomic, owner-scoped, completed-only, idempotent and export
       grant usage on schema public,auth,storage to authenticated,service_role;
       insert into auth.users values('${owner}'),('${other}');
     `);
-    for (const name of ['0001_init.sql', '0002_recipes_planning.sql', '0003_fitness.sql', '0007_account.sql', '0013_workout_mode.sql']) {
+    for (const name of ['0001_init.sql', '0002_recipes_planning.sql', '0003_fitness.sql', '0007_account.sql', '0013_workout_mode.sql', '0015_nutrition_insights.sql', '0016_planning_preferences.sql']) {
       await db.exec(readFileSync(new URL(name, migrations), 'utf8'));
     }
     await db.exec(`
@@ -40,6 +40,8 @@ test('workout RPC is atomic, owner-scoped, completed-only, idempotent and export
       grant select,insert,update,delete on all tables in schema public to authenticated;
       set role authenticated; select set_config('request.jwt.claim.sub','${owner}',false);
       insert into planned_workouts(id,user_id,planned_for,name) values('${planId}','${owner}','2026-10-24','Planned');
+      insert into planning_preferences(user_id,excluded_foods,excluded_exercises)
+        values('${owner}',array['peanuts'],array['${exercise}'::uuid]);
     `);
     const payload = {
       id: workoutId, name: 'Offline lift', started_at: '2026-10-23T10:00:00Z', completed_at: '2026-10-24T10:00:00Z',
@@ -84,6 +86,7 @@ test('workout RPC is atomic, owner-scoped, completed-only, idempotent and export
       select set_config('request.jwt.claim.sub','${other}',false);`);
     assert.equal((await db.query('select * from workouts')).rows.length, 0);
     assert.equal((await db.query('select * from workout_preferences')).rows.length, 0);
+    assert.equal((await db.query('select * from planning_preferences')).rows.length, 0);
     await assert.rejects(save(payload, other), /unavailable/);
     await assert.rejects(db.query(`insert into planned_workouts(id,user_id,planned_for,name,completed_workout_id)
       values(gen_random_uuid(),'${other}','2026-10-24','No','${workoutId}')`), /row-level security/);
@@ -91,11 +94,11 @@ test('workout RPC is atomic, owner-scoped, completed-only, idempotent and export
     await assert.rejects(save(payload), /permission denied/);
     await db.exec(`reset role; set role service_role`);
     const inventory = (await db.query<{ tables: string[] }>('select account_export_tables() as tables')).rows[0].tables;
-    for (const table of ['planned_workouts', 'workout_preferences', 'exercise_rest_preferences', 'workout_health_export_queue']) {
+    for (const table of ['planned_workouts', 'workout_preferences', 'exercise_rest_preferences', 'workout_health_export_queue', 'planning_preferences']) {
       assert.ok(inventory.includes(table));
     }
     await db.exec(`reset role; delete from auth.users where id='${owner}'`);
-    for (const table of ['workouts', 'workout_sets', 'planned_workouts', 'workout_preferences', 'exercise_rest_preferences', 'workout_health_export_queue']) {
+    for (const table of ['workouts', 'workout_sets', 'planned_workouts', 'workout_preferences', 'exercise_rest_preferences', 'workout_health_export_queue', 'planning_preferences']) {
       assert.equal((await db.query(`select * from ${table}`)).rows.length, 0, `${table} must cascade`);
     }
   } finally { await db.close(); }

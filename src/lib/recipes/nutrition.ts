@@ -2,6 +2,8 @@ import type { Nutrients, Product } from '../../types/index.ts';
 import { macrosForGrams, type Macros } from '../diary.ts';
 import { computeNutriScore, type NutriScoreResult } from '../scoring/nutriscore.ts';
 import { scoreProduct, type ScoreResult } from '../scoring/index.ts';
+import { emptyMicronutrients, MICRONUTRIENT_KEYS } from '../nutrition/micronutrients.ts';
+import type { MicronutrientKey, MicronutrientValues } from '../../types';
 import type { RecipeIngredient } from './types.ts';
 
 type NutrIngredient = Pick<RecipeIngredient, 'grams' | 'nutrition'>;
@@ -14,6 +16,7 @@ export interface RecipeNutrition {
   /** Totals for the whole recipe, summed over ingredients that have a weight and nutrition data. */
   total: Macros;
   perServing: Macros;
+  micronutrientsPerServing: MicronutrientValues;
   perServingGrams: number;
   per100g: Nutrients;
   fvlPercent: number;
@@ -38,9 +41,19 @@ export function computeRecipeNutrition(ingredients: NutrIngredient[], servings: 
   let excluded = 0;
   let incompleteIngredients = 0;
   const missingNutrients = new Set<keyof Nutrients>();
+  const micronutrientSums: Record<MicronutrientKey, number> = Object.fromEntries(MICRONUTRIENT_KEYS.map((key) => [key, 0])) as Record<MicronutrientKey, number>;
+  const missingMicronutrients: Record<MicronutrientKey, number> = Object.fromEntries(MICRONUTRIENT_KEYS.map((key) => [key, 0])) as Record<MicronutrientKey, number>;
 
   for (const ing of ingredients) {
     const validWeight = typeof ing.grams === 'number' && Number.isFinite(ing.grams) && ing.grams > 0;
+    for (const key of MICRONUTRIENT_KEYS) {
+      const value = ing.nutrition?.per100g?.[key];
+      if (validWeight && typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+        micronutrientSums[key] += (value * ing.grams!) / 100;
+      } else {
+        missingMicronutrients[key]++;
+      }
+    }
     const missing = KEYS.filter((key) => {
       const value = ing.nutrition?.per100g?.[key];
       return typeof value !== 'number' || !Number.isFinite(value) || value < 0;
@@ -68,12 +81,22 @@ export function computeRecipeNutrition(ingredients: NutrIngredient[], servings: 
   const total = macrosForGrams(subtotalPer100g, totalGrams);
   const per100g = { ...subtotalPer100g };
   for (const key of missingNutrients) per100g[key] = null;
+  for (const key of MICRONUTRIENT_KEYS) {
+    per100g[key] = totalGrams > 0 && missingMicronutrients[key] === 0
+      ? (micronutrientSums[key] / totalGrams) * 100
+      : null;
+  }
   const perServing: Macros = {
     calories: total.calories / safeServings,
     protein_g: total.protein_g / safeServings,
     carbs_g: total.carbs_g / safeServings,
     fat_g: total.fat_g / safeServings,
   };
+  const micronutrientsPerServing = emptyMicronutrients();
+  for (const key of MICRONUTRIENT_KEYS) {
+    const value = per100g[key];
+    micronutrientsPerServing[key] = typeof value === 'number' ? Math.round((value * (totalGrams / safeServings) / 100) * 10) / 10 : null;
+  }
   const fvlPercent = totalGrams > 0 ? (fvlGrams / totalGrams) * 100 : 0;
   const complete = ingredients.length > 0 && incompleteIngredients === 0 && validServings
     && Number.isFinite(totalGrams) && Object.values(sums).every(Number.isFinite)
@@ -82,6 +105,7 @@ export function computeRecipeNutrition(ingredients: NutrIngredient[], servings: 
     totalGrams,
     total,
     perServing,
+    micronutrientsPerServing,
     perServingGrams: totalGrams / safeServings,
     per100g,
     fvlPercent,

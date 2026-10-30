@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { Factor } from './scoring/factors.ts';
 import type { Food, FoodLogEntry, Nutrients } from '../types/index.ts';
+import { emptyMicronutrients } from './nutrition/micronutrients.ts';
 import {
   amountToGrams, buildEntryInsert, completeMacrosForGrams, copyEntryRows, createLatestGate, foodFromEntry,
   incompleteNutritionMessage, mainScoreReasons, manualFormFromFood, matchesQuery, missingRequiredMacros,
@@ -43,12 +44,13 @@ test('serving choice is offered only when the source gives a serving weight', ()
 });
 
 test('builds an insert row from a complete food', () => {
-  const r = buildEntryInsert(food({ servingG: 40 }), { userId: 'u', date: '2026-10-23', meal: 'lunch', amount: '2', unit: 'serving' });
+  const r = buildEntryInsert(food({ servingG: 40, per100g: per100({ calciumMg: 100, vitaminDMcg: 2 }) }), { userId: 'u', date: '2026-10-23', meal: 'lunch', amount: '2', unit: 'serving' });
   assert.ok('row' in r);
   assert.equal(r.row.grams, 80);
   assert.equal(r.row.calories, 160);
   assert.equal(r.row.unit, 'serving');
   assert.equal(r.row.quantity, 2);
+  assert.deepEqual(r.row.micronutrients, { ...emptyMicronutrients(), calciumMg: 80, vitaminDMcg: 1.6 });
 });
 
 test('foodFromEntry keeps the logged amount and only offers a serving it knows', () => {
@@ -70,11 +72,12 @@ test('recentFoods de-duplicates by source and keeps the newest amount', () => {
 });
 
 test('copied rows keep the stored snapshot but not ids or health links', () => {
-  const [row] = copyEntryRows([entry()], { userId: 'u2', date: '2026-10-23' });
+  const [row] = copyEntryRows([entry({ micronutrients: { ...emptyMicronutrients(), calciumMg: 35 } })], { userId: 'u2', date: '2026-10-23' });
   assert.equal(row.logged_on, '2026-10-23');
   assert.equal(row.user_id, 'u2');
   assert.equal(row.meal, 'breakfast');
   assert.equal(row.calories, 107);
+  assert.equal(row.micronutrients.calciumMg, 35);
   assert.ok(!('id' in row) && !('health_external_id' in row) && !('created_at' in row));
   assert.equal(copyEntryRows([entry()], { userId: 'u', date: 'd', meal: 'snack' })[0].meal, 'snack');
 });
@@ -89,6 +92,7 @@ test('manual nutrition requires every macro and converts to per 100 g', () => {
   const ok = parseManualFood(base);
   assert.ok('food' in ok);
   assert.equal(ok.food.per100g.calories, 450);
+  assert.equal(ok.food.per100g.calciumMg, null);
   assert.equal(ok.food.servingG, 40);
   assert.equal(ok.food.source, 'manual');
   const missing = parseManualFood({ ...base, fat: '' });
@@ -103,6 +107,13 @@ test('manual nutrition requires every macro and converts to per 100 g', () => {
   assert.ok('food' in per100g && per100g.food.servingG === null);
   const withCode = parseManualFood({ ...base, barcode: '0123 4567' });
   assert.ok('food' in withCode && withCode.food.sourceId === '01234567');
+  const withMicros = parseManualFood({ ...base, calciumMg: '120', ironMg: '0.5', vitaminDMcg: '2' });
+  assert.ok('food' in withMicros);
+  assert.equal(withMicros.food.per100g.calciumMg, 300);
+  assert.equal(withMicros.food.per100g.ironMg, 1.25);
+  assert.equal(withMicros.food.per100g.vitaminDMcg, 5);
+  const invalidMicro = parseManualFood({ ...base, potassiumMg: '-1' });
+  assert.ok('errors' in invalidMicro && invalidMicro.errors.potassiumMg);
 });
 
 test('manual form prefill leaves unknown values blank', () => {

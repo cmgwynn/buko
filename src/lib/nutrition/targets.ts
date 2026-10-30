@@ -103,3 +103,21 @@ export function floorWarning(result: TargetResult): string | null {
     `Eating very little can be harmful; please talk to a doctor or dietitian before dieting aggressively.`
   );
 }
+
+/** Apply only an explicitly accepted adjustment, keeping protein/fat fixed and honoring the floor. */
+export function applyAdaptiveCalorieAdjustment(
+  targets: import('../../types').NutritionTargets,
+  adjustment: number,
+  sex: Sex,
+): import('../../types').NutritionTargets {
+  const bounded = Number.isFinite(adjustment) ? Math.max(-200, Math.min(200, Math.round(adjustment))) : 0;
+  const requested = targets.calories + bounded;
+  const calories = Math.max(CALORIE_FLOOR[sex], requested);
+  return {
+    ...targets,
+    calories,
+    carbs_g: Math.max(0, Math.round((calories - targets.protein_g * 4 - targets.fat_g * 9) / 4)),
+    floor_applied: targets.floor_applied || requested < CALORIE_FLOOR[sex],
+    adaptive_calorie_adjustment: calories - targets.calories,
+  };
+}

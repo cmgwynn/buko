@@ -26,10 +26,13 @@ test('diary actions are owner-scoped, atomic, retry-safe, literal-searchable and
     for (const file of readdirSync(migrations).filter((file) => /^00(?:0[1-9]|1[0-2])_.*\.sql$/.test(file)).sort()) {
       await db.exec(readFileSync(new URL(file, migrations), 'utf8'));
     }
+    await db.exec(readFileSync(new URL('0015_nutrition_insights.sql', migrations), 'utf8'));
     await db.exec(`grant select,insert,update,delete on food_log_entries to authenticated;
       set role authenticated; select set_config('request.jwt.claim.sub','${owner}',false);`);
     const id = (await db.query<{ id: string }>(`insert into food_log_entries(user_id,logged_on,meal,source,name,quantity,unit,grams,calories,protein_g,carbs_g,fat_g)
       values($1,current_date-1,'breakfast','manual','Salmon 100%_meal',1,'serving',150,300,30,0,10) returning id`, [owner])).rows[0].id;
+    assert.deepEqual((await db.query<{ micronutrients: object }>('select micronutrients from food_log_entries where id=$1', [id])).rows[0].micronutrients,
+      { calciumMg: null, ironMg: null, potassiumMg: null, vitaminCMg: null, vitaminDMcg: null });
     const today = (await db.query<{ date: string }>('select current_date::text as date')).rows[0].date;
     const yesterday = (await db.query<{ date: string }>('select (current_date-1)::text as date')).rows[0].date;
     const request = '33333333-3333-4333-8333-333333333333';

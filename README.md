@@ -4,7 +4,7 @@ Scan products, rate them, track what you eat. See [PROJECT.md](./PROJECT.md) for
 
 Preparing an iOS/Android beta or store release? Start with the [store listing, EAS beta setup and launch checklist](./docs/STORE-LAUNCH.md). It records app IDs, listing text, account/health declarations and independent device/store acceptance work.
 
-Phases 1-7 are published on web, including subscriptions, owner-verified account export/deletion and dedicated workout mode. The owner confirmed migration `0013` ran on 2026-10-24. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks; native Phase 7 features require a new app build.
+Phases 1-8 are published on web, including subscriptions, owner-verified account export/deletion, dedicated workout mode and recipe-quality workflows. The Phase 9 nutrition and personalized-plan features described below are implemented in the current worktree but are not yet published; migrations `0015` and `0016` have not been applied. Independent signed-device, real store billing and screen-reader acceptance remain separate from automated checks; native features require a new app build.
 
 Phase 1 includes: email sign-up and onboarding with calorie/macro targets, a barcode scanner with an explainable 0–100 health score and better-product suggestions, a food diary with daily dashboard, and a grocery list.
 
@@ -21,7 +21,7 @@ npm install
 
 ## 2. Set up Supabase
 1. Create a project at supabase.com.
-2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), [`0006_subscriptions.sql`](./supabase/migrations/0006_subscriptions.sql), [`0007_account.sql`](./supabase/migrations/0007_account.sql), [`0008_diagnostics.sql`](./supabase/migrations/0008_diagnostics.sql), [`0009_community.sql`](./supabase/migrations/0009_community.sql), [`0010_ux_workflows.sql`](./supabase/migrations/0010_ux_workflows.sql), and [`0011_recipe_profiles.sql`](./supabase/migrations/0011_recipe_profiles.sql). This creates private app data and the separate members-only Shared library. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun. Apply `0009`, `0010` and `0011` once each; do not paste them again after success.
+2. Open **SQL Editor**, paste the contents of [`supabase/migrations/0001_init.sql`](./supabase/migrations/0001_init.sql), and run it. Then do the same, each as a **new query**, with [`0002_recipes_planning.sql`](./supabase/migrations/0002_recipes_planning.sql), [`0003_fitness.sql`](./supabase/migrations/0003_fitness.sql), [`0004_profile_birthdays.sql`](./supabase/migrations/0004_profile_birthdays.sql), [`0005_coach.sql`](./supabase/migrations/0005_coach.sql), [`0006_subscriptions.sql`](./supabase/migrations/0006_subscriptions.sql), [`0007_account.sql`](./supabase/migrations/0007_account.sql), [`0008_diagnostics.sql`](./supabase/migrations/0008_diagnostics.sql), [`0009_community.sql`](./supabase/migrations/0009_community.sql), [`0010_ux_workflows.sql`](./supabase/migrations/0010_ux_workflows.sql), [`0011_recipe_profiles.sql`](./supabase/migrations/0011_recipe_profiles.sql), [`0012_diary_navigation.sql`](./supabase/migrations/0012_diary_navigation.sql), [`0013_workout_mode.sql`](./supabase/migrations/0013_workout_mode.sql), [`0014_recipe_quality.sql`](./supabase/migrations/0014_recipe_quality.sql), [`0015_nutrition_insights.sql`](./supabase/migrations/0015_nutrition_insights.sql), and [`0016_planning_preferences.sql`](./supabase/migrations/0016_planning_preferences.sql). This creates private app data and the separate members-only Shared library. For an existing database, run only migrations not yet applied; `0004` and `0005` are safe to rerun. Apply `0009` through `0016` once each; do not paste them again after success. Follow the setup notes below for migrations that need additional configuration.
 3. **Authentication → Providers → Email:** for easiest testing on phones, turn **off** "Confirm email". If you leave it on, new users must tap the link in their confirmation email before logging in (the app tells them so).
 4. **Project Settings → API:** copy the **Project URL** and the **anon public** key.
 
@@ -198,6 +198,38 @@ calls and two reviewer calls; each has a 25-second timeout. These are call
 limits, not dollar caps. Set provider spending limits separately; failed calls
 can consume tokens/reservations. Never promise that an AI-approved meal has been
 physically tasted. No paid calls run automatically after cooking feedback.
+
+## Phase 9: personalized nutrition and weekly plans
+
+These features are implemented in this worktree but are not yet on the public
+website or a released app. No paid AI service is used.
+
+- Micronutrient tracking adds optional calcium, iron, potassium, vitamin C and
+  vitamin D data from USDA/Open Food Facts or manual labels. Unknown source
+  values remain unknown rather than being treated as zero. Daily Value
+  percentages use the [FDA Daily Values](https://www.fda.gov/food/nutrition-facts-label/daily-value-and-percent-daily-value-nutrition-and-supplement-facts-labels)
+  for adults and children 4+.
+- Weekly nutrition insights average only days with logged food and show the
+  number of days represented. Calorie-target suggestions require at least 14
+  logged days in the last 21 and four weight readings spanning at least 14 days.
+  Suggestions are limited to 100 kcal per review and ±200 kcal total; the
+  existing calorie floor is preserved. Nothing changes until the user accepts.
+- Generate a seven-day meal plan from saved recipes and the Buko library using
+  current targets, intake, diet preferences and reusable account-level food
+  exclusions. Preview additions and estimates before saving. Only explicitly
+  selected existing slots may be replaced; logged meals are protected.
+- Generate a four-week general-fitness run/walk and optional light-strength
+  schedule from the user's comfortable run duration, frequency and preferred
+  weekdays. Running time increases by at most 5% in each of weeks 2 and 3, then
+  week 4 is a recovery week. Review and edit every week before saving; existing
+  workouts are preserved unless the user selects a specific uncompleted slot
+  for replacement.
+- Saved food and exercise exclusions are account-scoped and reusable. These
+  plans are estimates and not medical advice. Ingredient phrase matching is
+  conservative, and recipes are not guaranteed kitchen-tested, allergy-safe or
+  compatible with every dietary need; inspect ingredients and labels.
+
+Before publishing Phase 9, apply [`0015_nutrition_insights.sql`](./supabase/migrations/0015_nutrition_insights.sql) and then [`0016_planning_preferences.sql`](./supabase/migrations/0016_planning_preferences.sql) once each, after `0014`. The first adds optional nutrient snapshots and accepted-adjustment storage; the second adds owner-only saved planning exclusions. GitHub Pages does not apply migrations. Test them against the live project and verify account export/deletion before deployment; neither migration nor the website has been applied/published by this work.
 
 ## Coach: later activation of Anthropic (optional, metered)
 Only do this after deciding to fund API usage. A free Claude chat account is not free Anthropic API credit.

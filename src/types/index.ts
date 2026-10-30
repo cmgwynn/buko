@@ -30,6 +30,7 @@ export interface NutritionTargets {
   bmr: number;
   tdee: number;
   floor_applied: boolean;
+  adaptive_calorie_adjustment?: number;
 }
 
 /** Nutrient amounts per 100 g (or 100 ml). `null` means the source did not report it. */
@@ -42,7 +43,15 @@ export interface Nutrients {
   saturatedFat: number | null;
   sodiumMg: number | null;
   fiber: number | null;
+  calciumMg?: number | null;
+  ironMg?: number | null;
+  potassiumMg?: number | null;
+  vitaminCMg?: number | null;
+  vitaminDMcg?: number | null;
 }
+
+export type MicronutrientKey = 'calciumMg' | 'ironMg' | 'potassiumMg' | 'vitaminCMg' | 'vitaminDMcg';
+export type MicronutrientValues = Record<MicronutrientKey, number | null>;
 
 export interface Food {
   source: FoodSource;
@@ -96,6 +105,8 @@ export interface FoodLogEntry {
   protein_g: number;
   carbs_g: number;
   fat_g: number;
+  /** Amounts for this logged serving; null means the source did not report them. */
+  micronutrients?: MicronutrientValues | null;
   created_at: string;
   health_external_id?: string | null;
 }export interface GroceryItem {

@@ -5,6 +5,7 @@ import { Body, Button, Notice, Screen, TextField } from '../../src/components/ui
 import { manualFormFromFood, parseManualFood, type ManualFoodErrors, type ManualFoodForm } from '../../src/lib/foodLogging';
 import { spacing, typography } from '../../src/theme';
 import type { Food } from '../../src/types';
+import { MICRONUTRIENTS } from '../../src/lib/nutrition/micronutrients';
 
 /** Enter label nutrition by hand (unknown barcode or incomplete source data), then choose an amount to log. */
 export default function ManualFood() {
@@ -44,6 +45,17 @@ export default function ManualFood() {
       <TextField label="Protein (g)" value={form.protein} onChangeText={set('protein')} keyboardType="decimal-pad" error={errors.protein} />
       <TextField label="Carbohydrate (g)" value={form.carbs} onChangeText={set('carbs')} keyboardType="decimal-pad" error={errors.carbs} />
       <TextField label="Fat (g)" value={form.fat} onChangeText={set('fat')} keyboardType="decimal-pad" error={errors.fat} />
+      <Body muted>Optional values from the label. Unknown nutrients stay unreported.</Body>
+      {MICRONUTRIENTS.map((item) => (
+        <TextField
+          key={item.key}
+          label={`${item.label} (${item.unit} per ${form.basisGrams || 100} g)`}
+          value={form[item.key] ?? ''}
+          onChangeText={set(item.key)}
+          keyboardType="decimal-pad"
+          error={errors[item.key]}
+        />
+      ))}
       {errors.form ? <Notice tone="danger">{errors.form}</Notice> : null}
       {hasErrors && !errors.form ? <Notice tone="danger">Fix the highlighted fields to continue.</Notice> : null}
       <Button title="Continue to amount" onPress={next} />
