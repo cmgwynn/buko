@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
+import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Linking, Text, View } from 'react-native';
+import { AppState, Linking, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Body, Button, Card, Heading, Loading, Notice, Screen } from '../src/components/ui';
@@ -16,6 +17,7 @@ import { ConfirmProvider } from '../src/components/ConfirmProvider';
 import { WorkoutWebOffline } from '../src/components/workout/WorkoutWebOffline';
 import { WorkoutModeProvider } from '../src/providers/WorkoutModeProvider';
 import { colors, layout, spacing } from '../src/theme';
+import { recordDailyUse } from '../src/lib/trial/client';
 
 const headerOptions = {
   headerShown: true,
@@ -43,6 +45,15 @@ const communityHeaderOptions = {
   headerLeft: () => <BackButton fallback="/community" />,
 };
 
+function DailyUse({ userId }: { userId: string }) {
+  useEffect(() => {
+    void recordDailyUse(userId);
+    const sub = AppState.addEventListener('change', (state) => { if (state === 'active') void recordDailyUse(userId); });
+    return () => sub.remove();
+  }, [userId]);
+  return null;
+}
+
 function Gate() {
   const { session, loading, sessionError } = useAuth();
   const { profile, loading: profileLoading, connectionError, refresh } = useProfile();
@@ -55,6 +66,7 @@ function Gate() {
   return (
     <>
     {sessionError ? <Notice tone={session ? 'info' : 'danger'}>{sessionError}</Notice> : null}
+    {onboarded && session ? <DailyUse userId={session.user.id} /> : null}
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="(auth)" />
@@ -105,7 +117,8 @@ function Gate() {
       </Stack.Protected>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="account" options={{ ...headerOptions, title: 'Your account & data' }} />
-        <Stack.Screen name="premium" options={{ ...headerOptions, title: 'Buko Premium' }} />
+        <Stack.Screen name="premium" options={{ ...headerOptions, title: 'Buko Plus' }} />
+        <Stack.Screen name="feedback" options={{ ...headerOptions, title: 'Send feedback' }} />
       </Stack.Protected>
       <Stack.Screen name="delete-account" options={{ ...headerOptions, title: 'Delete your account' }} />
     </Stack>

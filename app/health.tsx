@@ -85,8 +85,8 @@ export default function HealthSettings() {
       </Card>
 
       <Text style={[typography.heading, { marginTop: spacing.xl, marginBottom: spacing.sm }]}>{app}</Text>
-      {!billing.allowed ? <Card><Text style={typography.body}>Health integration syncing is paused without Premium. You can still turn existing permissions off.</Text>
-        <Button title="View Premium options" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
+      {!billing.allowed ? <Card><Text style={typography.body}>Health integration syncing is paused without Buko Plus. You can still turn existing permissions off.</Text>
+        <Button title="See Buko Plus" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
       <Notice tone="info">
         Health records are saved only to your private account and are never used for advertising. Imported health-app workouts and active energy are excluded from Coach requests. Optional Coach weight-trend sharing is controlled separately in Coach preferences.
       </Notice>

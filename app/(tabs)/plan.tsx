@@ -32,7 +32,6 @@ import { useProfile } from '../../src/providers/ProfileProvider';
 import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
 import { colors, layout, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
-import { PremiumGate } from '../../src/components/PremiumGate';
 
 type RecipeRow = Recipe & { recipe_ingredients: Pick<RecipeIngredient, 'name' | 'grams' | 'nutrition'>[] };
 type EntryRow = MealPlanEntry;
@@ -41,9 +40,6 @@ const weeklyEntries = (rows: EntryRow[]): WeeklyEntry[] => rows.map((row) => ({
 }));
 
 export default function Plan() {
-  return <PremiumGate feature="Meal planning"><PlanContent /></PremiumGate>;
-}
-function PlanContent() {
   const router = useRouter();
   const confirm = useConfirm();
   const { session } = useAuth();

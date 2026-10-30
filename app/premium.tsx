@@ -7,7 +7,7 @@ import { legalUrl } from '../src/lib/legal';
 import { useAuth } from '../src/providers/AuthProvider';
 import { useBilling } from '../src/providers/BillingProvider';
 import { SubscriptionManagement } from '../src/components/SubscriptionManagement';
-export default function Premium() {
+export default function Plus() {
   const { session } = useAuth();
   const billing = useBilling();
   const [items, setItems] = useState<PurchasesPackage[]>([]);
@@ -19,7 +19,7 @@ export default function Premium() {
     let live = true;
     if (session && Platform.OS !== 'web') {
       void storePackages(session.user.id).then((result) => {
-        if (live) { setItems(result); if (!result.length) setNote('Monthly and annual subscriptions are not available from the store yet.'); }
+        if (live) { setItems(result); if (!result.length) setNote('Buko Plus is not available from the store yet.'); }
       }).catch((err: unknown) => { if (live) setError(err instanceof Error ? err.message : 'Store is unavailable.'); });
     }
     return () => { live = false; };
@@ -42,12 +42,13 @@ export default function Premium() {
     try { await Linking.openURL(url); } catch { setError('Could not open the link. Try your device browser.'); }
   }
   return <Screen>
-    <Heading>Buko Premium</Heading>
-    <Card><Heading>Free, every day</Heading><Body>Scan products, keep a food diary and manage your grocery lists.</Body></Card>
-    <Card><Heading>More support with Premium</Heading><Body>Meal planning, recipe importing, optional health integrations and Coach access. AI requires owner activation and remains subject to request limits.</Body>
-      <Body>Subscriptions renew automatically until cancelled. Configure seven-day free trials in the stores; only eligible customers receive them. The store confirmation shows the actual offer, renewal price and billing period before you agree.</Body>
-      {!billing.status.enforced ? <Notice tone="info">Trial preview: paywall enforcement is off. Your current trial access has not changed.</Notice> : null}
-      <Body>{billing.status.premium ? 'Verified Premium active' : 'No active verified Premium subscription'}{billing.status.sandbox ? ' (sandbox testing)' : ''}</Body>
+    <Heading>Buko Plus</Heading>
+    <Card><Heading>Free, every day</Heading><Body>Food diary, barcode scanning, weekly meal and training plans, recipe imports, workouts and grocery lists.</Body></Card>
+    <Card><Heading>What Plus adds</Heading>
+      <Body>No ads, Coach reviews and chat, tested-meal suggestions and health-app sync. Plus also keeps Buko independent.</Body>
+      <Body muted>Monthly or yearly. The store shows the exact price and billing period before you confirm. Renews automatically until cancelled in your store account.</Body>
+      {!billing.status.enforced ? <Notice tone="info">Beta: everything is unlocked while we test. Thanks for trying Buko!</Notice> : null}
+      <Body>{billing.status.premium ? 'Buko Plus active' : 'Buko Plus not active'}{billing.status.sandbox ? ' (sandbox testing)' : ''}</Body>
       {billing.status.expiresAt ? <Body muted>Verified expiry: {new Date(billing.status.expiresAt).toLocaleDateString()}</Body> : null}
       {billing.error ? <Notice tone="warning">{billing.error}</Notice> : null}
       {error ? <Notice tone="danger">{error}</Notice> : null}

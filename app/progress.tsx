@@ -1,3 +1,4 @@
+import { AdSlot } from '../src/components/AdSlot';
 import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -214,6 +215,7 @@ export default function Progress() {
           </Card>
         </Pressable>
       ))}
+      <AdSlot placement="progress" />
     </Screen>
   );
 }

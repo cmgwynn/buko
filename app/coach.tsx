@@ -130,8 +130,8 @@ export default function Coach() {
       </ChipRow>
       <View style={{ height: spacing.lg }} />
       {!enabled ? <Notice tone="warning">Live AI is off. No paid Anthropic requests will be made. You can review factual weekly summaries after backend setup; AI chat and suggestions need owner activation.</Notice> : null}
-      {!billing.allowed ? <Card><Body>Coach reviews and chat require Premium. Privacy, consent withdrawal and history deletion remain available.</Body>
-        <Button title="View Premium options" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
+      {!billing.allowed ? <Card><Body>Coach reviews and chat are part of Buko Plus. Privacy, consent withdrawal and history deletion remain available.</Body>
+        <Button title="See Buko Plus" variant="secondary" onPress={() => router.push('/premium')} /></Card> : null}
       {(!consented || section === 'preferences') && prefs ? (
         <Card>
           <Heading>You choose what guides the coach</Heading>

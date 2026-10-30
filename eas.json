@@ -23,9 +23,19 @@
     "beta": {
       "extends": "production",
       "distribution": "store"
+    },
+    "closed": {
+      "extends": "production",
+      "distribution": "store"
     }
   },
   "submit": {
+    "closed": {
+      "android": {
+        "track": "alpha",
+        "releaseStatus": "completed"
+      }
+    },
     "beta": {
       "android": {
         "track": "internal",

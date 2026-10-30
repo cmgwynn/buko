@@ -69,9 +69,12 @@ export default function Profile() {
       </Card>
       <RecipeAdminLink />
       <Card>
+        <NavigationRow title="Send feedback" subtitle="Report a bug or suggest an idea" icon="chatbox-ellipses-outline" onPress={() => router.push({ pathname: '/feedback', params: { from: 'profile' } })} />
+      </Card>
+      <Card>
         <Text style={typography.label}>Account & privacy</Text>
         <NavigationRow title="Account & data" subtitle="Export your data or delete your account" icon="shield-checkmark-outline" onPress={() => router.push('/account')} />
-        <NavigationRow title="Subscription" subtitle="Premium, restore and manage" icon="card-outline" onPress={() => router.push('/premium')} />
+        <NavigationRow title="Subscription" subtitle="Buko Plus, restore and manage" icon="card-outline" onPress={() => router.push('/premium')} />
         <NavigationRow title="Privacy & diagnostics" subtitle="Your choices and how data is used" icon="lock-closed-outline" onPress={() => router.push({ pathname: '/settings', params: { section: 'privacy' } })} />
         <NavigationRow title="Help & about" subtitle="Quick guide, documents and data sources" icon="help-circle-outline" onPress={() => router.push({ pathname: '/settings', params: { section: 'help' } })} />
       </Card>

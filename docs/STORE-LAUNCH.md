@@ -188,6 +188,33 @@ Apple TestFlight internal testing is limited to App Store Connect team members a
 
 Google Play internal testing is a useful early track but **does not satisfy** the closed-testing prerequisite for production access on personal Play developer accounts created after **November 13, 2023**. Google currently requires a closed test with at least **12 testers continuously opted in for 14 days**, followed by an application for production access. Confirm the account type/date and current Play Console requirements; allow the full testing period in the schedule.
 
+## Beta trial plan (closed testing)
+
+The goal is a 2–4 week trial with real users before any public launch or paid features. The web app (https://cmgwynn.github.io/buko/) can be shared right away. Native testers need the steps below.
+
+**Before inviting anyone**
+- [ ] Apply migration `0017_trial_readiness.sql` in the Supabase SQL editor. It makes meal planning free, and adds in-app feedback and anonymous daily usage counts. Do not use `db push`.
+- [ ] Deploy the updated `import-recipe` function (it no longer checks premium): `npx supabase functions deploy import-recipe`.
+- [ ] Set the `EXPO_PUBLIC_CONTACT_EMAIL` secret so feedback can fall back to email.
+- [ ] Fill in the `[brackets]` in `public/legal/privacy.html` and `terms.html`, then remove the draft banner once they have been reviewed.
+- [ ] Sign up as a brand-new user on web and on a phone. Confirm that onboarding leads to the Diary welcome card and that "Plan my week" and "Build my training plan" both work.
+
+**iOS (TestFlight)**
+1. `npx eas-cli build --platform ios --profile beta`
+2. `npx eas-cli submit --platform ios --latest --profile beta`
+3. In App Store Connect, add an internal group of up to 100 team members. No review is needed. For an external group, use a public link; the first build needs beta review, which usually takes about a day.
+
+**Android (Play closed test, needed for production access)**
+1. `npx eas-cli build --platform android --profile closed`
+2. `npx eas-cli submit --platform android --latest --profile closed`. This targets the **closed testing (alpha)** track.
+3. Add at least **12 testers** by email list or Google Group, and keep them opted in for **14 continuous days**. Then apply for production in Play Console. Internal testing does not count toward this requirement.
+
+**What to measure** (owner SQL in the Supabase dashboard)
+- Daily active users: `select day, sum(active_users) from usage_daily group by day order by day desc;`
+- Week-N retention by sign-up cohort: `select cohort_week, day, sum(active_users) from usage_daily group by 1,2 order by 1,2;`
+- Feedback: `select created_at, category, screen, message from feedback order by created_at desc;`
+- Healthy targets for a small beta: more than 40% of testers return in week 2, and at least one plan is generated per active tester each week.
+
 ## Backend and store rollout status
 
 The owner reports backend setup through recipe-quality migration `0014`, admin provisioning and the new function deployment is complete. Do not rerun successful migrations. The deployed function independently returned its own unauthenticated 401 response; authenticated live flows and configuration still need acceptance. Follow the README's Phase 8 setup for new projects, keep paid AI off, and curate genuinely cooked recipes before approving them. Native store/device checks remain separate.
@@ -213,6 +240,24 @@ No subscription is currently approved for a public launch. Current staged defaul
 - Keep purchase packages/paywalls disabled while the rollout is staged or either real legal/document URL is missing. Test sandbox purchases only against a separate test Supabase/RevenueCat setup; never turn on sandbox acceptance in production.
 - Confirm the database-side restrictive premium policies and Edge Function premium checks are active only in the explicitly approved enforcement rollout. In the current staged default, access enforcement is not publicly activated.
 
+### Buko Plus pricing and free-tier ads (owner direction)
+
+Model: **free with light ads, plus an optional low-cost Buko Plus**. Planning, recipe import, logging, scanning, workouts and grocery lists stay free. Plus adds no ads, Coach, AI tested-meal suggestions and health-app sync. It still uses the single RevenueCat entitlement `premium`.
+
+| Store product (proposed) | Price target | RevenueCat package |
+| --- | --- | --- |
+| `buko_plus_monthly` | $0.99 / month | `$rc_monthly` |
+| `buko_plus_annual` | $7.99 / year | `$rc_annual` |
+
+- Prices are set in each store. The app shows only the store's `priceString` and never hardcodes these amounts.
+- Enroll in the Apple Small Business Program and confirm Google Play's 15% subscription rate before launch.
+- Ads: `EXPO_PUBLIC_ADS_ENABLED` defaults to `false`.
+  - `AdSlot` renders only in the approved placements (`recipes-browse`, `progress`) and is hidden for Plus members and during a live workout.
+  - Ads must never appear in Diary logging, search, scan, cooking or workouts.
+  - Until a native SDK is approved, the slot shows a house promo for Plus.
+- Adding AdMob means `react-native-google-mobile-ads`, an EAS rebuild, AdMob app IDs in `app.json`, non-personalized requests only, a UMP consent form for the EEA and UK, an `app-ads.txt` file, and updated App Privacy and Data safety answers.
+- Health data must never be shared with ad networks.
+
 ## Privacy, account, health and policy information to complete
 
 This is a **factual coverage checklist, not legal policy or terms text**. No privacy policy, terms of service, medical disclaimer or legal representation is drafted here. An owner must supply accurate facts and get any required legal review before launch.
@@ -220,7 +265,7 @@ This is a **factual coverage checklist, not legal policy or terms text**. No pri
 ### Owner facts and public URLs still needed
 
 - Legal developer/entity name, applicable contact and support email, support process, and approved public company/app URLs.
-- Hosted privacy-policy URL required for the App Store listing; hosted terms/EULA URL if the owner chooses/needs one; Google Play account/data-deletion request URL. These URLs and their availability have not been confirmed here.
+- Draft privacy and terms pages are hosted at `https://cmgwynn.github.io/buko/legal/privacy.html` and `.../terms.html` (source: `public/legal/`), and the data-deletion page is at `https://cmgwynn.github.io/buko/delete-account`. Before store submission, the owner must complete the `[bracketed]` facts, get a legal review, and remove the draft banner.
 - Service/provider facts: Supabase project/hosting region and retention/backups; Anthropic processing/retention terms if Coach is activated; Open Food Facts, USDA, and user-selected recipe publishers; store billing providers; and what request metadata each can receive. Specifically verify which services can observe a user’s external IP address or connection metadata, which logs retain it, and for how long; an intermediary/backend call may expose the backend’s network identity to the downstream service rather than the user’s.
 - Actual account data inventory, photo-storage behavior, export format and exclusions, deletion timing, and any legally or operationally retained billing/audit data.
 - Markets/languages, age rating, content-rights confirmation for third-party data/assets, and contact details to show users.

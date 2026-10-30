@@ -6,17 +6,23 @@ import { Body, Button, Card, Disclosure, Heading, NavigationRow, Notice, Screen 
 import { config } from '../src/lib/config';
 import { legalUrl } from '../src/lib/legal';
 import { loadDiagnosticConsent, saveDiagnosticConsent } from '../src/lib/diagnostics/client';
+import { loadUsageOptOut, saveUsageOptOut } from '../src/lib/trial/client';
 import { useAuth } from '../src/providers/AuthProvider';
 import { spacing } from '../src/theme';
+const adsCopy = config.adsEnabled
+  ? 'The free version may show non-personalized ads that never use your health data. Buko Plus removes them.'
+  : 'No ads.';
 export default function Settings() {
   const router = useRouter();
   const { section } = useLocalSearchParams<{ section?: string }>();
   const { session } = useAuth();
   const [diagnostics, setDiagnostics] = useState(false);
+  const [counting, setCounting] = useState(true);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let live = true;
+    if (session) void loadUsageOptOut(session.user.id).then((out) => { if (live) setCounting(!out); }).catch(() => {});
     if (session) void loadDiagnosticConsent(session.user.id).then((value) => { if (live) setDiagnostics(value); })
       .catch(() => { if (live) setError('Could not load your diagnostic preference. Reporting stays off.'); })
       .finally(() => { if (live) setBusy(false); });
@@ -29,6 +35,12 @@ export default function Settings() {
     catch { setError('Could not save the diagnostic preference. Please retry.'); }
     finally { setBusy(false); }
   }
+  async function toggleCounting(value: boolean) {
+    if (!session) return;
+    setCounting(value);
+    try { await saveUsageOptOut(session.user.id, !value); }
+    catch { setCounting(!value); setError('Could not save the usage-count preference. Please retry.'); }
+  }
   async function open(value: string) {
     const url = legalUrl(value);
     if (!url) { setError('The app owner has not published this document yet. It must be available before launch.'); return; }
@@ -40,7 +52,7 @@ export default function Settings() {
     {section !== 'help' ? <>
     <Card><Heading>Account & subscription</Heading>
       <NavigationRow title="Account & data" subtitle="Export data or delete account" onPress={() => router.push('/account')} />
-      <NavigationRow title="Subscription" subtitle="Premium, restore and manage" onPress={() => router.push('/premium')} />
+      <NavigationRow title="Subscription" subtitle="Buko Plus, restore and manage" onPress={() => router.push('/premium')} />
       <Body muted>Account deletion does not cancel store subscriptions. Manage your store subscription before deleting.</Body>
     </Card>
     <Card><Heading>Your choices</Heading>
@@ -58,8 +70,14 @@ export default function Settings() {
         <Body muted>Automatic native crash dumps and session replay are disabled. Network providers process connection metadata; Supabase receives your authenticated request, while the crash service sees the relay connection. Reporting requires owner configuration.</Body>
       </Disclosure>
     </Card>
+    <Card><Heading>Anonymous usage counts</Heading>
+      <View style={{ flexDirection: 'row', gap: spacing.md, alignItems: 'center' }}>
+        <View style={{ flex: 1 }}><Body>Count my daily visit</Body><Body muted>Adds one to a daily total by platform and sign-up week. No account ID or content.</Body></View>
+        <Switch accessibilityLabel="Count my daily visit" value={counting} onValueChange={(value) => { void toggleCounting(value); }} />
+      </View>
+    </Card>
     <Card><Disclosure title="Privacy & data processing">
-      <Body muted>No ads, behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials.</Body>
+      <Body muted>{adsCopy} No behavioral analytics or trackers. Account data is protected by owner-only database policies. Public food lookups go to Open Food Facts and USDA. Recipe URL imports fetch your chosen site without Buko credentials.</Body>
       <Body muted>Coach is optional. With consent, minimized context and chat may go to Anthropic; names, email and birthday are excluded from structured context. Avoid identifiers in free text. Imported health-app workouts and energy are excluded; weight sharing is a separate choice.</Body>
       <Body muted>Store subscriptions use RevenueCat with a pseudonymous identifier and purchase/device metadata. Exported files contain sensitive personal and health data. Deletion does not remove original Apple Health or Health Connect records.</Body>
     </Disclosure></Card>
@@ -73,7 +91,7 @@ export default function Settings() {
     <Card><Heading>Legal & data sources</Heading>
       <Button title="Privacy policy" variant="ghost" onPress={() => { void open(config.privacyUrl); }} />
       <Button title="Terms of service" variant="ghost" onPress={() => { void open(config.termsUrl); }} />
-      <Body muted>No ads or behavioral analytics. Optional RevenueCat purchases, Coach and diagnostics involve additional processors as disclosed in their screens. Public food lookups use Open Food Facts and USDA.</Body>
+      <Body muted>{adsCopy} No behavioral analytics. Optional RevenueCat purchases, Coach and diagnostics involve additional processors as disclosed in their screens. Public food lookups use Open Food Facts and USDA.</Body>
       <Attribution usda />
       <Button title="Open Food Facts database license (ODbL)" variant="ghost" onPress={() => { void open('https://opendatacommons.org/licenses/odbl/1-0/'); }} />
     </Card>

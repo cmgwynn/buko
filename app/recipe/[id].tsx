@@ -18,7 +18,6 @@ import { formatQuantity, scaleQuantity } from '../../src/lib/recipes/units';
 import { supabase } from '../../src/lib/supabase';
 import { useAuth } from '../../src/providers/AuthProvider';
 import { useSelectedDate } from '../../src/providers/SelectedDateProvider';
-import { useBilling } from '../../src/providers/BillingProvider';
 import { colors, radius, spacing, typography } from '../../src/theme';
 import type { Meal } from '../../src/types';
 
@@ -30,7 +29,6 @@ export default function RecipeScreen() {
   const confirm = useConfirm();
   const { session } = useAuth();
   const { selectedDate, setSelectedDate } = useSelectedDate();
-  const billing = useBilling();
   const [full, setFull] = useState<RecipeFull | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activityError, setActivityError] = useState<string | null>(null);
@@ -125,7 +123,6 @@ export default function RecipeScreen() {
 
   async function addToPlan() {
     if (!session) return;
-    if (!billing.allowed) { router.push('/premium'); return; }
     const { error: e } = await supabase.from('meal_plan_entries').insert({
       user_id: session.user.id, planned_on: planDate, meal: planMeal, recipe_id: recipe.id, servings: 1,
     });
@@ -169,10 +166,7 @@ export default function RecipeScreen() {
           <Button title="Start cooking" icon="flame-outline" onPress={() => router.push({ pathname: '/cook/[id]', params: { id: recipe.id, servings: String(servings) } })} disabled={steps.length === 0} />
         </View>
         <View style={{ flex: 1 }}>
-          <Button title={planned ? 'Planned ✓' : 'Add to plan'} icon="calendar-outline" variant="secondary" onPress={() => {
-            if (!billing.allowed) router.push('/premium');
-            else setPlanning((p) => !p);
-          }} />
+          <Button title={planned ? 'Planned ✓' : 'Add to plan'} icon="calendar-outline" variant="secondary" onPress={() => setPlanning((p) => !p)} />
         </View>
       </View>
       {steps.length === 0 ? <Body muted>Add steps to use cooking mode.</Body> : null}

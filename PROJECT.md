@@ -32,6 +32,7 @@ Principles
 | 8 | Human-tested base recipes, bounded AI adaptation/chef review, private taste feedback and provenance | **Web release live**: owner confirmed migration `0014`, admin setup and recipe-quality Edge deployment on 2026-10-24; Pages deployment succeeded. Approved recipes require actual human curation; paid AI remains off by default. |
 | 9 | Micronutrients and weekly insights, explicitly accepted bounded calorie suggestions, personalized weekly meals, progressive run/strength plans and saved exclusions | **Web release published 2026-10-29** (commit `94cbc1a`; Pages run [41003962911](https://github.com/cmgwynn/buko/actions/runs/41003962911)). 431 Node tests, 94 Jest tests, TypeScript, production web export and responsive sign-in/sign-up smoke at 320/390/844/1440 px passed. Required schema endpoints respond; Supabase CLI migration history is blank, so do not infer missing schema or bulk-apply migrations. Full signed-in live feature and signed-device acceptance remain open. |
 
+| 10 | Beta trial readiness: free planning/import, Buko Plus copy ($0.99/mo, $7.99/yr store targets), one-time Diary welcome card, in-app feedback, anonymous daily usage counts, gated ad-slot scaffold, draft legal pages, EAS closed-test profile | **Web release in progress**. Owner must apply migration `0017` and redeploy `import-recipe`. Ads and purchases stay off. |
 Store and beta submission notes, proposed listing copy, official references and the independent release go/no-go checklist are in [`docs/STORE-LAUNCH.md`](./docs/STORE-LAUNCH.md). Owner-reported live status is not an independent claim of policy compliance or signed-device/store acceptance.
 
 ### Recipe library
@@ -116,7 +117,7 @@ Store and beta submission notes, proposed listing copy, official references and 
 - FDA Daily Values are the general adult values from [FDA Nutrition Facts labeling guidance](https://www.fda.gov/food/nutrition-facts-label/daily-value-and-percent-daily-value-nutrition-and-supplement-facts-labels); they are reference values, not personalized medical targets.
 
 ## Layout
-- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `account`, `delete-account`, `premium`, `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
+- `app/` – Expo Router screens: `(auth)`, `onboarding`, `(tabs)` (diary, scan, plan, train, recipes; grocery is a hidden tab opened from a Plan header button), `workout/*`, `exercise/[id]`, `progress`, `body`, `health`, `profile` (header button), `account`, `delete-account`, `premium` (Buko Plus), `feedback`, `product/[barcode]`, `log/*`, `edit-profile`, `recipe/*`, `cook/*`, `grocery/generate`, `pantry`
 - `src/lib/scoring/` – isolated health-score module (`config.ts` = all weights/thresholds/sources, `factors.ts`, `index.ts`)
 - `src/lib/nutrition/targets.ts` – Mifflin-St Jeor, calorie floors, macro split
 - `src/lib/api/` – Open Food Facts, USDA, alternatives

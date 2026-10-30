@@ -14,6 +14,8 @@ export const config = {
   premiumEnforcement: process.env.EXPO_PUBLIC_PREMIUM_ENFORCEMENT === 'true',
   privacyUrl: process.env.EXPO_PUBLIC_PRIVACY_URL ?? '',
   termsUrl: process.env.EXPO_PUBLIC_TERMS_URL ?? '',
+  /** Off until the owner approves ads, an ad network account exists and privacy disclosures are updated. */
+  adsEnabled: process.env.EXPO_PUBLIC_ADS_ENABLED === 'true',
 };
 
 export const isSupabaseConfigured = Boolean(config.supabaseUrl && config.supabaseAnonKey);

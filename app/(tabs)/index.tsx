@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ComponentProps } from 'r
 import { Pressable, Text, View } from 'react-native';
 import { MacroBar } from '../../src/components/MacroBar';
 import { CoachDiaryPanel } from '../../src/components/CoachDiaryPanel';
+import { useWelcome, WelcomeCard } from '../../src/components/WelcomeCard';
 import { useConfirm } from '../../src/components/ConfirmProvider';
 import { TabHeader } from '../../src/components/TabHeader';
 import { Button, Card, CardGrid, Eyebrow, HeroCard, Notice, Screen } from '../../src/components/ui';
@@ -92,6 +93,7 @@ export default function Diary() {
   const [actionEntry, setActionEntry] = useState<FoodLogEntry | null>(null);
   const [transfer, setTransfer] = useState<TransferSelection | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const welcome = useWelcome(session?.user.id);
   const [plansLoadedFor, setPlansLoadedFor] = useState<string | null>(null);
   const loadVersion = useRef(0);
   const viewKey = `${session?.user.id ?? ''}:${date}`;
@@ -301,6 +303,7 @@ export default function Diary() {
         </Pressable>
       } />
       {searchOpen ? <DiaryHistorySearch key={session?.user.id} autoFocus /> : null}
+      {welcome.show ? <WelcomeCard onDismiss={welcome.dismiss} /> : null}
       {birthdayError ? <Notice tone="danger">{birthdayError}</Notice> : null}
       <DateNavigator />
       {routeError ? <View><Notice tone="danger">{routeError}</Notice><Button title="Dismiss date warning" variant="ghost" onPress={() => setRouteError(null)} /></View> : null}
@@ -428,7 +431,7 @@ export default function Diary() {
         </View>
       ) : null}
       {notice ? <Notice tone="info">{notice}</Notice> : null}
-      {plansLoadedFor === viewKey && !error && date >= today && !entries.length && !planned.length ? (
+      {!welcome.show && plansLoadedFor === viewKey && !error && date >= today && !entries.length && !planned.length ? (
         <Card accent={colors.hero}>
           <Eyebrow>{date === today ? 'Nothing planned today' : `Nothing planned for ${formatDay(date)}`}</Eyebrow>
           <Text style={typography.small}>Let Buko plan the rest of your week around your targets.</Text>
