@@ -65,10 +65,11 @@ export function renewalText(item: PlanPackage): string {
     : `${price}, renews automatically until cancelled in your store account.`;
 }
 
-export type PaywallSource = 'meal-plan' | 'training-plan' | 'suggest' | 'coach' | 'health';
+export type PaywallSource = 'meal-plan' | 'training-plan' | 'checkin' | 'suggest' | 'coach' | 'health';
 const SOURCES: Record<PaywallSource, string> = {
   'meal-plan': 'Save your generated meal plan',
   'training-plan': 'Save your 4-week training plan',
+  checkin: 'Let your plan adapt every week',
   suggest: 'Get tested meal suggestions',
   coach: 'Talk it through with Coach',
   health: 'Sync with your health app',

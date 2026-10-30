@@ -62,6 +62,7 @@ export default function Profile() {
       ) : null}
       <Card>
         <Text style={typography.label}>Personalize Buko</Text>
+        <NavigationRow title="Weekly check-in" subtitle="Review your week and adapt the next one" icon="checkmark-done-outline" onPress={() => router.push('/checkin')} />
         <NavigationRow title="Goals & personal details" subtitle="Nutrition goals, units and dietary preferences" icon="person-outline" onPress={() => router.push('/edit-profile')} />
         <NavigationRow title="Health connections" subtitle="Permissions, activity adjustment and sync" icon="heart-outline" onPress={() => router.push('/health')} />
         <NavigationRow title="Coach preferences" subtitle="Weekly review, consent and chat history" icon="chatbubbles-outline" onPress={() => router.push('/coach')} />

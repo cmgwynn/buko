@@ -119,6 +119,7 @@ function Gate() {
         <Stack.Screen name="account" options={{ ...headerOptions, title: 'Your account & data' }} />
         <Stack.Screen name="premium" options={{ ...headerOptions, title: 'Buko Plus' }} />
         <Stack.Screen name="feedback" options={{ ...headerOptions, title: 'Send feedback' }} />
+        <Stack.Screen name="checkin" options={{ ...headerOptions, title: 'Weekly check-in' }} />
       </Stack.Protected>
       <Stack.Screen name="delete-account" options={{ ...headerOptions, title: 'Delete your account' }} />
     </Stack>
