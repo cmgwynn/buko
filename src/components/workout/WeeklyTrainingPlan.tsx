@@ -13,7 +13,7 @@ import { getSession, workoutSessionStore } from '../../lib/fitness/session';
 import { fromDisplayWeight, parseNum, toDisplayWeight, weightUnit } from '../../lib/fitness/format';
 import { toDateString } from '../../lib/diary';
 import type { Exercise, WorkoutSet } from '../../lib/fitness/types';
-import { Button, Card, Chip, ChipRow, Eyebrow, Heading, Notice, TextField } from '../ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, Heading, Notice, TextField } from '../ui';
 import { useConfirm } from '../ConfirmProvider';
 import { colors, radius, spacing, typography } from '../../theme';
 
@@ -21,7 +21,17 @@ const KIND_ACCENT = { run: colors.primary, strength: colors.macro.protein, rest:
 
 const numeric = (value: number | null) => value != null && Number.isFinite(value) ? String(value) : '';
 
-export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean }) {
+function friendlyDate(date: string) {
+  const parsed = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? date : parsed.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function nextMonday(today: string) {
+  const weekday = new Date(`${today}T00:00:00Z`).getUTCDay();
+  return trainingAddDays(today, (8 - weekday) % 7 || 7);
+}
+
+export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { disabled?: boolean; autoOpen?: boolean }) {
   const { session } = useAuth();
   const userId = session?.user.id;
   const { profile } = useProfile();
@@ -54,6 +64,11 @@ export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean })
     setPreview(null); setExisting([]); setError(null); setStatus(null); setSearch(''); setSaveBlocked(false);
     return () => { version.current++; };
   }, [userId]);
+  useEffect(() => {
+    if (autoOpen && userId && !disabled && !open) void load();
+    // Only open automatically on arrival; a user who closes the generator keeps it closed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpen, userId, disabled]);
   function checkOwner(expected = userId) {
     if (!expected || expected !== account.current || workoutSessionStore.getAccount() !== expected) throw new Error('The account changed. Reload the generator.');
     if (getSession().active) throw new Error('Finish or discard your live workout before changing training plans.');
@@ -160,28 +175,36 @@ export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean })
     } finally { lock.current = false; setBusy(false); }
   }
   const off = busy || disabled;
+  const today = toDateString(new Date());
+  const selectedCount = preview?.days.filter((day) => day.save && day.kind !== 'rest').length ?? 0;
   return <Card>
-    <Heading>Weekly run + strength plan</Heading>
-    <Text style={typography.small}>Build four editable weeks for general fitness, not a race. Your manual workouts and saved routines stay unchanged. Planning and account exclusions need a connection.</Text>
+    <Heading>Run + strength plan</Heading>
+    <Text style={typography.small}>Four editable weeks for general fitness. Nothing is saved until you confirm.</Text>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {status ? <Notice tone="info">{status}</Notice> : null}
     {!open || owner !== userId ? <Button title="Build a weekly training plan" variant="secondary" loading={busy} disabled={disabled || !userId} onPress={() => { void load(); }} /> : <>
+      <Eyebrow>1 · When to start</Eyebrow>
+      <ChipRow>
+        <Chip label="Tomorrow" selected={input.startDate === trainingAddDays(today, 1)} disabled={off} onPress={() => changeInput({ startDate: trainingAddDays(today, 1) })} />
+        <Chip label="Next Monday" selected={input.startDate === nextMonday(today)} disabled={off} onPress={() => changeInput({ startDate: nextMonday(today) })} />
+      </ChipRow>
       <TextField label="Training start date (YYYY-MM-DD)" value={input.startDate} editable={!off} onChangeText={(startDate) => changeInput({ startDate })} />
-      <TextField label="Comfortable easy run/walk minutes (5–60)" keyboardType="decimal-pad" value={numeric(input.comfortableMinutes)} editable={!off}
-        onChangeText={(value) => changeInput({ comfortableMinutes: parseNum(value) ?? NaN })} />
-      <Text style={typography.small}>Choose what feels comfortable now, not a goal. If you are new to running, choose run/walk and start short. No history or fitness level is assumed.</Text>
+      <Eyebrow>2 · Your run days</Eyebrow>
+      <ChipRow>{TRAINING_DAYS.map((day, index) => <Chip key={day} label={day} selected={input.preferredRunDays.includes(index)} disabled={off}
+        onPress={() => changeInput({ preferredRunDays: input.preferredRunDays.includes(index) ? input.preferredRunDays.filter((value) => value !== index) : [...input.preferredRunDays, index] })} />)}</ChipRow>
       <Text style={typography.subheading}>Comfortable run sessions per week</Text>
       <ChipRow>{[1, 2, 3].map((count) => <Chip key={count} label={String(count)} selected={input.comfortableRunsPerWeek === count} disabled={off}
         onPress={() => changeInput({ comfortableRunsPerWeek: count })} />)}</ChipRow>
-      <Text style={typography.subheading}>Preferred run days</Text>
-      <ChipRow>{TRAINING_DAYS.map((day, index) => <Chip key={day} label={day} selected={input.preferredRunDays.includes(index)} disabled={off}
-        onPress={() => changeInput({ preferredRunDays: input.preferredRunDays.includes(index) ? input.preferredRunDays.filter((value) => value !== index) : [...input.preferredRunDays, index] })} />)}</ChipRow>
+      <Eyebrow>3 · Where you are now</Eyebrow>
+      <TextField label="Comfortable easy run/walk minutes (5–60)" keyboardType="decimal-pad" value={numeric(input.comfortableMinutes)} editable={!off}
+        onChangeText={(value) => changeInput({ comfortableMinutes: parseNum(value) ?? NaN })} />
+      <Text style={typography.small}>What feels easy today, not a goal. New to running? Keep run/walk on and start short.</Text>
       <ChipRow>
         <Chip label="Run / walk" selected={input.runWalk} disabled={off} onPress={() => changeInput({ runWalk: !input.runWalk })} />
         <Chip label="Include light strength" selected={input.includeStrength} disabled={off} onPress={() => changeInput({ includeStrength: !input.includeStrength })} />
       </ChipRow>
-      <Text style={typography.subheading}>Account exercise exclusions</Text>
-      <Text style={typography.small}>Excluded exercises will never be generated. This does not edit existing plans or logs. Select an exercise to exclude it, then save exclusions.</Text>
+      <Disclosure title={`Exercises to skip${savedExcluded.length ? ` (${savedExcluded.length})` : ''}`}>
+      <Text style={typography.small}>Skipped exercises are never generated. Existing plans and logs are unchanged.</Text>
       <TextField label="Find exercises to exclude" value={search} editable={!off} onChangeText={setSearch} />
       <ChipRow>{catalog.filter((exercise) => excluded.includes(exercise.id) || exercise.name.toLowerCase().includes(search.toLowerCase()))
         .sort((a, b) => Number(excluded.includes(b.id)) - Number(excluded.includes(a.id))).slice(0, search ? 30 : Math.max(12, excluded.length))
@@ -190,31 +213,38 @@ export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean })
       {excluded.filter((id) => !catalog.some((exercise) => exercise.id === id)).map((id) => <Button key={id} title={`Remove unavailable exclusion ${id}`} variant="ghost" disabled={off}
         onPress={() => { setExcluded((values) => values.filter((value) => value !== id)); setPreview(null); }} />)}
       <Button title="Save exercise exclusions" variant="secondary" disabled={off || !dirty} onPress={() => { void saveExclusions(); }} />
-      <Button title="Generate editable preview" loading={busy} disabled={disabled || dirty} onPress={() => { void generate(); }} />
+      </Disclosure>
+      {dirty ? <Notice tone="info">Save your exercise changes to continue.</Notice> : null}
+      <Button title="Preview my 4-week plan" loading={busy} disabled={disabled || dirty} onPress={() => { void generate(); }} />
       {preview ? <>
         <Heading>Review all four weeks</Heading>
+        <Text style={typography.small}>{selectedCount} workouts selected. Tap a workout to adjust it, or skip it.</Text>
+        <Disclosure title="Why this plan">
         {preview.rationale.map((reason) => <Text key={reason} style={[typography.small, { marginVertical: spacing.xs }]}>{reason}</Text>)}
-        <Text style={typography.small}>Excluded: {preview.exclusions.join(', ') || 'none'}. Existing dates are skipped by default. Choose “add alongside” or an individual uncompleted slot to replace. Editing targets can exceed the generator’s conservative defaults; review carefully. Saving uses only selected workouts.</Text>
-        <TextField label="Find replacement exercises for preview" value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
+        <Text style={typography.small}>Excluded: {preview.exclusions.join(', ') || 'none'}. Dates that already have a plan are skipped by default; you can add alongside or replace an uncompleted one. Edited targets can exceed the conservative defaults.</Text>
+        </Disclosure>
         {preview.days.map((day, index) => <View key={index} style={{
-          marginVertical: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background,
-          borderLeftWidth: 4, borderLeftColor: KIND_ACCENT[day.kind], opacity: day.kind === 'rest' ? 0.85 : 1,
+          marginVertical: spacing.xs, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background,
+          borderLeftWidth: 4, borderLeftColor: KIND_ACCENT[day.kind], opacity: day.kind === 'rest' || !day.save ? 0.75 : 1,
         }}>
-          <Eyebrow>Week {day.week} · {day.date}</Eyebrow>
-          <Text style={[typography.subheading, { marginTop: 2 }]}>{day.name}</Text>
-          <Text style={typography.small}>{day.rationale}</Text>
-          {day.kind === 'rest' ? <Text style={typography.small}>{day.notes}</Text> : <>
-            <Button title={`${day.save ? 'Skip' : 'Include'} workout ${index + 1}`} variant="secondary" disabled={off}
+          <Eyebrow>Week {day.week} · {friendlyDate(day.date)}</Eyebrow>
+          <Text style={[day.kind === 'rest' ? typography.body : typography.subheading, { marginTop: 2 }]}>{day.name}</Text>
+          {day.kind === 'rest' ? null : <>
+            <Text style={typography.small}>{day.snapshot.map((item) => item.exercise.name).join(' · ')}</Text>
+            <Button title={`${day.save ? 'Skip' : 'Include'} workout ${index + 1}`} variant="ghost" disabled={off}
               onPress={() => patchDay(index, { save: !day.save, replaceId: null })} />
-            <TextField label={`Workout ${index + 1} date`} value={day.date} editable={!off} onChangeText={(date) => patchDay(index, { date, replaceId: null, save: false })} />
-            <TextField label={`Workout ${index + 1} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
-            <TextField label={`Workout ${index + 1} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
             {existing.filter((plan) => plan.planned_for === day.date).map((plan) => <View key={plan.id}>
               <Text style={typography.small}>Existing: {plan.name}{plan.completed_workout_id ? ' · completed, preserved' : ''}</Text>
               {!plan.completed_workout_id ? <Button title={`${day.replaceId === plan.id ? 'Keep' : 'Replace'} existing ${plan.name} on ${day.date}`}
                 variant="ghost" disabled={off} onPress={() => patchDay(index, { replaceId: day.replaceId === plan.id ? null : plan.id, save: day.replaceId !== plan.id })} /> : null}
             </View>)}
             {day.save && !day.replaceId && existing.some((plan) => plan.planned_for === day.date) ? <Notice tone="info">This adds alongside existing plans; none will be replaced.</Notice> : null}
+            <Disclosure title={`Adjust workout ${index + 1}`}>
+            <Text style={typography.small}>{day.rationale}</Text>
+            <TextField label={`Workout ${index + 1} date`} value={day.date} editable={!off} onChangeText={(date) => patchDay(index, { date, replaceId: null, save: false })} />
+            <TextField label={`Workout ${index + 1} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
+            <TextField label={`Workout ${index + 1} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
+            <TextField label={`Find replacement exercises for workout ${index + 1}`} value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />
             {day.snapshot.map((item, itemIndex) => <View key={itemIndex}>
               <Text style={typography.body}>{item.exercise.name}</Text>
               <ChipRow>{catalog.filter((exercise) => !savedExcluded.includes(exercise.id) && exercise.category === item.exercise.category
@@ -239,9 +269,10 @@ export function WeeklyTrainingPlan({ disabled = false }: { disabled?: boolean })
               <Button title={`Remove ${item.exercise.name} from workout ${index + 1}`} variant="ghost" disabled={off || day.snapshot.length <= 1}
                 onPress={() => patchDay(index, { snapshot: day.snapshot.filter((_, n) => n !== itemIndex) })} />
             </View>)}
+            </Disclosure>
           </>}
         </View>)}
-        <Button title="Review and save selected workouts" loading={busy} disabled={disabled || dirty || saveBlocked || !preview.days.some((day) => day.save)} onPress={() => { void save(); }} />
+        <Button title={`Save ${selectedCount} workouts to my plan`} loading={busy} disabled={disabled || dirty || saveBlocked || !preview.days.some((day) => day.save)} onPress={() => { void save(); }} />
       </> : null}
       <Button title="Close training generator" variant="ghost" disabled={off} onPress={() => { version.current++; setOpen(false); setPreview(null); }} />
     </>}

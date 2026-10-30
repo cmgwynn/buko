@@ -153,6 +153,12 @@ export default function Train() {
           <Button title={selectedDate === today ? 'Start workout' : 'Start workout now'} icon="barbell-outline" variant="accent" disabled={!recovery.ready} onPress={() => start()} />
         )}
       </HeroCard>
+      <Card accent={colors.hero}>
+        <Eyebrow>Personal plan</Eyebrow>
+        <Text style={typography.subheading}>Build my training plan</Text>
+        <Text style={typography.small}>Choose your run days. Buko ramps you up over 4 weeks.</Text>
+        <Button title="Build my plan" icon="sparkles-outline" onPress={() => router.push('/workout/plan')} />
+      </Card>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.md }}>
         <Text style={typography.heading}>Your routines</Text>
         <Button title="Create" icon="add" variant="ghost" onPress={() => router.push('/routine/edit')} />
@@ -160,7 +166,7 @@ export default function Train() {
       {!loaded ? <Loading /> : null}
       {loaded && routines.length === 0 ? (
         <Card>
-          <Text style={typography.body}>Start with a workout idea or create your own routine.</Text>
+          <Text style={typography.body}>No routines yet. Create one, or pick a ready-made workout.</Text>
           <NavigationRow title="Browse workout library" icon="library-outline" onPress={() => router.push('/workout/library')} />
         </Card>
       ) : (
@@ -180,7 +186,7 @@ export default function Train() {
 
       <PlannedWorkouts routines={routines} />
       <Card>
-        <NavigationRow title="Workout library" icon="library-outline" onPress={() => router.push('/workout/library')} />
+        {routines.length ? <NavigationRow title="Workout library" icon="library-outline" onPress={() => router.push('/workout/library')} /> : null}
         <NavigationRow title="Exercises" icon="search-outline" onPress={() => router.push('/workout/exercises')} />
         <NavigationRow title="Progress" icon="stats-chart-outline" onPress={() => router.push('/progress')} />
         <NavigationRow title="Weight & measurements" icon="body-outline" onPress={() => router.push('/body')} />

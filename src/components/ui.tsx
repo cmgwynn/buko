@@ -64,6 +64,20 @@ export const Eyebrow = ({ children, onHero }: { children: ReactNode; onHero?: bo
   <Text style={[typography.eyebrow, onHero && { color: colors.onHeroMuted }]}>{children}</Text>
 );
 
+/** Prominent call to action for the personal plan generators. */
+export function HeroCta({ eyebrow, title, body, action, icon, onPress, disabled, children }: {
+  eyebrow: string; title: string; body: string; action: string; icon?: ComponentProps<typeof Ionicons>['name'];
+  onPress: () => void; disabled?: boolean; children?: ReactNode;
+}) {
+  return <HeroCard>
+    <Eyebrow onHero>{eyebrow}</Eyebrow>
+    <Text accessibilityRole="header" style={[typography.heading, { color: colors.onHero, marginTop: spacing.xs }]}>{title}</Text>
+    <Text style={[typography.small, { color: colors.onHeroMuted, marginTop: spacing.xs, marginBottom: spacing.md }]}>{body}</Text>
+    {children}
+    <Button title={action} icon={icon} variant="accent" disabled={disabled} onPress={onPress} />
+  </HeroCard>;
+}
+
 export const Title = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.title}>{children}</Text>;
 export const Heading = ({ children }: { children: ReactNode }) => <Text accessibilityRole="header" style={typography.heading}>{children}</Text>;
 export const Body = ({ children, muted }: { children: ReactNode; muted?: boolean }) => (

@@ -38,6 +38,7 @@ jest.mock('../../../components/ui', () => {
     Card: ({ children }: { children: unknown }) => React.createElement(View, null, children),
     Heading: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     Eyebrow: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
+    Disclosure: ({ title, children }: { title: string; children: unknown }) => React.createElement(View, null, React.createElement(Text, null, title), children),
     Notice: ({ children }: { children: unknown }) => React.createElement(Text, null, children),
     ChipRow: ({ children }: { children: unknown }) => React.createElement(View, null, children),
     Button: ({ title, onPress, disabled, loading }: { title: string; onPress: () => void; disabled?: boolean; loading?: boolean }) =>
@@ -81,7 +82,7 @@ async function open() {
 }
 async function preview() {
   await open();
-  await fireEvent.press(screen.getByRole('button', { name: 'Generate editable preview' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Preview my 4-week plan' }));
   await screen.findByText('Review all four weeks');
 }
 
@@ -89,7 +90,7 @@ test('generation is preview-only, full four weeks are visible, and cancelling co
   await preview();
   expect(screen.getAllByText(/Week [1-4] ·/)).toHaveLength(28);
   expect(mockSaveSlot).not.toHaveBeenCalled();
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(mockConfirm).toHaveBeenCalledTimes(1);
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });
@@ -99,7 +100,7 @@ test('editing a preview target requires confirmation and saves uncompleted snaps
   await fireEvent.changeText(screen.getByLabelText('Workout 1 Running minutes'), '9');
   await fireEvent.changeText(screen.getByLabelText('Workout 1 name'), 'My comfortable run');
   mockConfirm.mockResolvedValue(true);
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   await screen.findByText(/Saved 16 workouts/);
   expect(mockSaveSlot.mock.calls[0][0]).toBe('owner');
   expect(mockSaveSlot.mock.calls[0][1].day).toMatchObject({
@@ -116,7 +117,7 @@ test('occupied dates are preserved unless one specific uncompleted slot is selec
   expect(screen.queryByRole('button', { name: `Replace existing completed on ${mockStartDate}` })).toBeNull();
   await fireEvent.press(screen.getByRole('button', { name: `Replace existing replace me on ${mockStartDate}` }));
   mockConfirm.mockResolvedValue(true);
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   await screen.findByText(/Saved 16 workouts/);
   expect(mockSaveSlot.mock.calls[0][1].replace?.id).toBe('replace me');
   expect(mockSaveSlot.mock.calls.some(([, operation]) => ['keep me', 'completed'].includes(operation.replace?.id ?? ''))).toBe(false);
@@ -125,13 +126,13 @@ test('occupied dates are preserved unless one specific uncompleted slot is selec
 test('saving exclusions preserves food preferences and excluded running produces no run targets', async () => {
   await open();
   await fireEvent.press(screen.getByRole('button', { name: 'Running' }));
-  expect(screen.getByRole('button', { name: 'Generate editable preview' }).props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: 'Preview my 4-week plan' }).props.accessibilityState.disabled).toBe(true);
   await fireEvent.press(screen.getByRole('button', { name: 'Save exercise exclusions' }));
   await screen.findByText(/Exercise exclusions saved/);
   expect(mockSavePreferences).toHaveBeenCalledWith('owner', {
     excludedFoods: ['milk'], excludedExercises: [mockCatalog[0].id],
   });
-  await fireEvent.press(screen.getByRole('button', { name: 'Generate editable preview' }));
+  await fireEvent.press(screen.getByRole('button', { name: 'Preview my 4-week plan' }));
   await screen.findByText('Review all four weeks');
   expect(screen.queryByLabelText('Workout 1 Running minutes')).toBeNull();
   expect(screen.getByText(/No running sessions were created/)).toBeTruthy();
@@ -142,7 +143,7 @@ test('missing preference storage fails closed without generating or saving', asy
   await render(<WeeklyTrainingPlan />);
   await fireEvent.press(screen.getByRole('button', { name: 'Build a weekly training plan' }));
   expect(await screen.findByText('planning_preferences unavailable')).toBeTruthy();
-  expect(screen.queryByRole('button', { name: 'Generate editable preview' })).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Preview my 4-week plan' })).toBeNull();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });
 
@@ -151,7 +152,7 @@ test('changed or completed replacements are rejected before confirmation and wri
   await preview();
   await fireEvent.press(screen.getByRole('button', { name: `Replace existing slot on ${mockStartDate}` }));
   mockLoadPlans.mockResolvedValue([mockExisting('slot', true)]);
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(await screen.findByText(/selected replacement changed/)).toBeTruthy();
   expect(mockConfirm).not.toHaveBeenCalled();
   expect(mockSaveSlot).not.toHaveBeenCalled();
@@ -160,7 +161,7 @@ test('changed or completed replacements are rejected before confirmation and wri
 test('live workout blocks saving even if it starts while preview is open', async () => {
   await preview();
   mockActive = true;
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(await screen.findByText(/Finish or discard your live workout/)).toBeTruthy();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });
@@ -169,9 +170,9 @@ test('partial save failure blocks retries until regeneration and reports persist
   await preview();
   mockConfirm.mockResolvedValue(true);
   mockSaveSlot.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('network disconnected'));
-  await fireEvent.press(screen.getByRole('button', { name: 'Review and save selected workouts' }));
+  await fireEvent.press(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }));
   expect(await screen.findByText(/1 workouts saved.*Regenerate the preview before retrying/)).toBeTruthy();
-  expect(screen.getByRole('button', { name: 'Review and save selected workouts' }).props.accessibilityState.disabled).toBe(true);
+  expect(screen.getByRole('button', { name: /^Save \d+ workouts to my plan$/ }).props.accessibilityState.disabled).toBe(true);
   expect(mockSaveSlot).toHaveBeenCalledTimes(2);
 });
 
@@ -181,5 +182,12 @@ test('account changes clear the previous account preview and saved exclusions', 
   await screen.rerender(<WeeklyTrainingPlan />);
   await waitFor(() => expect(screen.queryByText('Review all four weeks')).toBeNull());
   expect(screen.getByRole('button', { name: 'Build a weekly training plan' })).toBeTruthy();
+  expect(mockSaveSlot).not.toHaveBeenCalled();
+});
+
+test('autoOpen loads the setup form on arrival without generating or saving', async () => {
+  await render(<WeeklyTrainingPlan autoOpen />);
+  expect(await screen.findByLabelText('Training start date (YYYY-MM-DD)')).toBeTruthy();
+  expect(screen.queryByText('Review all four weeks')).toBeNull();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });

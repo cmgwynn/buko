@@ -216,13 +216,18 @@ These features are published on the web version. No paid AI service is used.
 - Generate a seven-day meal plan from saved recipes and the Buko library using
   current targets, intake, diet preferences and reusable account-level food
   exclusions. Preview additions and estimates before saving. Only explicitly
-  selected existing slots may be replaced; logged meals are protected.
+  selected existing slots may be replaced; logged meals are protected. Start
+  from the **Plan my week** card at the top of Plan: pick days (defaults to
+  today onward), meals and foods to skip (saved automatically when you
+  preview), then review a day-by-day preview before **Add to my plan**.
 - Generate a four-week general-fitness run/walk and optional light-strength
   schedule from the user's comfortable run duration, frequency and preferred
   weekdays. Running time increases by at most 5% in each of weeks 2 and 3, then
   week 4 is a recovery week. Review and edit every week before saving; existing
   workouts are preserved unless the user selects a specific uncompleted slot
-  for replacement.
+  for replacement. Open it from **Build my training plan** on Train (or from
+  Start workout); it has its own screen at `/workout/plan`. Per-workout edits
+  sit under each session's **Adjust** section.
 - Saved food and exercise exclusions are account-scoped and reusable. These
   plans are estimates and not medical advice. Ingredient phrase matching is
   conservative, and recipes are not guaranteed kitchen-tested, allergy-safe or

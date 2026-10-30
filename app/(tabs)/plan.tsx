@@ -7,7 +7,7 @@ import Animated, { useAnimatedStyle, useSharedValue, type SharedValue } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MacroBar } from '../../src/components/MacroBar';
 import { TabHeader } from '../../src/components/TabHeader';
-import { Button, Card, Chip, ChipRow, Disclosure, Loading, Notice, TextField } from '../../src/components/ui';
+import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, HeroCta, Loading, Notice, TextField } from '../../src/components/ui';
 import { PlanRecipePicker, type PlanChoice } from '../../src/components/PlanRecipePicker';
 import { DateNavigator } from '../../src/components/date/DateNavigator';
 import { DaySwipe } from '../../src/components/date/DaySwipe';
@@ -59,6 +59,8 @@ function PlanContent() {
   const [loaded, setLoaded] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [removed, setRemoved] = useState<EntryRow | null>(null);
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [generateQueued, setGenerateQueued] = useState(false);
   const [generatorDays, setGeneratorDays] = useState<number[]>([0, 1, 2, 3, 4, 5, 6]);
   const [generatorMeals, setGeneratorMeals] = useState<Meal[]>(['breakfast', 'lunch', 'dinner']);
   const [replaceSlots, setReplaceSlots] = useState<string[]>([]);
@@ -95,8 +97,8 @@ function PlanContent() {
   }, [session?.user.id]);
   useFocusEffect(useCallback(() => { void loadExclusions(); }, [loadExclusions]));
 
-  async function saveExclusions() {
-    if (!session || savingPreferences) return;
+  async function saveExclusions(): Promise<boolean> {
+    if (!session || savingPreferences) return false;
     setSavingPreferences(true); setPreview(null);
     try {
       // Reload the other preference field rather than overwriting a stale exercise-exclusion snapshot.
@@ -104,10 +106,11 @@ function PlanContent() {
       const value = await savePlanningPreferences(session.user.id, {
         ...latest, excludedFoods: exclusionText.split(/\n|,/).map((value) => value.trim()).filter(Boolean),
       });
-      if (activeOwner.current !== session.user.id) return;
+      if (activeOwner.current !== session.user.id) return false;
       setPreferences({ owner: session.user.id, value });
       setExclusionText(value.excludedFoods.join('\n')); setPreferenceError(null);
-    } catch (err) { if (activeOwner.current === session.user.id) setPreferenceError(err instanceof Error ? err.message : 'Could not save food exclusions.'); }
+      return true;
+    } catch (err) { if (activeOwner.current === session.user.id) setPreferenceError(err instanceof Error ? err.message : 'Could not save foods to skip.'); return false; }
     finally { setSavingPreferences(false); }
   }
 
@@ -172,6 +175,11 @@ function PlanContent() {
   liveGeneratorContext.current = generatorContext;
   useEffect(() => { setPreview(null); }, [generatorContext]);
   useEffect(() => { setReplaceSlots([]); setPreview(null); }, [start, session?.user.id]);
+  useEffect(() => {
+    // Default to the remaining days of the week; past days are opt-in.
+    const upcoming = Array.from({ length: 7 }, (_, index) => index).filter((index) => addDays(start, index) >= today);
+    setGeneratorDays(upcoming.length ? upcoming : [0, 1, 2, 3, 4, 5, 6]);
+  }, [start, today]);
   useEffect(() => { setPreferences(null); setExclusionText(''); setPreferenceError(null); }, [session?.user.id]);
 
   function macroText(macros: KnownMacros) {
@@ -191,13 +199,25 @@ function PlanContent() {
     });
   }
 
+  async function previewWeek() {
+    if (!activePreferences) return;
+    if (exclusionText === activePreferences.excludedFoods.join('\n')) { generatePreview(); return; }
+    // Saved exclusions update state asynchronously; generate once the saved list matches the field.
+    if (await saveExclusions()) setGenerateQueued(true);
+  }
+  useEffect(() => {
+    if (!generateQueued || !activePreferences || exclusionText !== activePreferences.excludedFoods.join('\n')) return;
+    setGenerateQueued(false);
+    generatePreview();
+  });
+
   async function applyPreview() {
     if (!session || !preview || mutation.current || preview.owner !== session.user.id || preview.context !== generatorContext) return;
     const proposal = preview;
     if (!await confirm({
       title: 'Add this weekly meal plan?',
-      message: `${proposal.result.additions} meals will be added to the previewed dates. ${proposal.result.replaceIds.length} existing unlogged meals will be removed only from the slots you explicitly selected. All other meals and all diary logs remain unchanged. Library recipes save private copies. Nutrition is estimated; check ingredients and labels for allergies.`,
-      confirmLabel: 'Confirm weekly meal plan',
+      message: `Adds ${proposal.result.additions} meals${proposal.result.replaceIds.length ? ` and replaces ${proposal.result.replaceIds.length} you selected` : ''}. Everything else, including diary logs, stays as is. Nutrition is estimated; check labels for allergies.`,
+      confirmLabel: 'Add to my plan',
     })) return;
     if (mutation.current || activeOwner.current !== proposal.owner || liveGeneratorContext.current !== proposal.context) {
       setPreview(null); setError('Planning inputs changed. Generate and review a fresh preview.');
@@ -242,7 +262,7 @@ function PlanContent() {
           .eq('meal', original.meal).eq('servings', original.servings).is('logged_at', null).select('id');
         if (removed.error || !removed.data?.length) throw new Error('New meals were added, but at least one original meal could not be replaced or changed during saving. Review your plan: some originals remain. Do not retry the old preview.');
       }
-      setMessage('Weekly meal plan added. Review servings or remove meals using your normal Plan controls.');
+      setMessage('Your week is planned. Adjust servings or swap meals any time.'); setGeneratorOpen(false);
     } catch (err) { saveError = err instanceof Error ? err.message : 'Could not save weekly plan.'; }
     finally {
       setPreview(null); setReplaceSlots([]);
@@ -421,6 +441,92 @@ function PlanContent() {
           {pending ? <Notice tone="info">Saving…</Notice> : message ? <Notice tone="info">{message}</Notice> : null}
           {removed ? <Button title="Undo remove meal" variant="ghost" disabled={pending} onPress={() => { void undoRemove(); }} /> : null}
           {!loaded ? <Loading /> : null}
+          {loaded ? <HeroCta eyebrow={`Week of ${formatDay(start)}`} title="Plan my week"
+            body="Buko fills your empty meals with recipes that fit your targets. You review everything before it’s added."
+            action={generatorOpen ? 'Hide setup' : 'Generate my week'} icon={generatorOpen ? 'chevron-up' : 'sparkles-outline'}
+            onPress={() => setGeneratorOpen((open) => !open)} /> : null}
+          {loaded && generatorOpen ? <Card>
+            <Eyebrow>1 · Days</Eyebrow>
+            <ChipRow>{Array.from({ length: 7 }, (_, index) => <Chip key={index} label={formatDay(addDays(start, index))} selected={generatorDays.includes(index)} disabled={pending}
+              onPress={() => setGeneratorDays((days) => days.includes(index) ? days.filter((day) => day !== index) : [...days, index].sort())} />)}</ChipRow>
+            <Eyebrow>2 · Meals</Eyebrow>
+            <ChipRow>{MEALS.map(({ key, label }) => <Chip key={key} label={label} selected={generatorMeals.includes(key)} disabled={pending}
+              onPress={() => setGeneratorMeals((meals) => meals.includes(key) ? meals.filter((meal) => meal !== key) : [...meals, key])} />)}</ChipRow>
+            <Eyebrow>3 · Foods to skip</Eyebrow>
+            <TextField label="Foods to skip (comma or new line)" value={exclusionText} onChangeText={setExclusionText} multiline editable={!pending && !savingPreferences} />
+            <Text style={typography.small}>Remembered for next time. Matches recipe names and ingredients, but isn’t an allergy guarantee.</Text>
+            {preferenceError ? <Notice tone="danger">{preferenceError}</Notice> : null}
+            {!activePreferences ? <Button title="Load saved foods to skip" variant="secondary" disabled={pending} onPress={() => { void loadExclusions(); }} /> : null}
+            {(() => {
+              const occupied = generatorDays.flatMap((index) => generatorMeals.map((meal) => {
+                const date = addDays(start, index);
+                const rows = entries.filter((entry) => entry.planned_on === date && entry.meal === meal);
+                return rows.length ? { date, meal, rows } : null;
+              })).filter((slot): slot is NonNullable<typeof slot> => slot !== null);
+              if (!occupied.length) return null;
+              return <Disclosure title={`Replace already-planned meals (${occupied.length})`}>
+                <Text style={typography.small}>Planned meals are kept unless you tick them here. Logged meals are never replaced.</Text>
+                {occupied.map(({ date, meal, rows }) => {
+                  const key = mealSlotKey(date, meal);
+                  const protectedSlot = rows.some((entry) => entry.logged_at);
+                  return <Pressable key={key} accessibilityRole="checkbox" accessibilityState={{ checked: replaceSlots.includes(key), disabled: pending || protectedSlot }}
+                    disabled={pending || protectedSlot} style={{ paddingVertical: spacing.sm, minHeight: 44 }}
+                    onPress={() => setReplaceSlots((slots) => slots.includes(key) ? slots.filter((slot) => slot !== key) : [...slots, key])}>
+                    <Text style={typography.body}>{replaceSlots.includes(key) && !protectedSlot ? '☑' : '☐'} {formatDay(date)} · {MEALS.find((item) => item.key === meal)?.label ?? meal}{protectedSlot ? ' (logged)' : ''}</Text>
+                    <Text style={typography.small}>{rows.map((entry) => recipeById.get(entry.recipe_id)?.title ?? 'Unavailable recipe').join(' · ')}</Text>
+                  </Pressable>;
+                })}
+              </Disclosure>;
+            })()}
+            <Disclosure title="How this works">
+              <Text style={typography.small}>Targets: {targets ? macroText(targets) : 'unavailable, so no goal-fit claims'}. Diet preferences: {profile?.diet_prefs.join(', ') || (profile ? 'none' : 'unavailable')}.</Text>
+              <Text style={typography.small}>{intake && intake.owner === session?.user.id && intake.date === today ? 'Today counts what you’ve already logged.' : 'Today’s intake is unavailable, so only planned meals are counted.'} Other days use their own plans. Each meal gets a share of your day (25/30/35/10%), favoring variety. One serving per meal, editable afterwards. No AI or outside calls.</Text>
+              <Notice tone="info">Nutrition values are estimates; missing nutrients stay unknown. Starter recipes aren’t kitchen-tested. Recipes are filtered, never certified allergy-safe. Check ingredients and labels.</Notice>
+            </Disclosure>
+            <Button title="Preview my week" icon="sparkles-outline" loading={savingPreferences}
+              disabled={pending || savingPreferences || !activePreferences || !profile || !!error || !generatorDays.length || !generatorMeals.length}
+              onPress={() => { void previewWeek(); }} />
+            {preview ? <>
+              <Text accessibilityRole="header" style={[typography.subheading, { marginTop: spacing.md }]}>
+                Your week · {preview.result.additions} meal{preview.result.additions === 1 ? '' : 's'}{preview.result.replaceIds.length ? ` · ${preview.result.replaceIds.length} replaced` : ''}
+              </Text>
+              {preview.result.dailyTotals.map(({ date, totals }) => {
+                const slots = preview.result.slots.filter((slot) => slot.date === date);
+                return <View key={date} style={{ marginTop: spacing.sm, padding: spacing.md, borderRadius: radius.md, backgroundColor: colors.background, borderLeftWidth: 4, borderLeftColor: colors.primary }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <Eyebrow>{formatDay(date)}</Eyebrow>
+                    <Text style={typography.small}>{totals.calories == null ? 'kcal unknown' : `~${Math.round(totals.calories).toLocaleString()} kcal`}</Text>
+                  </View>
+                  {slots.map((slot) => {
+                    const label = MEALS.find((item) => item.key === slot.meal)?.label ?? slot.meal;
+                    const removedTitles = slot.replaceIds.map((id) => {
+                      const entry = entries.find((row) => row.id === id);
+                      return entry ? recipeById.get(entry.recipe_id)?.title ?? 'Unavailable recipe' : id;
+                    });
+                    return <View key={mealSlotKey(slot.date, slot.meal)} style={{ flexDirection: 'row', gap: spacing.sm, paddingVertical: 6 }}>
+                      <Text style={[typography.small, { width: 72 }]}>{label}</Text>
+                      <View style={{ flex: 1 }}>
+                        <Text style={slot.candidate ? typography.body : typography.small} numberOfLines={2}>
+                          {slot.candidate ? slot.candidate.title : slot.reason.startsWith('Preserved') ? 'Keeping what’s planned' : 'No matching recipe'}
+                        </Text>
+                        {removedTitles.length ? <Text style={typography.small}>Replaces {removedTitles.join(', ')}</Text> : null}
+                      </View>
+                      {slot.macros?.calories != null ? <Text style={typography.small}>{Math.round(slot.macros.calories)} kcal</Text> : null}
+                    </View>;
+                  })}
+                  <Disclosure title="Ingredients & macros">
+                    {slots.filter((slot) => slot.candidate).map((slot) => <Text key={mealSlotKey(slot.date, slot.meal)} style={[typography.small, { marginBottom: spacing.xs }]}>
+                      {slot.candidate!.title}: {slot.candidate!.ingredients.map((ingredient) => ingredient.name).join(', ')}{slot.macros ? ` — ${macroText(slot.macros)}` : ''}
+                    </Text>)}
+                    <Text style={typography.small}>Day total (estimate): {macroText(totals)}</Text>
+                  </Disclosure>
+                </View>;
+              })}
+              <Button title="Add to my plan" icon="checkmark" disabled={pending || savingPreferences || !preview.result.additions} onPress={() => { void applyPreview(); }} />
+              <Button title="Discard preview" variant="ghost" disabled={pending} onPress={() => setPreview(null)} />
+            </> : null}
+          </Card> : null}
+
           {targets ? (
             <Card>
               <Text style={typography.label}>Planned {formatDay(selected)}</Text>
@@ -439,59 +545,6 @@ function PlanContent() {
             </Card>
           ) : null}
 
-          {loaded ? <Card>
-            <Disclosure title="Generate a weekly meal plan">
-              <Text style={typography.small}>Week of {formatDay(start)}. Choose days and meals, review the entire preview, then explicitly confirm. Manual Plan controls remain unchanged. No AI or external recipe/nutrition calls.</Text>
-              <Text style={typography.label}>Days to generate</Text>
-              <ChipRow>{Array.from({ length: 7 }, (_, index) => <Chip key={index} label={formatDay(addDays(start, index))} selected={generatorDays.includes(index)} disabled={pending}
-                onPress={() => setGeneratorDays((days) => days.includes(index) ? days.filter((day) => day !== index) : [...days, index].sort())} />)}</ChipRow>
-              <Text style={typography.label}>Meal slots</Text>
-              <ChipRow>{MEALS.map(({ key, label }) => <Chip key={key} label={label} selected={generatorMeals.includes(key)} disabled={pending}
-                onPress={() => setGeneratorMeals((meals) => meals.includes(key) ? meals.filter((meal) => meal !== key) : [...meals, key])} />)}</ChipRow>
-              <TextField label="Saved food exclusions (one food per line or comma)" value={exclusionText} onChangeText={setExclusionText} multiline editable={!pending && !savingPreferences} />
-              <Text style={typography.small}>Saved to this account and applied to recipe titles and every ingredient. Phrase matching is conservative, not allergy certification. Save edits before generating.</Text>
-              {preferenceError ? <Notice tone="danger">{preferenceError}</Notice> : null}
-              {!activePreferences ? <Button title="Load saved exclusions" variant="secondary" disabled={pending} onPress={() => { void loadExclusions(); }} /> : null}
-              <Button title="Save food exclusions" variant="secondary" loading={savingPreferences} disabled={pending || !activePreferences} onPress={() => { void saveExclusions(); }} />
-              <Text style={typography.label}>Occupied slots: select only those you want replaced</Text>
-              {generatorDays.flatMap((index) => generatorMeals.map((meal) => {
-                const date = addDays(start, index);
-                const occupied = entries.filter((entry) => entry.planned_on === date && entry.meal === meal);
-                if (!occupied.length) return null;
-                const key = mealSlotKey(date, meal);
-                const protectedSlot = occupied.some((entry) => entry.logged_at);
-                return <Pressable key={key} accessibilityRole="checkbox" accessibilityState={{ checked: replaceSlots.includes(key), disabled: pending || protectedSlot }}
-                  disabled={pending || protectedSlot} style={{ paddingVertical: spacing.sm, minHeight: 44 }}
-                  onPress={() => setReplaceSlots((slots) => slots.includes(key) ? slots.filter((slot) => slot !== key) : [...slots, key])}>
-                  <Text style={typography.body}>{replaceSlots.includes(key) && !protectedSlot ? '☑' : '☐'} {formatDay(date)} · {meal} {protectedSlot ? '(logged: preserved)' : '(preserved unless checked)'}</Text>
-                  <Text style={typography.small}>{occupied.map((entry) => `${recipeById.get(entry.recipe_id)?.title ?? 'Unavailable recipe'} (${entry.servings} servings)`).join(' · ')}</Text>
-                </Pressable>;
-              }))}
-              <Text style={typography.small}>Goal data: {targets ? macroText(targets) : 'unavailable; no goal-fit claims'}. Preferences: {profile?.diet_prefs.join(', ') || (profile ? 'none' : 'unavailable')}.</Text>
-              <Text style={typography.small}>{intake && intake.owner === session?.user.id && intake.date === today ? 'Uses logged intake only for today; logged plan rows are not counted twice.' : 'Today’s intake unavailable: uses planned meals only, not an assumed zero intake.'} Future/past days use their own plans, never today’s intake. Fixed meal shares (25/30/35/10%) guide remaining budgets; variety is preferred among equally complete recipes. No guarantee of meeting daily targets; 1 serving per generated meal, editable afterward.</Text>
-              <Notice tone="info">All nutrient values are estimates. Missing nutrients remain unknown, not zero. Starter-library recipes are not guaranteed kitchen-tested. Recognizable diet conflicts and saved exclusions are filtered, but recipes are never certified compatible or allergy-safe. Review ingredients, product labels and cross-contact risks before use.</Notice>
-              <Button title="Preview weekly meal plan" disabled={pending || savingPreferences || !activePreferences || !profile || !!error || !generatorDays.length || !generatorMeals.length || exclusionText !== activePreferences.excludedFoods.join('\n')}
-                onPress={generatePreview} />
-              {preview ? <>
-                <Text accessibilityRole="header" style={typography.subheading}>Full weekly preview · {preview.result.additions} additions · {preview.result.replaceIds.length} removals</Text>
-                <Text style={typography.small}>All unselected days/meals and all unchecked occupied slots remain unchanged. Only the replacements listed below are removed after additions succeed.</Text>
-                {preview.result.slots.map((slot) => <View key={mealSlotKey(slot.date, slot.meal)} style={{ marginTop: spacing.md }}>
-                  <Text style={typography.subheading}>{formatDay(slot.date)} · {slot.meal}</Text>
-                  <Text style={typography.body}>{slot.candidate ? `${slot.replaceIds.length ? 'REPLACE' : 'ADD'}: ${slot.candidate.title} · 1 serving · ${slot.candidate.source}` : 'NO CHANGE'}</Text>
-                  {slot.replaceIds.length ? <Text style={typography.small}>Remove: {slot.replaceIds.map((id) => {
-                    const entry = entries.find((entry) => entry.id === id);
-                    return entry ? recipeById.get(entry.recipe_id)?.title ?? 'Unavailable recipe' : id;
-                  }).join(', ')}</Text> : null}
-                  {slot.macros ? <Text style={typography.small}>Estimates: {macroText(slot.macros)}</Text> : null}
-                  {slot.candidate ? <Text style={typography.small}>Ingredients: {slot.candidate.ingredients.map((ingredient) => ingredient.name).join(', ')}</Text> : null}
-                  <Text style={typography.small}>{slot.reason}</Text>
-                </View>)}
-                {preview.result.dailyTotals.map(({ date, totals }) => <Text key={date} style={[typography.small, { marginTop: spacing.sm }]}>{formatDay(date)} final planned totals (estimates, not intake): {macroText(totals)}</Text>)}
-                <Button title="Confirm and add previewed weekly plan" disabled={pending || savingPreferences || !preview.result.additions} onPress={() => { void applyPreview(); }} />
-                <Button title="Discard preview" variant="ghost" disabled={pending} onPress={() => setPreview(null)} />
-              </> : null}
-            </Disclosure>
-          </Card> : null}
 
           {MEALS.map(({ key, label }) => {
             const items = entries.filter((e) => e.planned_on === selected && e.meal === key);

@@ -34,7 +34,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (request.method !== 'GET' || url.origin !== ROOT.origin || !url.pathname.startsWith(ROOT.pathname)) return;
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(async () => {
+    event.respondWith(fetch(request, { cache: 'no-cache' }).catch(async () => {
       const cached = await caches.open(CACHE);
       const shell = await cached.match(new URL('index.html', ROOT).href);
       return shell || Response.error();

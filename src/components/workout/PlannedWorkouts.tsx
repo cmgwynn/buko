@@ -3,6 +3,7 @@ import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { deleteWorkoutPlan, loadWorkoutPlans, planWorkout, startPlannedWorkout, type PlannedWorkoutRow, type RoutineRow } from '../../lib/fitness/data';
 import { useWorkoutRecovery, useWorkoutSession, workoutSessionStore } from '../../lib/fitness/session';
+import { formatDay } from '../../lib/diary';
 import { useSelectedDate } from '../../providers/SelectedDateProvider';
 import { useWorkoutMode } from '../../providers/WorkoutModeProvider';
 import { Button, Card, Chip, ChipRow, Heading, Notice, TextField } from '../ui';
@@ -60,14 +61,14 @@ export function PlannedWorkouts({ routines }: { routines: RoutineRow[] }) {
     if (lock.current) return;
     lock.current = true; setBusy(true);
     try {
-      if (!await confirm({ title: 'Remove planned workout?', message: `${plan.name} will be removed from ${selectedDate}. Completed workouts and the saved routine stay.`, confirmLabel: 'Remove plan', destructive: true })) return;
+      if (!await confirm({ title: 'Remove planned workout?', message: `${plan.name} will be removed from ${formatDay(selectedDate)}. Completed workouts and the saved routine stay.`, confirmLabel: 'Remove plan', destructive: true })) return;
       await deleteWorkoutPlan(plan.id); await load();
     }
     catch (e) { setError(e instanceof Error ? e.message : 'Could not remove the plan.'); }
     finally { lock.current = false; setBusy(false); }
   }
   return <View style={{ marginTop: spacing.lg }}>
-    <Heading>Planned workouts · {selectedDate}</Heading>
+    <Heading>Planned · {formatDay(selectedDate)}</Heading>
     {error ? <Notice tone="danger">{error}</Notice> : null}
     {plans.filter((plan) => plan.planned_for === selectedDate).map((plan) => <Card key={plan.id}>
       <Text style={typography.subheading}>{plan.name}</Text>
@@ -77,7 +78,7 @@ export function PlannedWorkouts({ routines }: { routines: RoutineRow[] }) {
       <Button title={`Remove plan for ${plan.name}`} variant="ghost" disabled={busy || online === false} onPress={() => { void remove(plan); }} />
     </Card>)}
     {planning ? <Card>
-      <Text style={typography.subheading}>Plan a saved routine for {selectedDate}</Text>
+      <Text style={typography.subheading}>Plan a saved routine for {formatDay(selectedDate)}</Text>
       {!routines.length ? <Text style={typography.small}>Create a routine first.</Text> : <ChipRow>{routines.map((routine) => <Chip key={routine.id} label={routine.name} selected={routine.id === routineId} onPress={() => setRoutineId(routine.id)} />)}</ChipRow>}
       <TextField label="Plan notes (optional)" multiline maxLength={2000} value={notes} onChangeText={setNotes} />
       <Button title="Save workout plan" loading={busy} disabled={!routineId || online === false} onPress={() => { void save(); }} />

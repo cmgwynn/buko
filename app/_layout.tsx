@@ -91,6 +91,7 @@ function Gate() {
         <Stack.Screen name="grocery/generate" options={{ ...headerOptions, title: 'Grocery list from plan' }} />
         <Stack.Screen name="pantry" options={{ ...headerOptions, title: 'Pantry' }} />
         <Stack.Screen name="workout/start" options={{ ...workoutHeaderOptions, title: 'Start workout' }} />
+        <Stack.Screen name="workout/plan" options={{ ...workoutHeaderOptions, title: 'Training plan' }} />
         <Stack.Screen name="workout/active" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="workout/finish" options={{ headerShown: false, gestureEnabled: false }} />
         <Stack.Screen name="workout/exercises" options={{ ...workoutHeaderOptions, title: 'Exercises' }} />

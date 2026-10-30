@@ -1,8 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
-import { Button, Card, Heading, Loading, Notice, Screen } from '../../src/components/ui';
-import { WeeklyTrainingPlan } from '../../src/components/workout/WeeklyTrainingPlan';
+import { Button, Card, Heading, Loading, NavigationRow, Notice, Screen } from '../../src/components/ui';
 import { loadRoutines, routineToItems, type RoutineRow } from '../../src/lib/fitness/data';
 import { getSession, startSession, useWorkoutRecovery, useWorkoutSession, workoutSessionStore } from '../../src/lib/fitness/session';
 import { spacing, typography } from '../../src/theme';
@@ -57,11 +56,13 @@ export default function StartWorkout() {
       </Card> : null}
       <Button title="Start empty workout" variant={routine ? 'secondary' : 'primary'} loading={busy} disabled={!recovery.ready} onPress={() => { void begin(); }} />
       {!routineId ? <>
-        <View style={{ height: spacing.lg }} /><Heading>Or choose a saved routine</Heading>
-        {loading ? <Loading /> : routines.map((row) => <Card key={row.id}><Text style={typography.subheading}>{row.name}</Text>
+        {loading ? <Loading /> : routines.length ? <><View style={{ height: spacing.lg }} /><Heading>Or choose a saved routine</Heading></> : null}
+        {loading ? null : routines.map((row) => <Card key={row.id}><Text style={typography.subheading}>{row.name}</Text>
           <Button title={`Use ${row.name}`} variant="secondary" disabled={busy} onPress={() => router.setParams({ routine: row.id })} /></Card>)}
       </> : null}
-      <WeeklyTrainingPlan disabled={busy || !recovery.ready} />
+      <Card>
+        <NavigationRow title="Build a 4-week training plan" subtitle="Run + strength, ramped to your days" icon="sparkles-outline" onPress={() => router.push('/workout/plan')} />
+      </Card>
     </>}
   </Screen>;
 }
