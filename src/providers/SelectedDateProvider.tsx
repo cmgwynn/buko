@@ -70,6 +70,11 @@ export function SelectedDateProvider({ children }: PropsWithChildren) {
   return <SelectedDateContext.Provider value={value}>{children}</SelectedDateContext.Provider>;
 }
 
+/** For components that also render outside the provider (e.g. standalone date fields). */
+export function useOptionalSelectedDate(): SelectedDateContextValue | null {
+  return useContext(SelectedDateContext);
+}
+
 export function useSelectedDate(): SelectedDateContextValue {
   const context = useContext(SelectedDateContext);
   if (!context) throw new Error('useSelectedDate must be used within SelectedDateProvider.');

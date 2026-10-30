@@ -72,7 +72,8 @@
             "./assets/sounds/buko_rest_cue.wav"
           ]
         }
-      ]
+      ],
+      "expo-asset"
     ],
     "ios": {
       "supportsTablet": false,

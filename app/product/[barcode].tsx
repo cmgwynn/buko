@@ -30,6 +30,8 @@ export default function ProductScreen() {
   const [addError, setAddError] = useState<string | null>(null);
   const [showFactors, setShowFactors] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [altsFailed, setAltsFailed] = useState(false);
+  const [altsAttempt, setAltsAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -52,11 +54,12 @@ export default function ProductScreen() {
   useEffect(() => {
     if (!product || !result) return;
     let cancelled = false;
+    setAlts(null); setAltsFailed(false);
     findAlternatives(product, result)
       .then((a) => { if (!cancelled) setAlts(a); })
-      .catch(() => { if (!cancelled) setAlts([]); });
+      .catch(() => { if (!cancelled) { setAlts([]); setAltsFailed(true); } });
     return () => { cancelled = true; };
-  }, [product, result]);
+  }, [product, result, altsAttempt]);
 
   async function addToGrocery() {
     if (!product || !session) return;
@@ -155,7 +158,11 @@ export default function ProductScreen() {
           <Heading>Better alternatives</Heading>
           <View style={{ height: spacing.md }} />
           {alts === null ? <Body muted>Looking for higher-scoring products in the same category…</Body> : null}
-          {alts?.length === 0 ? <Body muted>We couldn&apos;t find clearly better products in this category.</Body> : null}
+          {alts?.length === 0 && altsFailed ? <>
+            <Body muted>The food database is busy, so alternatives couldn&apos;t load.</Body>
+            <Button title="Try again" variant="secondary" onPress={() => setAltsAttempt((n) => n + 1)} />
+          </> : null}
+          {alts?.length === 0 && !altsFailed ? <Body muted>We couldn&apos;t find clearly better products in this category.</Body> : null}
           {alts?.map(({ product: a, result: r }) => (
             <Pressable key={a.barcode} accessibilityRole="button" accessibilityLabel={`${a.name}, score ${r.score ?? 'unknown'}`} onPress={() => router.push({ pathname: '/product/[barcode]', params: { barcode: a.barcode } })}>
               <Card style={{ flexDirection: 'row', alignItems: 'center' }}>

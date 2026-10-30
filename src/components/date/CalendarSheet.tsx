@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Pressable, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { addLocalDays, addLocalMonths, assertDateString, formatLocalDate, localDateStartIso, monthRange, parseLocalDate } from '../../lib/dates';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../providers/AuthProvider';
-import { useSelectedDate } from '../../providers/SelectedDateProvider';
+import { useOptionalSelectedDate } from '../../providers/SelectedDateProvider';
 import { colors, radius, spacing, typography } from '../../theme';
 import { subscribeToDateHistoryInvalidation } from './dateHistory';
 import { loadHistoryPages } from './historyPages';
@@ -16,17 +16,28 @@ interface CalendarSheetProps {
   selectedDate?: string;
   onSelect?: (date: string) => void;
   maxDate?: string;
+  minDate?: string;
+  /** Month to show when nothing is selected yet (selectedDate ''). */
+  openTo?: string;
+  /** Food/workout dots; off for fields like birthdays where history is irrelevant. */
+  showHistory?: boolean;
 }
 
-export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp, onSelect, maxDate: maxDateProp }: CalendarSheetProps) {
+export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp, onSelect, maxDate: maxDateProp, minDate: minDateProp, openTo, showHistory = true }: CalendarSheetProps) {
   const { session } = useAuth();
   const reducedMotion = useReducedMotion();
-  const context = useSelectedDate();
-  const selectedDate = assertDateString(selectedDateProp ?? context.selectedDate);
-  const selectDate = onSelect ?? context.setSelectedDate;
+  const context = useOptionalSelectedDate();
+  const rawSelected = selectedDateProp ?? context?.selectedDate ?? '';
+  const selectedDate = rawSelected ? assertDateString(rawSelected) : '';
+  const selectDate = onSelect ?? context?.setSelectedDate ?? (() => {});
   const maxDate = maxDateProp == null ? null : assertDateString(maxDateProp);
-  const today = context.today;
-  const [month, setMonth] = useState(() => `${selectedDate.slice(0, 7)}-01`);
+  const minDate = minDateProp == null ? null : assertDateString(minDateProp);
+  const today = context?.today ?? formatLocalDate();
+  const anchor = selectedDate || (openTo ? assertDateString(openTo) : today);
+  const [month, setMonth] = useState(() => `${anchor.slice(0, 7)}-01`);
+  const [pickingYear, setPickingYear] = useState(false);
+  const firstYear = Number((minDate ?? '1900').slice(0, 4));
+  const lastYear = Number((maxDate ?? '2100').slice(0, 4));
   const [foodDays, setFoodDays] = useState<Set<string>>(() => new Set());
   const [workoutDays, setWorkoutDays] = useState<Set<string>>(() => new Set());
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +52,7 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
   const reloadHistory = useCallback(async () => {
     const request = ++requestId.current;
     const isCurrent = () => request === requestId.current && currentHistoryKey.current === historyKey;
-    if (!visible || !session) {
+    if (!visible || !session || !showHistory) {
       setFoodDays(new Set());
       setWorkoutDays(new Set());
       setError(null);
@@ -73,11 +84,11 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
       if (isCurrent()) setError(`Could not load date history: ${(err as Error).message}`);
     }
     if (isCurrent()) setLoading(false);
-  }, [historyKey, range.end, range.start, session, visible]);
+  }, [historyKey, range.end, range.start, session, visible, showHistory]);
 
   useEffect(() => {
-    if (visible) setMonth(`${selectedDate.slice(0, 7)}-01`);
-  }, [selectedDate, visible]);
+    if (visible) { setMonth(`${anchor.slice(0, 7)}-01`); setPickingYear(false); }
+  }, [anchor, visible]);
 
   useEffect(() => {
     void reloadHistory();
@@ -94,7 +105,7 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
 
   function selectDay(day: number) {
     const date = `${month.slice(0, 7)}-${String(day).padStart(2, '0')}`;
-    if (maxDate && date > maxDate) return;
+    if ((maxDate && date > maxDate) || (minDate && date < minDate)) return;
     selectDate(date);
     onClose();
   }
@@ -119,9 +130,12 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
             <Pressable accessibilityRole="button" accessibilityLabel="Previous month" disabled={month <= '1900-01-01'} onPress={() => changeMonth(-1)} style={{ minWidth: 42, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="chevron-back" size={22} color={colors.primary} />
             </Pressable>
-            <Text accessibilityLiveRegion="polite" style={[typography.subheading, { flex: 1, textAlign: 'center' }]}>
-              {monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
-            </Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={`${monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}, choose year`} accessibilityState={{ expanded: pickingYear }} onPress={() => setPickingYear((open) => !open)} style={{ flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+              <Text accessibilityLiveRegion="polite" style={typography.subheading}>
+                {monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              </Text>
+              <Ionicons name={pickingYear ? 'chevron-up' : 'chevron-down'} size={16} color={colors.primary} />
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Next month" disabled={month >= '2100-12-01'} onPress={() => changeMonth(1)} style={{ minWidth: 42, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
               <Ionicons name="chevron-forward" size={22} color={colors.primary} />
             </Pressable>
@@ -129,6 +143,20 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
               <Ionicons name="chevron-forward" size={18} color={colors.primary} />
             </Pressable>
           </View>
+          {pickingYear ? (
+            <ScrollView style={{ maxHeight: 300 }} contentContainerStyle={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+              {Array.from({ length: lastYear - firstYear + 1 }, (_, index) => lastYear - index).map((year) => {
+                const current = String(year) === month.slice(0, 4);
+                return (
+                  <Pressable key={year} accessibilityRole="button" accessibilityLabel={`Year ${year}`} accessibilityState={{ selected: current }}
+                    onPress={() => { setMonth(`${year}-${month.slice(5, 7)}-01`); setPickingYear(false); }}
+                    style={{ width: '25%', height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: current ? colors.primary : 'transparent' }}>
+                    <Text style={[typography.body, current && { color: colors.onPrimary }]}>{year}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : <>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around', marginBottom: spacing.xs }}>
             {weekdays.map((weekday, index) => <Text key={`${weekday}-${index}`} style={[typography.label, { width: '13%', textAlign: 'center' }]}>{weekday}</Text>)}
           </View>
@@ -137,7 +165,7 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
               if (day == null) return <View key={`blank-${index}`} style={{ width: '14.28%', height: 48 }} />;
               const date = `${month.slice(0, 7)}-${String(day).padStart(2, '0')}`;
               const selected = date === selectedDate;
-              const disabled = date < '1900-01-01' || date > '2100-12-31' || (maxDate != null && date > maxDate);
+              const disabled = date < '1900-01-01' || date > '2100-12-31' || (maxDate != null && date > maxDate) || (minDate != null && date < minDate);
               const hasFood = loadedKey === historyKey && foodDays.has(date);
               const hasWorkout = loadedKey === historyKey && workoutDays.has(date);
               return (
@@ -159,9 +187,10 @@ export function CalendarSheet({ visible, onClose, selectedDate: selectedDateProp
               );
             })}
           </View>
-          {loading ? <Text style={[typography.small, { marginTop: spacing.sm }]}>Loading date history…</Text> : null}
-          {error ? <Text accessibilityRole="alert" style={[typography.small, { color: colors.danger, marginTop: spacing.sm }]}>{error}</Text> : null}
-          <Text style={[typography.small, { marginTop: spacing.sm }]}>Dots mark days with food or workouts logged. Future dates are available for planning.</Text>
+          </>}
+          {showHistory && loading ? <Text style={[typography.small, { marginTop: spacing.sm }]}>Loading date history…</Text> : null}
+          {showHistory && error ? <Text accessibilityRole="alert" style={[typography.small, { color: colors.danger, marginTop: spacing.sm }]}>{error}</Text> : null}
+          {showHistory ? <Text style={[typography.small, { marginTop: spacing.sm }]}>Dots mark days with food or workouts logged. Future dates are available for planning.</Text> : null}
           <Pressable accessibilityRole="button" onPress={onClose} style={{ alignSelf: 'flex-end', marginTop: spacing.md, padding: spacing.sm }}>
             <Text style={[typography.body, { color: colors.primary }]}>Close</Text>
           </Pressable>

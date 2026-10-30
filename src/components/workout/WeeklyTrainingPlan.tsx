@@ -17,6 +17,7 @@ import { toDateString } from '../../lib/diary';
 import type { Exercise, WorkoutSet } from '../../lib/fitness/types';
 import { Button, Card, Chip, ChipRow, Disclosure, Eyebrow, Heading, Notice, TextField } from '../ui';
 import { useConfirm } from '../ConfirmProvider';
+import { DateField } from '../date/DateField';
 import { colors, radius, spacing, typography } from '../../theme';
 
 const KIND_ACCENT = { run: colors.primary, strength: colors.macro.protein, rest: colors.score.unknown } as const;
@@ -193,7 +194,7 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
         <Chip label="Tomorrow" selected={input.startDate === trainingAddDays(today, 1)} disabled={off} onPress={() => changeInput({ startDate: trainingAddDays(today, 1) })} />
         <Chip label="Next Monday" selected={input.startDate === nextMonday(today)} disabled={off} onPress={() => changeInput({ startDate: nextMonday(today) })} />
       </ChipRow>
-      <TextField label="Training start date (YYYY-MM-DD)" value={input.startDate} editable={!off} onChangeText={(startDate) => changeInput({ startDate })} />
+      <DateField label="Or pick a start date" value={input.startDate} minDate={today} disabled={off} onChange={(startDate) => changeInput({ startDate })} />
       <Eyebrow>2 · Your run days</Eyebrow>
       <ChipRow>{TRAINING_DAYS.map((day, index) => <Chip key={day} label={day} selected={input.preferredRunDays.includes(index)} disabled={off}
         onPress={() => changeInput({ preferredRunDays: input.preferredRunDays.includes(index) ? input.preferredRunDays.filter((value) => value !== index) : [...input.preferredRunDays, index] })} />)}</ChipRow>
@@ -246,7 +247,7 @@ export function WeeklyTrainingPlan({ disabled = false, autoOpen = false }: { dis
             {day.save && !day.replaceId && existing.some((plan) => plan.planned_for === day.date) ? <Notice tone="info">This adds alongside existing plans; none will be replaced.</Notice> : null}
             <Disclosure title={`Adjust workout ${index + 1}`}>
             <Text style={typography.small}>{day.rationale}</Text>
-            <TextField label={`Workout ${index + 1} date`} value={day.date} editable={!off} onChangeText={(date) => patchDay(index, { date, replaceId: null, save: false })} />
+            <DateField label={`Workout ${index + 1} date`} value={day.date} minDate={today} disabled={off} onChange={(date) => patchDay(index, { date, replaceId: null, save: false })} />
             <TextField label={`Workout ${index + 1} name`} value={day.name} maxLength={100} editable={!off} onChangeText={(name) => patchDay(index, { name })} />
             <TextField label={`Workout ${index + 1} notes`} value={day.notes} multiline maxLength={2000} editable={!off} onChangeText={(notes) => patchDay(index, { notes })} />
             <TextField label={`Find replacement exercises for workout ${index + 1}`} value={exerciseSearch} editable={!off} onChangeText={setExerciseSearch} />

@@ -34,6 +34,12 @@ jest.mock('../../../providers/AuthProvider', () => ({ useAuth: () => ({ session:
 jest.mock('../../../providers/ProfileProvider', () => ({ useProfile: () => ({ profile: { units: 'metric' } }) }));
 jest.mock('../../../providers/BillingProvider', () => ({ useBilling: () => ({ allowed: mockAllowed }) }));
 jest.mock('expo-router', () => ({ useRouter: () => ({ push: mockPush }) }));
+jest.mock('../../../components/date/DateField', () => {
+  const React = require('react');
+  const { TextInput } = require('react-native');
+  return { DateField: ({ label, value, onChange }: { label: string; value: string; onChange: (date: string) => void }) =>
+    React.createElement(TextInput, { accessibilityLabel: label, value, onChangeText: onChange }) };
+});
 jest.mock('../../../components/ConfirmProvider', () => ({ useConfirm: () => mockConfirm }));
 jest.mock('../../../components/ui', () => {
   const React = require('react');
@@ -82,8 +88,8 @@ beforeEach(() => {
 async function open() {
   await render(<WeeklyTrainingPlan />);
   await fireEvent.press(screen.getByRole('button', { name: 'Build a weekly training plan' }));
-  await screen.findByLabelText('Training start date (YYYY-MM-DD)');
-  await fireEvent.changeText(screen.getByLabelText('Training start date (YYYY-MM-DD)'), mockStartDate);
+  await screen.findByLabelText('Or pick a start date');
+  await fireEvent.changeText(screen.getByLabelText('Or pick a start date'), mockStartDate);
 }
 async function preview() {
   await open();
@@ -192,7 +198,7 @@ test('account changes clear the previous account preview and saved exclusions', 
 
 test('autoOpen loads the setup form on arrival without generating or saving', async () => {
   await render(<WeeklyTrainingPlan autoOpen />);
-  expect(await screen.findByLabelText('Training start date (YYYY-MM-DD)')).toBeTruthy();
+  expect(await screen.findByLabelText('Or pick a start date')).toBeTruthy();
   expect(screen.queryByText('Review all four weeks')).toBeNull();
   expect(mockSaveSlot).not.toHaveBeenCalled();
 });

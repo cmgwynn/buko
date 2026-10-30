@@ -11,6 +11,7 @@ import {
   COACH_CONSENT_VERSION, COACH_NOTICE, type CoachAction, type CoachFocus, type CoachPreferences,
   type CoachReply, type WeeklyFacts,
 } from '../src/lib/coach/types';
+import { DateField } from '../src/components/date/DateField';
 import { useAuth } from '../src/providers/AuthProvider';
 import { useBilling } from '../src/providers/BillingProvider';
 import { useProfile } from '../src/providers/ProfileProvider';
@@ -97,7 +98,7 @@ export default function Coach() {
     if (!selected || busy) return;
     if (!billing.allowed) { router.push({ pathname: '/premium', params: { from: 'coach' } }); return; }
     if (selected.kind === 'recipe' && (!calendarDate(day) || !Number.isFinite(Number(servings)) || Number(servings) < 0.25 || Number(servings) > 20)) {
-      setError('Choose a valid date (YYYY-MM-DD) and servings between 0.25 and 20.'); return;
+      setError('Choose a plan date and servings between 0.25 and 20.'); return;
     }
     setBusy(true); setError(null);
     try {
@@ -195,7 +196,7 @@ export default function Coach() {
         <Card>
           <Heading>Confirm suggestion</Heading><Body>{selected.title}</Body><Body muted>{selected.detail}</Body>
           {selected.kind === 'recipe' ? <>
-            <TextField label="Plan date (YYYY-MM-DD)" value={day} onChangeText={setDay} />
+            <DateField label="Plan date" value={day} minDate={today} onChange={setDay} />
             <ChipRow>{['breakfast', 'lunch', 'dinner', 'snack'].map((value) => <Chip key={value} label={value} selected={meal === value} onPress={() => setMeal(value)} />)}</ChipRow>
             <TextField label="Servings to plan" value={servings} onChangeText={setServings} keyboardType="decimal-pad" />
           </> : <Body muted>Adds one grocery item. It does not remove your original item or guarantee availability/allergen suitability.</Body>}

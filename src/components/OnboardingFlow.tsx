@@ -10,6 +10,8 @@ import { useAuth } from '../providers/AuthProvider';
 import { useProfile } from '../providers/ProfileProvider';
 import { colors, radius, spacing, typography } from '../theme';
 import { accountStorageWrites } from '../lib/account/storageWrites';
+import { addLocalDays, addLocalMonths } from '../lib/dates';
+import { DateField } from './date/DateField';
 import { onboardingDraftKey, parseOnboardingDraft } from '../lib/nutrition/onboardingDraft';
 import { signOutSafely } from '../lib/recovery';
 import type { ActivityLevel, DietPref, Goal, Sex, Units } from '../types';
@@ -205,11 +207,10 @@ export function OnboardingFlow({ editing = false }: { editing?: boolean }) {
           <Label>Birthday</Label>
           <Body muted>Your birthday stays in your private profile. Age and formula-based targets update automatically on your birthday.</Body>
           {profile && !profile.birth_date ? <Notice tone="info">We previously stored only an approximate birth year. Please enter your actual birthday once; we will not guess it.</Notice> : null}
-          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
-            <View style={{ flex: 1 }}><TextField label="Month" value={birthMonth} onChangeText={setBirthMonth} keyboardType="number-pad" maxLength={2} placeholder="MM" /></View>
-            <View style={{ flex: 1 }}><TextField label="Day" value={birthDay} onChangeText={setBirthDay} keyboardType="number-pad" maxLength={2} placeholder="DD" /></View>
-            <View style={{ flex: 1.4 }}><TextField label="Year" value={birthYear} onChangeText={setBirthYear} keyboardType="number-pad" maxLength={4} placeholder="YYYY" /></View>
-          </View>
+          <DateField label="Birthday" placeholder="Choose your birthday" value={birthDate}
+            maxDate={addLocalMonths(today, -12 * MIN_AGE)} minDate={addLocalDays(addLocalMonths(today, -12 * 101), 1)} openTo={addLocalMonths(today, -12 * 30)}
+            onChange={(date) => { setBirthYear(date.slice(0, 4)); setBirthMonth(date.slice(5, 7)); setBirthDay(date.slice(8, 10)); }} />
+          <Body muted>Tip: tap the month and year at the top of the calendar to jump straight to your birth year.</Body>
           {birthYear || birthMonth || birthDay ? (
             ageOk ? <Body muted>Age {ageNum} · updates automatically</Body>
               : <Notice tone="danger">Enter a valid birthday. Buko is for adults aged {MIN_AGE}–100.</Notice>
